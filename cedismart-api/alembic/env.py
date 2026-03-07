@@ -15,12 +15,11 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models so that Base.metadata is fully populated.
-# As models are implemented in later prompts, add imports here:
-# from app.modules.auth.models import User  # noqa: F401
-# from app.modules.accounts.models import FinancialAccount  # noqa: F401
-# from app.modules.transactions.models import Transaction  # noqa: F401
-# from app.modules.categories.models import Category  # noqa: F401
-# from app.modules.budgets.models import Budget  # noqa: F401
+from app.modules.auth.models import User  # noqa: F401
+from app.modules.accounts.models import FinancialAccount  # noqa: F401
+from app.modules.transactions.models import Transaction  # noqa: F401
+from app.modules.categories.models import Category  # noqa: F401
+from app.modules.budgets.models import Budget  # noqa: F401
 
 config = context.config
 

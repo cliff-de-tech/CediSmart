@@ -37,3 +37,7 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
+
+# Main Blueprint and Gemini
+budget-app-blueprint.md
+GEMINI.md
