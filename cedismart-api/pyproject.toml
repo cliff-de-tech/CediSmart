@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "cedismart-api"
+version = "0.1.0"
+description = "CediSmart — Production-grade fintech budget management API for Ghana"
+requires-python = ">=3.11"
+readme = "README.md"
+
+dependencies = [
+    "fastapi==0.115.6",
+    "uvicorn[standard]==0.34.0",
+    "sqlalchemy[asyncio]==2.0.36",
+    "asyncpg==0.30.0",
+    "alembic==1.14.1",
+    "pydantic-settings==2.7.1",
+    "pydantic[email]==2.10.5",
+    "redis[asyncio]==5.2.1",
+    "bcrypt==4.2.1",
+    "python-jose[cryptography]==3.3.0",
+    "slowapi==0.1.9",
+    "httpx==0.28.1",
+    "cryptography==44.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.25.2",
+    "httpx==0.28.1",
+    "ruff==0.9.4",
+    "black==24.10.0",
+    "mypy==1.14.1",
+    "bandit==1.8.3",
+    "aiosqlite==0.20.0",
+    "coverage==7.6.10",
+    "pytest-cov==6.0.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH"]
+ignore = ["A003"]
+
+[tool.ruff.isort]
+known-first-party = ["app"]
+
+[tool.black]
+target-version = ["py311"]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/core/config.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
