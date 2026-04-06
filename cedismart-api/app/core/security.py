@@ -81,12 +81,17 @@ def create_access_token(user_id: UUID, expires_delta: timedelta | None = None) -
     return jwt.encode(payload, _load_private_key(), algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(user_id: UUID, expires_delta: timedelta | None = None) -> str:
+def create_refresh_token(
+    user_id: UUID,
+    expires_delta: timedelta | None = None,
+    jti: str | None = None,
+) -> str:
     """Create a long-lived JWT refresh token.
 
     Args:
         user_id: The authenticated user's UUID.
         expires_delta: Optional custom expiry. Defaults to REFRESH_TOKEN_EXPIRE_DAYS.
+        jti: Optional JWT ID for per-token revocation tracking in Redis.
 
     Returns:
         Encoded JWT string.
@@ -95,12 +100,14 @@ def create_refresh_token(user_id: UUID, expires_delta: timedelta | None = None) 
         expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     now = datetime.now(timezone.utc)
-    payload = {
+    payload: dict[str, object] = {
         "sub": str(user_id),
         "type": "refresh",
         "iat": now,
         "exp": now + expires_delta,
     }
+    if jti is not None:
+        payload["jti"] = jti
     return jwt.encode(payload, _load_private_key(), algorithm=settings.ALGORITHM)
 
 

@@ -1,0 +1,62 @@
+name: Backend Deploy
+
+# Only deploy when code lands on main — never on feature branches
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cedismart-api/**"
+      - ".github/workflows/backend-deploy.yml"
+
+defaults:
+  run:
+    working-directory: cedismart-api
+
+jobs:
+  deploy:
+    name: Deploy to Railway
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Railway
+        uses: railwayapp/railway-github-action@v1
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          # Deploy the cedismart-api service defined in Railway project
+          service: cedismart-api
+
+      - name: Health check — verify deployment is live
+        # Wait for Railway to finish deploying before hitting the health endpoint
+        run: |
+          echo "Waiting 30s for Railway deployment to stabilise..."
+          sleep 30
+
+          HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+            --max-time 15 \
+            "${{ secrets.PRODUCTION_API_URL }}/health")
+
+          echo "Health check responded with HTTP $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Health check FAILED (expected 200, got $HTTP_STATUS)"
+            exit 1
+          fi
+
+          echo "Health check passed."
+
+      - name: Notify Slack on deployment failure
+        if: failure()
+        # Only runs if a previous step in this job failed
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          payload: |
+            {
+              "text": ":red_circle: *CediSmart API deployment FAILED* on `main`.\nCommit: ${{ github.sha }}\nAuthor: ${{ github.actor }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }
+        env:
+          # SLACK_WEBHOOK_URL is stored as a secret — never log it
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

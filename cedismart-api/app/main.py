@@ -9,6 +9,8 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 
 from fastapi import FastAPI, Request, Response
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -53,12 +55,17 @@ def create_app() -> FastAPI:
 
     # -- Exception handlers --
     register_exception_handlers(app)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # -- Middleware --
     _add_middleware(app)
 
     # -- Routers --
     _include_routers(app)
+
+    # -- Attach slowapi limiter to app state (required for rate limiting) --
+    from app.modules.auth.router import limiter
+    app.state.limiter = limiter
 
     # -- Health check --
     @app.get("/health", tags=["Health"])
@@ -111,27 +118,27 @@ def _add_middleware(app: FastAPI) -> None:
 
 def _include_routers(app: FastAPI) -> None:
     """Include all module routers under /api/v1/."""
-    # Module routers will be imported and included here as they are built.
-    # Example (uncomment as modules are implemented):
-    #
-    # from app.modules.auth.router import router as auth_router
-    # app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
-    #
-    # from app.modules.accounts.router import router as accounts_router
-    # app.include_router(accounts_router, prefix="/api/v1/accounts", tags=["Accounts"])
-    #
-    # from app.modules.transactions.router import router as transactions_router
-    # app.include_router(transactions_router, prefix="/api/v1/transactions", tags=["Transactions"])
-    #
-    # from app.modules.categories.router import router as categories_router
-    # app.include_router(categories_router, prefix="/api/v1/categories", tags=["Categories"])
-    #
-    # from app.modules.budgets.router import router as budgets_router
-    # app.include_router(budgets_router, prefix="/api/v1/budgets", tags=["Budgets"])
-    #
-    # from app.modules.reports.router import router as reports_router
-    # app.include_router(reports_router, prefix="/api/v1/reports", tags=["Reports"])
-    pass
+    from app.modules.auth.router import router as auth_router
+    app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
+
+    from app.modules.users.router import router as users_router
+    app.include_router(users_router, prefix="/api/v1/users", tags=["Users"])
+
+    from app.modules.accounts.router import router as accounts_router
+    app.include_router(accounts_router, prefix="/api/v1/accounts", tags=["Accounts"])
+
+    from app.modules.categories.router import router as categories_router
+    app.include_router(categories_router, prefix="/api/v1/categories", tags=["Categories"])
+
+    from app.modules.transactions.router import router as transactions_router
+    app.include_router(transactions_router, prefix="/api/v1/transactions", tags=["Transactions"])
+
+    from app.modules.budgets.router import router as budgets_router
+    app.include_router(budgets_router, prefix="/api/v1/budgets", tags=["Budgets"])
+
+    from app.modules.reports.router import router as reports_router
+    app.include_router(reports_router, prefix="/api/v1/reports", tags=["Reports"])
+
 
 
 # ---------------------------------------------------------------------------
