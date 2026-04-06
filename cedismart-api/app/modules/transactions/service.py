@@ -11,6 +11,7 @@ Business rules enforced here:
 - All DB aggregation is in SQL — never loop and sum in Python.
 """
 
+import asyncio
 import json
 import logging
 import uuid
@@ -59,12 +60,8 @@ async def _invalidate_caches(
 ) -> None:
     """Invalidate summary, budget, and report caches for the affected month."""
     await redis.delete(_summary_cache_key(user_id))
-    await invalidate_budget_cache(
-        user_id, transaction_date.year, transaction_date.month, redis
-    )
-    await invalidate_report_cache(
-        user_id, transaction_date.year, transaction_date.month, redis
-    )
+    await invalidate_budget_cache(user_id, transaction_date.year, transaction_date.month, redis)
+    await invalidate_report_cache(user_id, transaction_date.year, transaction_date.month, redis)
 
 
 # ---------------------------------------------------------------------------
@@ -353,16 +350,20 @@ async def bulk_create_transactions(
 
     # --- Preload all valid IDs in 3 queries (not per-item) ---
 
-    # 1. Existing client_ids to detect duplicates
-    existing_result = await db.execute(
-        select(Transaction.client_id).where(
-            Transaction.user_id == user_id,
-            Transaction.client_id.is_not(None),
-        )
-    )
-    existing_client_ids: set[uuid.UUID] = {
-        row[0] for row in existing_result.all()
+    # 1. Existing client_ids — query only against incoming IDs to avoid full-table scan
+    incoming_client_ids: set[uuid.UUID] = {
+        item.client_id for item in payload.transactions if item.client_id is not None
     }
+    if incoming_client_ids:
+        existing_result = await db.execute(
+            select(Transaction.client_id).where(
+                Transaction.user_id == user_id,
+                Transaction.client_id.in_(incoming_client_ids),
+            )
+        )
+        existing_client_ids: set[uuid.UUID] = {row[0] for row in existing_result.all()}
+    else:
+        existing_client_ids = set()
 
     # 2. All active account IDs owned by this user
     accounts_result = await db.execute(
@@ -384,21 +385,19 @@ async def bulk_create_transactions(
     )
     valid_category_ids: set[uuid.UUID] = {row[0] for row in categories_result.all()}
 
+    affected_months: set[tuple[int, int]] = set()
+
     for item in payload.transactions:
         if item.client_id in existing_client_ids:
             skipped += 1
             continue
 
         if item.account_id not in valid_account_ids:
-            errors.append(
-                BulkErrorItem(client_id=item.client_id, reason="Account not found")
-            )
+            errors.append(BulkErrorItem(client_id=item.client_id, reason="Account not found"))
             continue
 
         if item.category_id not in valid_category_ids:
-            errors.append(
-                BulkErrorItem(client_id=item.client_id, reason="Category not found")
-            )
+            errors.append(BulkErrorItem(client_id=item.client_id, reason="Category not found"))
             continue
 
         tx = Transaction(
@@ -414,14 +413,18 @@ async def bulk_create_transactions(
         )
         db.add(tx)
         existing_client_ids.add(item.client_id)  # prevent in-batch duplicates
+        affected_months.add((item.transaction_date.year, item.transaction_date.month))
         created += 1
 
     if created > 0:
         await db.flush()
-        # Invalidate for current month — bulk sync items may span multiple months
-        # but we conservatively invalidate for today's month (covers most cases)
-        today = datetime.now(timezone.utc).date()
-        await _invalidate_caches(user_id, today, redis)
+        # Invalidate caches concurrently for every distinct (year, month) touched by created transactions
+        await asyncio.gather(
+            *[
+                _invalidate_caches(user_id, date(year, month, 1), redis)
+                for year, month in affected_months
+            ]
+        )
 
     return {"created": created, "skipped": skipped, "errors": errors}
 

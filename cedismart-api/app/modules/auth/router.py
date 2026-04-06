@@ -216,7 +216,10 @@ async def pin_reset_initiate(
         db=db,
         redis=redis,
     )
-    return MessageResponse(message="If this number is registered, an OTP has been sent", expires_in=expires_in)
+    return MessageResponse(
+        message="If this number is registered, an OTP has been sent",
+        expires_in=expires_in,
+    )
 
 
 # ---------------------------------------------------------------------------

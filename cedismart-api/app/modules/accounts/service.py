@@ -105,6 +105,7 @@ async def _compute_balances(
         .outerjoin(
             Transaction,
             (Transaction.account_id == FinancialAccount.id)
+            & (Transaction.user_id == user_id)
             & (Transaction.is_deleted.is_(False)),
         )
         .where(FinancialAccount.user_id == user_id)
@@ -311,7 +312,8 @@ async def delete_account(
 
     tx_count_result = await db.execute(
         select(func.count(Transaction.id)).where(
-            Transaction.account_id == account_id
+            Transaction.account_id == account_id,
+            Transaction.user_id == user_id,
         )
     )
     tx_count = tx_count_result.scalar_one()

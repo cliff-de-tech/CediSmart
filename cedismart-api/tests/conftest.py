@@ -23,10 +23,14 @@ if not os.environ.get("RSA_PRIVATE_KEY"):
         _ser.PrivateFormat.TraditionalOpenSSL,
         _ser.NoEncryption(),
     ).decode()
-    os.environ["RSA_PUBLIC_KEY"] = _priv.public_key().public_bytes(
-        _ser.Encoding.PEM,
-        _ser.PublicFormat.SubjectPublicKeyInfo,
-    ).decode()
+    os.environ["RSA_PUBLIC_KEY"] = (
+        _priv.public_key()
+        .public_bytes(
+            _ser.Encoding.PEM,
+            _ser.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode()
+    )
 
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
@@ -51,7 +55,7 @@ from app.main import app
 from app.modules.auth.models import User
 
 # ---------------------------------------------------------------------------
-# Test database — SQLite for speed; CI overrides via TEST_DATABASE_URL env var
+# Test database — SQLite for local dev; CI overrides via TEST_DATABASE_URL env var
 # ---------------------------------------------------------------------------
 
 _TEST_DB_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///./test.db")
@@ -92,7 +96,9 @@ class FakeRedis:
     async def exists(self, key: str) -> int:
         return 1 if key in self._store else 0
 
-    async def scan_iter(self, match: str | None = None, count: int | None = None) -> AsyncGenerator[str, None]:
+    async def scan_iter(
+        self, match: str | None = None, count: int | None = None
+    ) -> AsyncGenerator[str, None]:
         for key in list(self._store.keys()):
             if match is None or fnmatch.fnmatch(key, match):
                 yield key
@@ -130,8 +136,14 @@ def fake_redis() -> FakeRedis:
 
 
 @pytest.fixture
-async def client(db_session: AsyncSession, fake_redis: FakeRedis) -> AsyncGenerator[AsyncClient, None]:
-    """HTTP test client with test DB and fake Redis injected."""
+async def client(
+    db_session: AsyncSession, fake_redis: FakeRedis
+) -> AsyncGenerator[AsyncClient, None]:
+    """HTTP test client with test DB and fake Redis injected.
+
+    Set TEST_USE_REAL_REDIS=1 in the environment to skip the fake Redis override
+    and exercise the real Redis dependency (e.g., in CI against a live Redis).
+    """
 
     async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
@@ -140,7 +152,9 @@ async def client(db_session: AsyncSession, fake_redis: FakeRedis) -> AsyncGenera
         yield fake_redis
 
     app.dependency_overrides[get_db] = _override_get_db
-    app.dependency_overrides[get_redis] = _override_get_redis  # type: ignore[assignment]
+    use_real_redis = os.environ.get("TEST_USE_REAL_REDIS", "").lower() in ("1", "true", "yes")
+    if not use_real_redis:
+        app.dependency_overrides[get_redis] = _override_get_redis  # type: ignore[assignment]
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
