@@ -1,6 +1,5 @@
 """Budgets module integration tests."""
 
-import pytest
 from httpx import AsyncClient
 
 from tests.conftest import assert_error_response, make_auth_headers

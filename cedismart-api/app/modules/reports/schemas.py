@@ -5,10 +5,8 @@ Reports are read-only — no request schemas with write semantics.
 """
 
 import uuid
-from typing import Optional
 
 from pydantic import BaseModel
-
 
 # ---------------------------------------------------------------------------
 # GET /reports/monthly
@@ -27,7 +25,7 @@ class MonthlyReportResponse(BaseModel):
     total_expense: str
     net: str
     transaction_count: int
-    top_expense_category: Optional[TopCategoryItem]
+    top_expense_category: TopCategoryItem | None
     days_with_activity: int
 
 
@@ -39,8 +37,8 @@ class MonthlyReportResponse(BaseModel):
 class CategoryBreakdownItem(BaseModel):
     id: uuid.UUID
     name: str
-    color: Optional[str]
-    icon: Optional[str]
+    color: str | None
+    icon: str | None
     amount: str
     percentage: str
     transaction_count: int

@@ -15,9 +15,8 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Optional
 
 import redis.asyncio as aioredis
 from sqlalchemy import case, func, or_, select
@@ -28,8 +27,8 @@ from sqlalchemy.orm import joinedload
 from app.core.exceptions import AppException
 from app.modules.accounts.models import FinancialAccount
 from app.modules.budgets.service import invalidate_budget_cache
-from app.modules.reports.service import invalidate_report_cache
 from app.modules.categories.models import Category
+from app.modules.reports.service import invalidate_report_cache
 from app.modules.transactions.models import Transaction
 from app.modules.transactions.schemas import (
     BulkCreateRequest,
@@ -151,11 +150,11 @@ async def list_transactions(
     db: AsyncSession,
     page: int = 1,
     per_page: int = 20,
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
-    category_id: Optional[uuid.UUID] = None,
-    account_id: Optional[uuid.UUID] = None,
-    transaction_type: Optional[str] = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    category_id: uuid.UUID | None = None,
+    account_id: uuid.UUID | None = None,
+    transaction_type: str | None = None,
 ) -> tuple[list[Transaction], int]:
     """Return a paginated, filtered list of transactions for the user.
 
@@ -447,7 +446,7 @@ async def get_summary(
         except Exception:
             pass  # Cache corrupted — fall through to DB
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     current_year, current_month = now.year, now.month
 
     # Compute last month
@@ -532,7 +531,7 @@ async def get_summary(
     exp_last = Decimal(str(row.expense_last))
 
     # Percentage changes — None when last month value was zero (avoids div/0)
-    def _pct_change(current: Decimal, last: Decimal) -> Optional[float]:
+    def _pct_change(current: Decimal, last: Decimal) -> float | None:
         if last == Decimal("0"):
             return None
         return float(((current - last) / last * 100).quantize(Decimal("0.01")))

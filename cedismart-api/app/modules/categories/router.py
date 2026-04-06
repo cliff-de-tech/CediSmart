@@ -5,9 +5,10 @@ Every endpoint requires a valid JWT access token via the CurrentUser dependency.
 """
 
 import uuid
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -20,7 +21,6 @@ from app.modules.categories.schemas import (
     CategoryResponse,
     CategoryUpdateRequest,
 )
-from sqlalchemy import select
 
 router = APIRouter()
 
@@ -53,7 +53,7 @@ async def _get_user(user_id: uuid.UUID, db: AsyncSession) -> User:
 async def list_categories(
     user_id: CurrentUser,
     db: DBSession,
-    type: Optional[str] = Query(
+    type: str | None = Query(
         None,
         description="Filter by category type: income | expense",
         pattern="^(income|expense)$",

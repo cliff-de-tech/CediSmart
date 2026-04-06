@@ -3,7 +3,6 @@
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -25,8 +24,8 @@ class AccountRef(BaseModel):
 class CategoryRef(BaseModel):
     id: uuid.UUID
     name: str
-    icon: Optional[str]
-    color: Optional[str]
+    icon: str | None
+    color: str | None
 
     model_config = {"from_attributes": True}
 
@@ -41,10 +40,10 @@ class TransactionCreateRequest(BaseModel):
     category_id: uuid.UUID
     amount: Decimal = Field(..., gt=Decimal("0"), decimal_places=2)
     transaction_type: str
-    description: Optional[str] = Field(None, max_length=255)
+    description: str | None = Field(None, max_length=255)
     transaction_date: date
-    notes: Optional[str] = None
-    client_id: Optional[uuid.UUID] = None
+    notes: str | None = None
+    client_id: uuid.UUID | None = None
 
     @field_validator("transaction_type")
     @classmethod
@@ -67,16 +66,16 @@ class TransactionUpdateRequest(BaseModel):
     account_id is intentionally excluded — cannot be changed after creation.
     """
 
-    category_id: Optional[uuid.UUID] = None
-    amount: Optional[Decimal] = Field(None, gt=Decimal("0"), decimal_places=2)
-    transaction_type: Optional[str] = None
-    description: Optional[str] = Field(None, max_length=255)
-    transaction_date: Optional[date] = None
-    notes: Optional[str] = None
+    category_id: uuid.UUID | None = None
+    amount: Decimal | None = Field(None, gt=Decimal("0"), decimal_places=2)
+    transaction_type: str | None = None
+    description: str | None = Field(None, max_length=255)
+    transaction_date: date | None = None
+    notes: str | None = None
 
     @field_validator("transaction_type")
     @classmethod
-    def validate_transaction_type(cls, v: Optional[str]) -> Optional[str]:
+    def validate_transaction_type(cls, v: str | None) -> str | None:
         if v is not None and v not in TRANSACTION_TYPES:
             raise ValueError("transaction_type must be one of: income, expense, transfer")
         return v
@@ -89,9 +88,9 @@ class BulkTransactionItem(BaseModel):
     category_id: uuid.UUID
     amount: Decimal = Field(..., gt=Decimal("0"), decimal_places=2)
     transaction_type: str
-    description: Optional[str] = Field(None, max_length=255)
+    description: str | None = Field(None, max_length=255)
     transaction_date: date
-    notes: Optional[str] = None
+    notes: str | None = None
     client_id: uuid.UUID  # Required for bulk — deduplication depends on it
 
     @field_validator("transaction_type")
@@ -103,9 +102,7 @@ class BulkTransactionItem(BaseModel):
 
 
 class BulkCreateRequest(BaseModel):
-    transactions: list[BulkTransactionItem] = Field(
-        ..., min_length=1, max_length=100
-    )
+    transactions: list[BulkTransactionItem] = Field(..., min_length=1, max_length=100)
 
 
 # ---------------------------------------------------------------------------
@@ -119,10 +116,10 @@ class TransactionResponse(BaseModel):
     category: CategoryRef
     amount: Decimal
     transaction_type: str
-    description: Optional[str]
+    description: str | None
     transaction_date: date
-    notes: Optional[str]
-    client_id: Optional[uuid.UUID]
+    notes: str | None
+    client_id: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
@@ -152,14 +149,14 @@ class BulkCreateResponse(BaseModel):
 
 
 class MonthSummary(BaseModel):
-    income: str   # Decimal serialised as string — preserves precision in JSON
+    income: str  # Decimal serialised as string — preserves precision in JSON
     expense: str
     net: str
 
 
 class MonthComparison(BaseModel):
-    income_change_pct: Optional[float]   # None when last month had zero income
-    expense_change_pct: Optional[float]  # None when last month had zero expense
+    income_change_pct: float | None  # None when last month had zero income
+    expense_change_pct: float | None  # None when last month had zero expense
 
 
 class TransactionSummaryResponse(BaseModel):

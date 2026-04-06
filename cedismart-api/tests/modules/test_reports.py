@@ -2,7 +2,6 @@
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from httpx import AsyncClient
 
 from tests.conftest import make_auth_headers

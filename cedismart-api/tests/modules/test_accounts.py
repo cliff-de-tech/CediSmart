@@ -1,6 +1,5 @@
 """Accounts module integration tests."""
 
-import pytest
 from httpx import AsyncClient
 
 from tests.conftest import assert_error_response, make_auth_headers
@@ -87,6 +86,7 @@ async def test_get_account_not_found(client: AsyncClient, make_user) -> None:
     headers = make_auth_headers(user.id)
 
     import uuid
+
     resp = await client.get(f"/api/v1/accounts/{uuid.uuid4()}", headers=headers)
     assert_error_response(resp, 404, "ACCOUNT_NOT_FOUND")
 
@@ -146,9 +146,7 @@ async def test_free_tier_account_limit(client: AsyncClient, make_user) -> None:
     headers = make_auth_headers(user.id)
 
     for i in range(3):
-        await _create_account(
-            client, headers, {**_ACCOUNT_PAYLOAD, "name": f"Account {i}"}
-        )
+        await _create_account(client, headers, {**_ACCOUNT_PAYLOAD, "name": f"Account {i}"})
 
     resp = await client.post(
         "/api/v1/accounts/",

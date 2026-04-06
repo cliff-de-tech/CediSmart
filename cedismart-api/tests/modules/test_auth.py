@@ -1,10 +1,8 @@
 """Auth module integration tests — registration, login, tokens, PIN reset."""
 
-import pytest
 from httpx import AsyncClient
 
 from tests.conftest import FakeRedis, assert_error_response, make_auth_headers
-
 
 # ---------------------------------------------------------------------------
 # POST /api/v1/auth/register/initiate
@@ -248,9 +246,7 @@ async def test_pin_reset_initiate_registered_phone(
     mock_send_otp.assert_called_once()
 
 
-async def test_pin_reset_initiate_unregistered_phone(
-    client: AsyncClient, mock_send_otp
-) -> None:
+async def test_pin_reset_initiate_unregistered_phone(client: AsyncClient, mock_send_otp) -> None:
     resp = await client.post(
         "/api/v1/auth/pin/reset/initiate",
         json={"phone": "+233211111111"},

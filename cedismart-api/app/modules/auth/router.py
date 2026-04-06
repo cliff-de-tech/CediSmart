@@ -6,11 +6,10 @@ Rate limiting is applied via ``slowapi`` at the endpoint level.
 
 from typing import Annotated
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-
-import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db

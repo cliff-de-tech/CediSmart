@@ -1,9 +1,9 @@
 """FinancialAccount model — bank, mobile money, and cash accounts."""
 
 import uuid
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Index, Numeric, String, ForeignKey, text
+from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin
@@ -21,9 +21,7 @@ class FinancialAccount(TimestampMixin, Base):
     """
 
     __tablename__ = "financial_accounts"
-    __table_args__ = (
-        Index("idx_financial_accounts_user_active", "user_id", "is_active"),
-    )
+    __table_args__ = (Index("idx_financial_accounts_user_active", "user_id", "is_active"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
         primary_key=True,
@@ -37,13 +35,11 @@ class FinancialAccount(TimestampMixin, Base):
     account_type: Mapped[str] = mapped_column(
         String(20), nullable=False
     )  # 'bank' | 'mobile_money' | 'cash'
-    provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
     opening_balance: Mapped[float] = mapped_column(
         Numeric(14, 2), nullable=False, server_default=text("0")
     )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
 
     # --- Relationships ---
     user: Mapped["User"] = relationship("User", back_populates="accounts")

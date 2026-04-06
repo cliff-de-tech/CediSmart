@@ -16,9 +16,8 @@ Business rules enforced here:
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Optional
 
 import redis.asyncio as aioredis
 from sqlalchemy import case, func, or_, select
@@ -65,7 +64,7 @@ async def invalidate_budget_cache(
 
 
 def _current_year_month() -> tuple[int, int]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return now.year, now.month
 
 
@@ -107,7 +106,7 @@ async def _compute_budget_progress(
     year: int,
     month: int,
     db: AsyncSession,
-    budget_ids: Optional[list[uuid.UUID]] = None,
+    budget_ids: list[uuid.UUID] | None = None,
 ) -> dict[uuid.UUID, Decimal]:
     """Compute total spent amount per budget in a single SQL aggregation.
 
@@ -199,8 +198,8 @@ def _build_budget_response(
 async def list_budgets(
     user_id: uuid.UUID,
     db: AsyncSession,
-    year: Optional[int] = None,
-    month: Optional[int] = None,
+    year: int | None = None,
+    month: int | None = None,
 ) -> list[dict]:
     """Return all budgets for the given period with computed progress.
 
@@ -226,9 +225,7 @@ async def list_budgets(
 
     # Load categories (avoid N+1)
     category_ids = [b.category_id for b in budgets]
-    cat_result = await db.execute(
-        select(Category).where(Category.id.in_(category_ids))
-    )
+    cat_result = await db.execute(select(Category).where(Category.id.in_(category_ids)))
     categories = {c.id: c for c in cat_result.scalars().all()}
     for b in budgets:
         b.category = categories[b.category_id]
@@ -323,14 +320,10 @@ async def upsert_budget(
     await db.flush()
 
     # Reload the budget with category
-    budget_result = await db.execute(
-        select(Budget).where(Budget.id == budget_id)
-    )
+    budget_result = await db.execute(select(Budget).where(Budget.id == budget_id))
     budget = budget_result.scalar_one()
 
-    cat_result = await db.execute(
-        select(Category).where(Category.id == budget.category_id)
-    )
+    cat_result = await db.execute(select(Category).where(Category.id == budget.category_id))
     budget.category = cat_result.scalar_one()
 
     spent_map = await _compute_budget_progress(user_id, year, month, db, [budget_id])

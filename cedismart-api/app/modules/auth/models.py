@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import TIMESTAMP, Boolean, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -24,20 +23,14 @@ class User(TimestampMixin, Base):
         default=uuid.uuid4,
         server_default=text("gen_random_uuid()"),
     )
-    phone: Mapped[str] = mapped_column(
-        String(20), unique=True, nullable=False, index=True
-    )
-    email: Mapped[Optional[str]] = mapped_column(
-        String(255), unique=True, nullable=True
-    )
-    full_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    full_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     pin_hash: Mapped[str] = mapped_column(String(60), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="GHS")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
-    is_premium: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
-    premium_expires_at: Mapped[Optional[datetime]] = mapped_column(
+    is_premium: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    premium_expires_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
 
@@ -51,9 +44,7 @@ class User(TimestampMixin, Base):
     categories: Mapped[list["Category"]] = relationship(
         "Category", back_populates="user", lazy="noload"
     )
-    budgets: Mapped[list["Budget"]] = relationship(
-        "Budget", back_populates="user", lazy="noload"
-    )
+    budgets: Mapped[list["Budget"]] = relationship("Budget", back_populates="user", lazy="noload")
 
     def __repr__(self) -> str:
         return f"<User id={self.id} phone={self.phone}>"

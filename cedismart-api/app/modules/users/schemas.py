@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -15,17 +14,15 @@ SUPPORTED_CURRENCIES = {"GHS", "USD", "EUR", "GBP"}
 
 
 class UserUpdateRequest(BaseModel):
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    email: Optional[EmailStr] = None
-    currency: Optional[str] = Field(None, min_length=3, max_length=3)
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    email: EmailStr | None = None
+    currency: str | None = Field(None, min_length=3, max_length=3)
 
     @field_validator("currency")
     @classmethod
-    def validate_currency(cls, v: Optional[str]) -> Optional[str]:
+    def validate_currency(cls, v: str | None) -> str | None:
         if v is not None and v.upper() not in SUPPORTED_CURRENCIES:
-            raise ValueError(
-                f"currency must be one of: {', '.join(sorted(SUPPORTED_CURRENCIES))}"
-            )
+            raise ValueError(f"currency must be one of: {', '.join(sorted(SUPPORTED_CURRENCIES))}")
         return v.upper() if v else v
 
 
@@ -37,11 +34,11 @@ class UserUpdateRequest(BaseModel):
 class UserResponse(BaseModel):
     id: uuid.UUID
     phone: str
-    email: Optional[str]
-    full_name: Optional[str]
+    email: str | None
+    full_name: str | None
     currency: str
     is_premium: bool
-    premium_expires_at: Optional[datetime]
+    premium_expires_at: datetime | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

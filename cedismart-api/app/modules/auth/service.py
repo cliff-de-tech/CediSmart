@@ -12,7 +12,6 @@ import hmac
 import logging
 import secrets
 import uuid
-from typing import Optional
 
 import redis.asyncio as aioredis
 from sqlalchemy import select
@@ -109,7 +108,7 @@ async def verify_registration(
     """
     # --- Validate OTP ---
     redis_key = f"{OTP_REDIS_PREFIX}{phone}"
-    stored_otp: Optional[str] = await redis.get(redis_key)
+    stored_otp: str | None = await redis.get(redis_key)
 
     if stored_otp is None or not hmac.compare_digest(stored_otp, otp):
         raise AppException(
@@ -340,7 +339,7 @@ async def confirm_pin_reset(
     )
 
     redis_key = f"{PIN_RESET_OTP_REDIS_PREFIX}{phone}"
-    stored_otp: Optional[str] = await redis.get(redis_key)
+    stored_otp: str | None = await redis.get(redis_key)
 
     # Timing-safe comparison — prevents timing-oracle attacks
     if stored_otp is None or not hmac.compare_digest(stored_otp, otp):

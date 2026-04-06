@@ -9,7 +9,7 @@ not try to parse the literal string "summary" as a UUID.
 
 import uuid
 from datetime import date
-from typing import Annotated, Optional
+from typing import Annotated
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Query
@@ -22,12 +22,12 @@ from app.modules.transactions import service
 from app.modules.transactions.schemas import (
     BulkCreateRequest,
     BulkCreateResponse,
+    PaginationMeta,
     TransactionCreateRequest,
     TransactionListResponse,
     TransactionResponse,
     TransactionSummaryResponse,
     TransactionUpdateRequest,
-    PaginationMeta,
 )
 
 router = APIRouter()
@@ -75,13 +75,11 @@ async def list_transactions(
     db: DBSession,
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
-    category_id: Optional[uuid.UUID] = Query(None),
-    account_id: Optional[uuid.UUID] = Query(None),
-    transaction_type: Optional[str] = Query(
-        None, pattern="^(income|expense|transfer)$"
-    ),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
+    category_id: uuid.UUID | None = Query(None),
+    account_id: uuid.UUID | None = Query(None),
+    transaction_type: str | None = Query(None, pattern="^(income|expense|transfer)$"),
 ) -> TransactionListResponse:
     """Return a paginated list of transactions ordered by date descending.
 

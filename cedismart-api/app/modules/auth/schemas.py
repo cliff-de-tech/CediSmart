@@ -1,7 +1,6 @@
 """Auth module — Pydantic v2 request/response schemas with validators."""
 
 import re
-from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -159,4 +158,4 @@ class MessageResponse(BaseModel):
     """Generic success message, optionally with an expiry hint."""
 
     message: str
-    expires_in: Optional[int] = None
+    expires_in: int | None = None

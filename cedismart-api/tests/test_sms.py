@@ -1,8 +1,9 @@
 """SMS client unit tests — Termii integration paths."""
 
-import pytest
-import httpx
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+import pytest
 
 from app.core.exceptions import AppException
 
@@ -13,6 +14,7 @@ async def test_send_otp_stub_when_no_api_key() -> None:
         mock_settings.TERMII_API_KEY = ""
 
         from app.core import sms
+
         with patch.object(sms.logger, "warning") as mock_warn:
             await sms.send_otp("+233201234567", "123456")
             mock_warn.assert_called_once()
@@ -30,6 +32,7 @@ async def test_send_otp_timeout() -> None:
         mock_client.post = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
 
         from app.core import sms
+
         with patch("app.core.sms.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(AppException) as exc_info:
                 await sms.send_otp("+233201234567", "123456")
@@ -49,6 +52,7 @@ async def test_send_otp_network_error() -> None:
         mock_client.post = AsyncMock(side_effect=httpx.ConnectError("connection refused"))
 
         from app.core import sms
+
         with patch("app.core.sms.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(AppException) as exc_info:
                 await sms.send_otp("+233201234567", "123456")
@@ -70,6 +74,7 @@ async def test_send_otp_non_200_response() -> None:
         mock_client.post = AsyncMock(return_value=mock_response)
 
         from app.core import sms
+
         with patch("app.core.sms.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(AppException) as exc_info:
                 await sms.send_otp("+233201234567", "123456")
@@ -84,7 +89,9 @@ async def test_send_otp_termii_rejection() -> None:
 
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json = MagicMock(return_value={"code": "error", "message": "insufficient credits"})
+        mock_response.json = MagicMock(
+            return_value={"code": "error", "message": "insufficient credits"}
+        )
 
         mock_client = AsyncMock()
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -92,6 +99,7 @@ async def test_send_otp_termii_rejection() -> None:
         mock_client.post = AsyncMock(return_value=mock_response)
 
         from app.core import sms
+
         with patch("app.core.sms.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(AppException) as exc_info:
                 await sms.send_otp("+233201234567", "123456")
@@ -114,6 +122,7 @@ async def test_send_otp_success() -> None:
         mock_client.post = AsyncMock(return_value=mock_response)
 
         from app.core import sms
+
         with patch("app.core.sms.httpx.AsyncClient", return_value=mock_client):
             result = await sms.send_otp("+233201234567", "123456")
             assert result is None

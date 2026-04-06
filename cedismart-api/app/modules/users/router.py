@@ -66,9 +66,7 @@ async def update_me(
 
     phone and PIN cannot be changed via this endpoint.
     """
-    user = await service.update_current_user(
-        user_id=user_id, payload=body, db=db
-    )
+    user = await service.update_current_user(user_id=user_id, payload=body, db=db)
     return UserResponse.model_validate(user)
 
 

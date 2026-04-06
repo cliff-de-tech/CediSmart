@@ -11,9 +11,8 @@ Principles enforced here:
 
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from typing import Optional
 
 import redis.asyncio as aioredis
 from sqlalchemy import case, func, select, text
@@ -37,7 +36,7 @@ def _cache_key(report_type: str, user_id: uuid.UUID, *parts: object) -> str:
     return f"{REPORT_CACHE_PREFIX}{report_type}:{user_id}:{suffix}"
 
 
-async def _get_cached(key: str, redis: aioredis.Redis) -> Optional[dict]:
+async def _get_cached(key: str, redis: aioredis.Redis) -> dict | None:
     cached = await redis.get(key)
     if cached:
         try:
@@ -244,15 +243,17 @@ async def get_category_report(
         total = g_total  # same for all rows (window function)
         pct = (amount / g_total * 100).quantize(Decimal("0.01")) if g_total > 0 else Decimal("0")
 
-        categories_list.append({
-            "id": str(row.id),
-            "name": row.name,
-            "color": row.color,
-            "icon": row.icon,
-            "amount": str(amount.quantize(Decimal("0.01"))),
-            "percentage": str(pct),
-            "transaction_count": row.tx_count,
-        })
+        categories_list.append(
+            {
+                "id": str(row.id),
+                "name": row.name,
+                "color": row.color,
+                "icon": row.icon,
+                "amount": str(amount.quantize(Decimal("0.01"))),
+                "percentage": str(pct),
+                "transaction_count": row.tx_count,
+            }
+        )
 
     result = {
         "period": {
@@ -284,7 +285,7 @@ async def get_trends_report(
     if cached:
         return cached
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Compute the start month (N months ago, inclusive of current)
     # E.g., months=6 and current = 2026-04 → start from 2025-11
@@ -355,13 +356,15 @@ async def get_trends_report(
     for row in rows:
         inc = Decimal(str(row.income))
         exp = Decimal(str(row.expense))
-        months_list.append({
-            "year": int(row.m_year),
-            "month": int(row.m_month),
-            "income": str(inc.quantize(Decimal("0.01"))),
-            "expense": str(exp.quantize(Decimal("0.01"))),
-            "net": str((inc - exp).quantize(Decimal("0.01"))),
-        })
+        months_list.append(
+            {
+                "year": int(row.m_year),
+                "month": int(row.m_month),
+                "income": str(inc.quantize(Decimal("0.01"))),
+                "expense": str(exp.quantize(Decimal("0.01"))),
+                "net": str((inc - exp).quantize(Decimal("0.01"))),
+            }
+        )
 
     result = {"months": months_list}
 

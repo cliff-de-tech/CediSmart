@@ -2,17 +2,17 @@
 
 import uuid
 from datetime import date
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Date,
+    ForeignKey,
     Index,
     Numeric,
     String,
     Text,
-    ForeignKey,
     UniqueConstraint,
     text,
 )
@@ -64,24 +64,20 @@ class Transaction(TimestampMixin, Base):
     account_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("financial_accounts.id"), nullable=False
     )
-    category_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("categories.id"), nullable=False
-    )
+    category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categories.id"), nullable=False)
     amount: Mapped[float] = mapped_column(
         Numeric(14, 2), nullable=False
     )  # ALWAYS positive; direction from transaction_type
     transaction_type: Mapped[str] = mapped_column(
         String(10), nullable=False
     )  # 'income' | 'expense' | 'transfer'
-    description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(255), nullable=True)
     transaction_date: Mapped[date] = mapped_column(
         Date, nullable=False
     )  # User-provided, NOT created_at
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("false")
-    )
-    client_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
         nullable=True
     )  # For offline sync deduplication
 
@@ -90,9 +86,7 @@ class Transaction(TimestampMixin, Base):
     account: Mapped["FinancialAccount"] = relationship(
         "FinancialAccount", back_populates="transactions"
     )
-    category: Mapped["Category"] = relationship(
-        "Category", back_populates="transactions"
-    )
+    category: Mapped["Category"] = relationship("Category", back_populates="transactions")
 
     def __repr__(self) -> str:
         return (

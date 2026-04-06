@@ -31,7 +31,9 @@ async def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail={"error": {"code": "INVALID_TOKEN", "message": "Invalid or expired token", "field": None}},
+        detail={
+            "error": {"code": "INVALID_TOKEN", "message": "Invalid or expired token", "field": None}
+        },
         headers={"WWW-Authenticate": "Bearer"},
     )
 

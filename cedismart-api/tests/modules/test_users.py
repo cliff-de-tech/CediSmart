@@ -1,9 +1,8 @@
 """Users module integration tests — GET/PATCH/DELETE /api/v1/users/me."""
 
-import pytest
 from httpx import AsyncClient
 
-from tests.conftest import assert_error_response, make_auth_headers
+from tests.conftest import make_auth_headers
 
 
 async def test_get_me(client: AsyncClient, make_user) -> None:

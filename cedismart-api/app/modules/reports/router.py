@@ -109,7 +109,5 @@ async def get_trends_report(
     All months are present in the response even if they have zero transactions
     — frontend charts can render without gap-handling logic.
     """
-    result = await service.get_trends_report(
-        user_id=user_id, months=months, db=db, redis=redis
-    )
+    result = await service.get_trends_report(user_id=user_id, months=months, db=db, redis=redis)
     return TrendsReportResponse(**result)

@@ -2,7 +2,6 @@
 
 import uuid
 
-import pytest
 from httpx import AsyncClient
 
 from tests.conftest import assert_error_response, make_auth_headers
@@ -182,7 +181,10 @@ async def test_bulk_create_transactions(client: AsyncClient, make_user) -> None:
         json={
             "transactions": [
                 {**_tx_payload(account_id, category_id), "client_id": client_id_1},
-                {**_tx_payload(account_id, category_id, description="Taxi"), "client_id": client_id_2},
+                {
+                    **_tx_payload(account_id, category_id, description="Taxi"),
+                    "client_id": client_id_2,
+                },
             ]
         },
         headers=headers,

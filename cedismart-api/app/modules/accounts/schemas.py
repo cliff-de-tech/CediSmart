@@ -3,10 +3,8 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
-
 
 # ---------------------------------------------------------------------------
 # Enums (string literals — avoids importing enum for simple cases)
@@ -23,7 +21,7 @@ ACCOUNT_TYPES = {"bank", "mobile_money", "cash"}
 class AccountCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     account_type: str = Field(..., description="bank | mobile_money | cash")
-    provider: Optional[str] = Field(None, max_length=50)
+    provider: str | None = Field(None, max_length=50)
     opening_balance: Decimal = Field(Decimal("0.00"), ge=Decimal("0"))
 
     @field_validator("account_type")
@@ -42,8 +40,8 @@ class AccountCreateRequest(BaseModel):
 
 
 class AccountUpdateRequest(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    provider: Optional[str] = Field(None, max_length=50)
+    name: str | None = Field(None, min_length=1, max_length=100)
+    provider: str | None = Field(None, max_length=50)
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +53,7 @@ class AccountResponse(BaseModel):
     id: uuid.UUID
     name: str
     account_type: str
-    provider: Optional[str]
+    provider: str | None
     opening_balance: Decimal
     balance: Decimal
     is_active: bool

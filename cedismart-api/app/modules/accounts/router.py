@@ -8,6 +8,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -21,7 +22,6 @@ from app.modules.accounts.schemas import (
     AccountUpdateRequest,
 )
 from app.modules.auth.models import User
-from sqlalchemy import select
 
 router = APIRouter()
 
@@ -191,6 +191,4 @@ async def delete_account(
         response.status_code = 204
         return Response(status_code=204)
 
-    return AccountDeactivatedResponse(
-        message="Account deactivated. Transaction history preserved."
-    )
+    return AccountDeactivatedResponse(message="Account deactivated. Transaction history preserved.")

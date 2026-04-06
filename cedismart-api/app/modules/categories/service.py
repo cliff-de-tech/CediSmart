@@ -10,7 +10,6 @@ Business rules enforced here:
 """
 
 import uuid
-from typing import Optional
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
@@ -75,7 +74,7 @@ async def _system_name_conflict(name: str, db: AsyncSession) -> bool:
 async def list_categories(
     user_id: uuid.UUID,
     db: AsyncSession,
-    category_type: Optional[str] = None,
+    category_type: str | None = None,
 ) -> list[Category]:
     """Return system categories + user's custom categories.
 
@@ -202,9 +201,7 @@ async def update_category(
             raise AppException(
                 status_code=409,
                 error_code="CATEGORY_NAME_CONFLICT",
-                message=(
-                    f"'{payload.name}' conflicts with a system category name."
-                ),
+                message=(f"'{payload.name}' conflicts with a system category name."),
                 field="name",
             )
         category.name = payload.name
@@ -252,8 +249,7 @@ async def delete_category(
             status_code=409,
             error_code="CATEGORY_HAS_TRANSACTIONS",
             message=(
-                f"This category has {tx_count} transaction(s). "
-                "Reassign them before deleting."
+                f"This category has {tx_count} transaction(s). " "Reassign them before deleting."
             ),
         )
 

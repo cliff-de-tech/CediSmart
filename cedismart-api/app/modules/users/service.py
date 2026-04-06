@@ -10,7 +10,6 @@ Business rules enforced here:
 
 import hashlib
 import uuid
-from typing import Optional
 
 import redis.asyncio as aioredis
 from sqlalchemy import select

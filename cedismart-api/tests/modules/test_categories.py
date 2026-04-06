@@ -1,6 +1,5 @@
 """Categories module integration tests."""
 
-import pytest
 from httpx import AsyncClient
 
 from tests.conftest import assert_error_response, make_auth_headers
@@ -131,6 +130,7 @@ async def test_delete_category_no_transactions(client: AsyncClient, make_user) -
 
 async def test_delete_category_not_found(client: AsyncClient, make_user) -> None:
     import uuid
+
     user = await make_user()
     headers = make_auth_headers(user.id)
 
@@ -148,9 +148,7 @@ async def test_free_tier_category_limit(client: AsyncClient, make_user) -> None:
     headers = make_auth_headers(user.id)
 
     for i in range(20):
-        await _create_category(
-            client, headers, {**_CATEGORY_PAYLOAD, "name": f"Category {i}"}
-        )
+        await _create_category(client, headers, {**_CATEGORY_PAYLOAD, "name": f"Category {i}"})
 
     resp = await client.post(
         "/api/v1/categories/",

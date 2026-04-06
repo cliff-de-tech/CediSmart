@@ -1,13 +1,12 @@
 """PIN hashing (bcrypt) and JWT token creation/verification (RS256)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import bcrypt
 from jose import JWTError, jwt
 
 from app.core.config import settings
-
 
 # ---------------------------------------------------------------------------
 # PIN hashing — bcrypt, cost factor 12
@@ -71,7 +70,7 @@ def create_access_token(user_id: UUID, expires_delta: timedelta | None = None) -
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
         "type": "access",
@@ -99,7 +98,7 @@ def create_refresh_token(
     if expires_delta is None:
         expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload: dict[str, object] = {
         "sub": str(user_id),
         "type": "refresh",
