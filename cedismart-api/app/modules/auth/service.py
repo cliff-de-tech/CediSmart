@@ -221,8 +221,8 @@ async def refresh_access_token(
 
     try:
         payload = decode_token(refresh_token_str)
-    except Exception:
-        raise _invalid
+    except Exception as e:
+        raise _invalid from e
 
     if payload.get("type") != "refresh":
         raise _invalid

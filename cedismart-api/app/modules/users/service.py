@@ -61,13 +61,13 @@ async def update_current_user(
 
     try:
         await db.flush()
-    except IntegrityError:
+    except IntegrityError as e:
         raise AppException(
             status_code=409,
             error_code="EMAIL_ALREADY_IN_USE",
             message="This email address is already associated with another account.",
             field="email",
-        )
+        ) from e
 
     return user
 

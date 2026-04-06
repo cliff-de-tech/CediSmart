@@ -242,13 +242,13 @@ async def create_transaction(
 
     try:
         await db.flush()
-    except IntegrityError:
+    except IntegrityError as e:
         raise AppException(
             status_code=409,
             error_code="DUPLICATE_CLIENT_ID",
             message="A transaction with this client_id already exists.",
             field="client_id",
-        )
+        ) from e
 
     # Reload with relationships
     result = await db.execute(
@@ -417,7 +417,8 @@ async def bulk_create_transactions(
 
     if created > 0:
         await db.flush()
-        # Invalidate caches concurrently for every distinct (year, month) touched by created transactions
+        # Invalidate caches concurrently for every distinct (year, month)
+        # touched by created transactions
         await asyncio.gather(
             *[
                 _invalidate_caches(user_id, date(year, month, 1), redis)

@@ -178,12 +178,12 @@ def mock_send_otp() -> AsyncGenerator[AsyncMock, None]:
 @pytest.fixture(autouse=True)
 def reset_rate_limiter() -> None:
     """Clear slowapi's in-memory rate limit counters between tests."""
+    import contextlib
+
     from app.modules.auth.router import limiter
 
-    try:
+    with contextlib.suppress(Exception):
         limiter._storage.reset()
-    except Exception:
-        pass
 
 
 # ---------------------------------------------------------------------------

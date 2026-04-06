@@ -170,7 +170,7 @@ async def create_category(
 
     try:
         await db.flush()
-    except IntegrityError:
+    except IntegrityError as e:
         # The DB unique constraint (user_id, name) will fire if the name
         # duplicates an existing user category. Surface a clean 409.
         raise AppException(
@@ -178,7 +178,7 @@ async def create_category(
             error_code="CATEGORY_NAME_DUPLICATE",
             message=f"You already have a category named '{payload.name}'.",
             field="name",
-        )
+        ) from e
 
     return category
 
@@ -213,13 +213,13 @@ async def update_category(
 
     try:
         await db.flush()
-    except IntegrityError:
+    except IntegrityError as e:
         raise AppException(
             status_code=409,
             error_code="CATEGORY_NAME_DUPLICATE",
             message=f"You already have a category named '{payload.name}'.",
             field="name",
-        )
+        ) from e
 
     return category
 

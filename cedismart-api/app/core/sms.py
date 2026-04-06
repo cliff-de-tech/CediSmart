@@ -66,20 +66,20 @@ async def send_otp(phone: str, otp: str) -> None:
     try:
         async with httpx.AsyncClient(timeout=_REQUEST_TIMEOUT) as client:
             response = await client.post(_TERMII_SEND_URL, json=payload)
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as exc:
         logger.error("Termii SMS timeout when sending to %s", phone)
         raise AppException(
             status_code=503,
             error_code="SMS_DELIVERY_FAILED",
             message="OTP could not be delivered. Please try again.",
-        )
+        ) from exc
     except httpx.RequestError as exc:
         logger.error("Termii SMS network error for %s: %s", phone, type(exc).__name__)
         raise AppException(
             status_code=503,
             error_code="SMS_DELIVERY_FAILED",
             message="OTP could not be delivered. Please try again.",
-        )
+        ) from exc
 
     if response.status_code != 200:
         logger.error(
