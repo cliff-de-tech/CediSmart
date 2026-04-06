@@ -9,6 +9,28 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
 ![License](https://img.shields.io/badge/license-Proprietary-red)
 
+[![API README](https://img.shields.io/badge/docs-API%20README-1f6feb)](./cedismart-api/README.md)
+[![OpenAPI (local)](https://img.shields.io/badge/openapi-local%20%2Fdocs-6f42c1)](http://localhost:8000/docs)
+
+---
+
+## Quick Navigation
+
+- [The Problem](#the-problem)
+- [What This Is](#what-this-is)
+- [Backend — Production API](#backend--production-api)
+  - [Tech Stack](#tech-stack)
+  - [Architecture](#architecture)
+  - [API Surface](#api-surface)
+  - [Key Engineering Decisions](#key-engineering-decisions)
+  - [Security Posture](#security-posture)
+  - [Testing](#testing)
+  - [CI/CD](#cicd)
+- [Mobile App — In Progress](#mobile-app--in-progress)
+- [Project Status](#project-status)
+- [Running Locally](#running-locally)
+- [About](#about)
+
 ---
 
 ## The Problem
@@ -22,13 +44,15 @@ Most budgeting apps are designed for bank-account-first economies. Ghana is diff
 
 CediSmart is built from first principles for this reality — not adapted from a Western template.
 
+> 💡 **Design principle:** optimize for reliability under constrained connectivity before optimizing for feature breadth.
+
 ---
 
 ## What This Is
 
 CediSmart is a **monorepo** containing a production-grade REST API (complete) and a React Native mobile app (in progress). It is not a tutorial project. It handles real money and is engineered accordingly.
 
-```
+```text
 CediSmart/
 ├── cedismart-api/      # FastAPI backend — Python 3.11+
 └── mobile/             # React Native (Expo) — in progress
@@ -39,6 +63,8 @@ CediSmart/
 ## Backend — Production API
 
 The backend is **fully implemented and tested**. 31 endpoints across 7 modules, 85%+ test coverage, CI/CD on GitHub Actions.
+
+> ✅ **Current state:** Backend feature-complete for core budgeting, accounts, auth, reporting, and guardrails.
 
 ### Tech Stack
 
@@ -56,24 +82,24 @@ The backend is **fully implemented and tested**. 31 endpoints across 7 modules, 
 
 ### Architecture
 
-CediSmart uses a **Modular Monolith** — a single deployable unit with enforced module boundaries. This is a deliberate choice over microservices: it avoids distributed system complexity at MVP scale while keeping internal separation clean enough to extract services later.
+CediSmart uses a **Modular Monolith** — a single deployable unit with enforced module boundaries. This is a deliberate choice over microservices: it avoids distributed system complexity at MVP scale while preserving clean boundaries for future extraction.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FastAPI Application                       │
-│                                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
-│  │   Auth   │ │ Accounts │ │  Trans-  │ │ Budgets  │           │
-│  │  Module  │ │  Module  │ │ actions  │ │  Module  │  Reports  │
-│  │          │ │          │ │  Module  │ │          │  Module   │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘           │
-│       │            │            │             │                  │
-│  ┌────▼────────────▼────────────▼─────────────▼──────────────┐  │
-│  │                        Core Layer                          │  │
-│  │          config · database · redis · security              │  │
-│  │          dependencies · exceptions · sms                   │  │
-│  └─────────────────────────┬──────────────────────────────────┘  │
-└────────────────────────────┼─────────────────────────────────────┘
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        FastAPI Application                            │
+│                                                                        │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐                 │
+│  │   Auth   │ │ Accounts │ │  Trans-  │ │ Budgets  │                 │
+│  │  Module  │ │  Module  │ │ actions  │ │  Module  │  Reports Module │
+│  │          │ │          │ │  Module  │ │          │                 │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘                 │
+│       │            │            │             │                        │
+│  ┌────▼────────────▼────────────▼─────────────▼────────────────────┐   │
+│  │                        Core Layer                               │   │
+│  │          config · database · redis · security                   │   │
+│  │          dependencies · exceptions · sms                        │   │
+│  └─────────────────────────┬───────────────────────────────────────┘   │
+└────────────────────────────┼───────────────────────────────────────────┘
                              │
               ┌──────────────┼──────────────┐
               ▼              ▼              ▼
@@ -130,29 +156,29 @@ All endpoints versioned under `/api/v1/`. Every response uses a consistent error
 
 These are the decisions that separate a learning project from production fintech code.
 
-**Money is never a Float.**
-All monetary values are `NUMERIC(14, 2)` in PostgreSQL and `Decimal` in Python throughout the entire stack. `Float` arithmetic introduces rounding errors that silently corrupt financial records. This is enforced via Pydantic validators and SQLAlchemy column types — there is no path for a float to reach the database.
+- **Money is never a Float.**
+  All monetary values are `NUMERIC(14, 2)` in PostgreSQL and `Decimal` in Python throughout the entire stack. `Float` arithmetic introduces rounding errors that silently corrupt financial records.
 
-**Account balances are never stored.**
-Balance = `opening_balance + SUM(income) − SUM(expense)`, computed at query time via a single SQL aggregation. Storing a cached balance introduces a class of bugs where the stored value drifts from the true value after edits or soft deletes. We avoid the problem entirely.
+- **Account balances are never stored.**
+  Balance = `opening_balance + SUM(income) − SUM(expense)`, computed at query time via a single SQL aggregation. Storing a cached balance introduces drift bugs when writes partially fail.
 
-**OTP timing attacks are mitigated.**
-OTP comparison uses `hmac.compare_digest()` instead of `==`. A standard string equality check returns early on the first mismatched character, leaking timing information that can be used to narrow down a valid OTP. Constant-time comparison closes this attack surface.
+- **OTP timing attacks are mitigated.**
+  OTP comparison uses `hmac.compare_digest()` instead of `==` to avoid early-return timing leaks.
 
-**Phone enumeration is prevented.**
-The PIN reset initiation endpoint returns an identical response whether the phone number is registered or not. The OTP is only generated and sent when the account exists — but the caller cannot distinguish the two cases. This is not a minor detail; it prevents attackers from harvesting registered phone numbers.
+- **Phone enumeration is prevented.**
+  PIN reset initiation returns an identical response whether phone exists or not.
 
-**Refresh tokens are individually revocable.**
-Each refresh token carries a `jti` (JWT ID) claim. The `jti` is stored in Redis with a 30-day TTL. Logout deletes the specific `jti` entry. This allows per-device logout without invalidating all sessions, and makes token revocation instantaneous rather than waiting for expiry.
+- **Refresh tokens are individually revocable.**
+  Each refresh token carries a `jti`; Redis stores active JTIs with TTL for per-device logout.
 
-**Race conditions on free-tier limits are prevented.**
-Free-tier enforcement (max 3 accounts, 5 budgets/month, 20 categories) uses `SELECT ... FOR UPDATE` before the count check. Without this, two concurrent requests can both read a count of 2 (below the limit of 3), both pass the check, and both insert — exceeding the limit. The row-level lock serialises concurrent creates.
+- **Race conditions on free-tier limits are prevented.**
+  Limit checks use `SELECT ... FOR UPDATE` to serialize concurrent writes.
 
-**Transactions are never hard-deleted.**
-`DELETE /transactions/{id}` sets `is_deleted = True`. The record stays in the database. Financial audit trails must be immutable. This also means balance calculations remain correct for historical periods even after a user "deletes" a transaction.
+- **Transactions are never hard-deleted.**
+  Deletion is logical (`is_deleted = True`) to preserve audit trail integrity.
 
-**JWT uses RS256, not HS256.**
-RS256 uses asymmetric keys — the private key signs tokens on the server, and only the public key is needed to verify them. This means verification can be performed in future microservices or edge functions without ever distributing the signing secret.
+- **JWT uses RS256, not HS256.**
+  Asymmetric signing separates signing authority (private key) from verification (public key).
 
 ### Security Posture
 
@@ -163,13 +189,13 @@ RS256 uses asymmetric keys — the private key signs tokens on the server, and o
 | Token replay | `jti` tracked in Redis — logout is immediate |
 | Resource enumeration | Ownership errors return 404, never 403 |
 | Injection | SQLAlchemy ORM only — no raw SQL strings |
-| Sensitive data in logs | Phone, PIN, OTP, tokens explicitly excluded from all log statements |
+| Sensitive data in logs | Phone, PIN, OTP, tokens excluded from logs |
 | CORS | Explicit origin allowlist — `*` never used |
 | Transport | HSTS enforced via middleware + Cloudflare SSL |
 
 ### Testing
 
-```
+```text
 69 tests · 85.46% coverage · 0 failures
 ```
 
@@ -183,6 +209,7 @@ RS256 uses asymmetric keys — the private key signs tokens on the server, and o
 | Overall | 85.46% |
 
 Tests run against **SQLite** locally for speed and **PostgreSQL 16** in CI. The CI pipeline enforces:
+
 - `ruff` — linting
 - `black --check` — formatting
 - `mypy --strict` — type checking (zero `Any` tolerance)
@@ -232,6 +259,8 @@ Planned screens: Registration → OTP → Set PIN → Login → Dashboard → Tr
 | 5 | Testing & Hardening | Partial (backend coverage done) |
 | 6 | Deployment | Not started |
 
+> 📌 **Roadmap focus (Q2 2026):** finish mobile core flows, then backend/mobile integration and end-to-end QA.
+
 ---
 
 ## Running Locally
@@ -269,7 +298,7 @@ Full setup guide: [`cedismart-api/README.md`](./cedismart-api/README.md)
 
 Built by **Clifford Darko Opoku-Sarkodie** — Backend Engineer targeting FAANG, remote-first global companies, and African fintech startups.
 
-This project exists to demonstrate production-grade engineering in a domain (African fintech) that is underrepresented in most portfolios: real market constraints, real security requirements, and financial data rules that actually protect users' money.
+This project exists to demonstrate production-grade engineering in a domain (African fintech) that is underrepresented in many portfolios: real market constraints, real security requirements, and real-world architecture tradeoffs.
 
 ---
 
