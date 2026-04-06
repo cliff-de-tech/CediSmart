@@ -83,9 +83,7 @@ async def app_exception_handler(_request: Request, exc: AppException) -> JSONRes
     )
 
 
-async def http_exception_handler(
-    _request: Request, exc: StarletteHTTPException
-) -> JSONResponse:
+async def http_exception_handler(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
     """Handle Starlette/FastAPI HTTPException with consistent format."""
     detail: Any = exc.detail
     message = detail if isinstance(detail, str) else "An error occurred"

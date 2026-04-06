@@ -1,13 +1,12 @@
 """PIN hashing (bcrypt) and JWT token creation/verification (RS256)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import bcrypt
 from jose import JWTError, jwt
 
 from app.core.config import settings
-
 
 # ---------------------------------------------------------------------------
 # PIN hashing — bcrypt, cost factor 12
@@ -71,7 +70,7 @@ def create_access_token(user_id: UUID, expires_delta: timedelta | None = None) -
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub": str(user_id),
         "type": "access",
@@ -81,12 +80,17 @@ def create_access_token(user_id: UUID, expires_delta: timedelta | None = None) -
     return jwt.encode(payload, _load_private_key(), algorithm=settings.ALGORITHM)
 
 
-def create_refresh_token(user_id: UUID, expires_delta: timedelta | None = None) -> str:
+def create_refresh_token(
+    user_id: UUID,
+    expires_delta: timedelta | None = None,
+    jti: str | None = None,
+) -> str:
     """Create a long-lived JWT refresh token.
 
     Args:
         user_id: The authenticated user's UUID.
         expires_delta: Optional custom expiry. Defaults to REFRESH_TOKEN_EXPIRE_DAYS.
+        jti: Optional JWT ID for per-token revocation tracking in Redis.
 
     Returns:
         Encoded JWT string.
@@ -94,13 +98,15 @@ def create_refresh_token(user_id: UUID, expires_delta: timedelta | None = None) 
     if expires_delta is None:
         expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    now = datetime.now(timezone.utc)
-    payload = {
+    now = datetime.now(UTC)
+    payload: dict[str, object] = {
         "sub": str(user_id),
         "type": "refresh",
         "iat": now,
         "exp": now + expires_delta,
     }
+    if jti is not None:
+        payload["jti"] = jti
     return jwt.encode(payload, _load_private_key(), algorithm=settings.ALGORITHM)
 
 

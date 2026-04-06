@@ -7,7 +7,6 @@ models to be imported and inspected without a running DB (e.g. for tests, lintin
 
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import TIMESTAMP, func
 from sqlalchemy.ext.asyncio import (
@@ -17,7 +16,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-
 
 # ---------------------------------------------------------------------------
 # Declarative base & mixins (import-safe, no DB connection needed)
@@ -54,8 +52,8 @@ class TimestampMixin:
 # Lazy engine & session factory (created on first access)
 # ---------------------------------------------------------------------------
 
-_engine: Optional[AsyncEngine] = None
-_session_factory: Optional[async_sessionmaker[AsyncSession]] = None
+_engine: AsyncEngine | None = None
+_session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 def get_engine() -> AsyncEngine:

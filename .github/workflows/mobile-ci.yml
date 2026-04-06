@@ -1,0 +1,43 @@
+name: Mobile CI
+
+# Run on push to main only — mobile linting on every branch would be noisy
+# before the mobile directory exists
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "mobile/**"
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  type-check:
+    name: TypeScript & ESLint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript — strict type check
+        run: npx tsc --noEmit
+
+      - name: ESLint — zero warnings tolerance
+        run: npx eslint src/ --max-warnings 0

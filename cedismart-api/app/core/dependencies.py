@@ -31,14 +31,20 @@ async def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail={"error": {"code": "INVALID_TOKEN", "message": "Invalid or expired token", "field": None}},
+        detail={
+            "error": {
+                "code": "INVALID_TOKEN",
+                "message": "Invalid or expired token",
+                "field": None,
+            }
+        },
         headers={"WWW-Authenticate": "Bearer"},
     )
 
     try:
         payload = decode_token(credentials.credentials)
-    except JWTError:
-        raise credentials_exception
+    except JWTError as e:
+        raise credentials_exception from e
 
     # Ensure this is an access token, not a refresh token
     token_type = payload.get("type")
@@ -51,8 +57,8 @@ async def get_current_user(
 
     try:
         user_id = UUID(user_id_str)
-    except ValueError:
-        raise credentials_exception
+    except ValueError as e:
+        raise credentials_exception from e
 
     return user_id
 
