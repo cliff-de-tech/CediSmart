@@ -341,3 +341,4 @@ CI: tsc --noEmit + eslint --max-warnings 0 + Jest.
 - SMS MoMo parsing (V2)
 - Push notifications (V2)
 - Railway production deployment (Phase 4 prerequisite)
+
