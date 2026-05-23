@@ -33,6 +33,8 @@ jobs:
 
       - name: Run Claude Code Review
         id: claude-review
+        # Non-blocking: Claude action can fail on OIDC/write-access constraints for some bot contexts.
+        # Keep advisory feedback when available without blocking required CI checks.
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:

@@ -72,6 +72,8 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
+# Temporary typed-debt carve-out for modules that currently fail strict mypy in CI.
+# Keep strict mode for all other modules; remove entries as each module is remediated.
 module = [
     "app.core.config",
     "app.core.security",
