@@ -5,7 +5,7 @@ Configures middleware, exception handlers, routers, and lifecycle hooks.
 
 import logging
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -95,16 +95,22 @@ def _add_middleware(app: FastAPI) -> None:
 
     # Request ID — attach a unique ID to every request for tracing
     @app.middleware("http")
-    async def request_id_middleware(request: Request, call_next: object) -> Response:
+    async def request_id_middleware(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
-        response: Response = await call_next(request)  # type: ignore[misc]
+        response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
 
     # Security headers
     @app.middleware("http")
-    async def security_headers_middleware(request: Request, call_next: object) -> Response:
-        response: Response = await call_next(request)  # type: ignore[misc]
+    async def security_headers_middleware(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"

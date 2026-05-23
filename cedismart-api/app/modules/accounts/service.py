@@ -12,6 +12,7 @@ Business rules enforced here:
 
 import uuid
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -133,7 +134,7 @@ async def _compute_balances(
 async def list_accounts(
     user_id: uuid.UUID,
     db: AsyncSession,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Return all active accounts for the user with computed balances.
 
     Uses a single SQL query with LEFT JOIN + aggregation — no N+1 queries.
@@ -173,7 +174,7 @@ async def get_account(
     account_id: uuid.UUID,
     user_id: uuid.UUID,
     db: AsyncSession,
-) -> dict:
+) -> dict[str, Any]:
     """Return a single account with its computed balance."""
     account = await _get_account_or_404(account_id, user_id, db)
     balances = await _compute_balances(user_id, db, [account.id])
@@ -195,7 +196,7 @@ async def create_account(
     payload: AccountCreateRequest,
     is_premium: bool,
     db: AsyncSession,
-) -> dict:
+) -> dict[str, Any]:
     """Create a new financial account.
 
     Enforces the free tier limit of 3 active accounts.
@@ -263,7 +264,7 @@ async def update_account(
     user_id: uuid.UUID,
     payload: AccountUpdateRequest,
     db: AsyncSession,
-) -> dict:
+) -> dict[str, Any]:
     """Update mutable account fields (name, provider only).
 
     opening_balance and account_type are immutable after creation.

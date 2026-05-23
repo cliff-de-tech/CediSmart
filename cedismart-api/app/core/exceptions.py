@@ -5,7 +5,7 @@ All API errors use a consistent JSON envelope:
 """
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -136,7 +136,7 @@ async def generic_exception_handler(_request: Request, exc: Exception) -> JSONRe
 
 def register_exception_handlers(app: FastAPI) -> None:
     """Register all global exception handlers on the FastAPI application."""
-    app.add_exception_handler(AppException, app_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(RequestValidationError, validation_exception_handler)  # type: ignore[arg-type]
-    app.add_exception_handler(Exception, generic_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(AppException, cast(Any, app_exception_handler))
+    app.add_exception_handler(StarletteHTTPException, cast(Any, http_exception_handler))
+    app.add_exception_handler(RequestValidationError, cast(Any, validation_exception_handler))
+    app.add_exception_handler(Exception, cast(Any, generic_exception_handler))

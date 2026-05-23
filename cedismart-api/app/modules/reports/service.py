@@ -13,6 +13,7 @@ import json
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 from sqlalchemy import case, func, select, text
@@ -36,11 +37,11 @@ def _cache_key(report_type: str, user_id: uuid.UUID, *parts: object) -> str:
     return f"{REPORT_CACHE_PREFIX}{report_type}:{user_id}:{suffix}"
 
 
-async def _get_cached(key: str, redis: aioredis.Redis) -> dict | None:
+async def _get_cached(key: str, redis: aioredis.Redis) -> dict[str, Any] | None:
     cached = await redis.get(key)
     if cached:
         try:
-            return json.loads(cached)  # type: ignore[return-value]
+            return cast(dict[str, Any], json.loads(cached))
         except Exception:
             pass
     return None
@@ -84,7 +85,7 @@ async def get_monthly_report(
     month: int,
     db: AsyncSession,
     redis: aioredis.Redis,
-) -> dict:
+) -> dict[str, Any]:
     """Monthly income/expense summary with top category and activity count.
 
     Single SQL query using SUM + CASE WHEN for income/expense split.
@@ -179,7 +180,7 @@ async def get_category_report(
     transaction_type: str,
     db: AsyncSession,
     redis: aioredis.Redis,
-) -> dict:
+) -> dict[str, Any]:
     """Spending breakdown by category for a date range.
 
     Uses GROUP BY with SUM and computes percentage via a SQL window function.
@@ -273,7 +274,7 @@ async def get_trends_report(
     months: int,
     db: AsyncSession,
     redis: aioredis.Redis,
-) -> dict:
+) -> dict[str, Any]:
     """Month-over-month income/expense trend for the last N months.
 
     Uses generate_series to ensure all months are present even if they

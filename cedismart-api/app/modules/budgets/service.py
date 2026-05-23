@@ -18,6 +18,7 @@ import json
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 from sqlalchemy import case, func, or_, select
@@ -152,7 +153,7 @@ async def _compute_budget_progress(
 def _build_budget_response(
     budget: Budget,
     spent: Decimal,
-) -> dict:
+) -> dict[str, Any]:
     """Build the response dict for a single budget with computed progress fields.
 
     All values are plain Python primitives so the dict is safely JSON-serialisable
@@ -200,7 +201,7 @@ async def list_budgets(
     db: AsyncSession,
     year: int | None = None,
     month: int | None = None,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Return all budgets for the given period with computed progress.
 
     Defaults to the current month if year/month not provided.
@@ -240,7 +241,7 @@ async def upsert_budget(
     is_premium: bool,
     db: AsyncSession,
     redis: aioredis.Redis,
-) -> dict:
+) -> dict[str, Any]:
     """Create or update a budget (UPSERT semantics).
 
     Free tier limit (5 budgets/month) is only enforced on INSERT, not UPDATE.
@@ -337,7 +338,7 @@ async def get_current_budgets(
     user_id: uuid.UUID,
     db: AsyncSession,
     redis: aioredis.Redis,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Optimised dashboard endpoint — returns current month budgets with progress.
 
     Results are cached in Redis for 5 minutes and invalidated on any budget
@@ -349,7 +350,7 @@ async def get_current_budgets(
     cached = await redis.get(cache_key)
     if cached:
         try:
-            return json.loads(cached)  # type: ignore[return-value]
+            return cast(list[dict[str, Any]], json.loads(cached))
         except Exception:
             pass  # Cache corrupted — fall through to DB
 

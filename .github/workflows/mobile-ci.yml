@@ -7,11 +7,13 @@ on:
     branches: [main]
     paths:
       - "mobile/**"
-      - ".github/workflows/mobile-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "mobile/**"
+
+permissions:
+  contents: read
 
 defaults:
   run:
@@ -30,8 +32,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-          cache-dependency-path: mobile/package-lock.json
 
       - name: Install dependencies
         run: npm ci
