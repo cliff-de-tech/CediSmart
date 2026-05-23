@@ -284,7 +284,8 @@ async def update_transaction(
         await _assert_category_accessible(payload.category_id, user_id, db)
         tx.category_id = payload.category_id
     if payload.amount is not None:
-        tx.amount = payload.amount  # type: ignore[assignment]
+        tx_typed = cast(Any, tx)
+        tx_typed.amount = payload.amount
     if payload.transaction_type is not None:
         tx.transaction_type = payload.transaction_type
     if payload.description is not None:

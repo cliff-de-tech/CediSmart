@@ -24,7 +24,6 @@ async def init_redis() -> aioredis.Redis:
             max_connections=20,
         ),
     )
-    assert redis_pool is not None
     return redis_pool
 
 

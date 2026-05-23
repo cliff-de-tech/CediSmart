@@ -139,4 +139,4 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppException, cast(Any, app_exception_handler))
     app.add_exception_handler(StarletteHTTPException, cast(Any, http_exception_handler))
     app.add_exception_handler(RequestValidationError, cast(Any, validation_exception_handler))
-    app.add_exception_handler(Exception, generic_exception_handler)
+    app.add_exception_handler(Exception, cast(Any, generic_exception_handler))
