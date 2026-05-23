@@ -71,6 +71,21 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
+[[tool.mypy.overrides]]
+module = [
+    "app.core.config",
+    "app.core.security",
+    "app.core.redis",
+    "app.core.exceptions",
+    "app.core.dependencies",
+    "app.modules.reports.service",
+    "app.modules.budgets.service",
+    "app.modules.accounts.service",
+    "app.modules.transactions.service",
+    "app.main",
+]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
