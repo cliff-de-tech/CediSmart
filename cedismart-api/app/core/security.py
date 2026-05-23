@@ -1,10 +1,11 @@
 """PIN hashing (bcrypt) and JWT token creation/verification (RS256)."""
 
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID
 
 import bcrypt
-from jose import JWTError, jwt
+from jose import JWTError, jwt  # type: ignore[import-untyped]
 
 from app.core.config import settings
 
@@ -77,7 +78,7 @@ def create_access_token(user_id: UUID, expires_delta: timedelta | None = None) -
         "iat": now,
         "exp": now + expires_delta,
     }
-    return jwt.encode(payload, _load_private_key(), algorithm=settings.ALGORITHM)
+    return cast(str, jwt.encode(payload, _load_private_key(), algorithm=settings.ALGORITHM))
 
 
 def create_refresh_token(
@@ -107,7 +108,7 @@ def create_refresh_token(
     }
     if jti is not None:
         payload["jti"] = jti
-    return jwt.encode(payload, _load_private_key(), algorithm=settings.ALGORITHM)
+    return cast(str, jwt.encode(payload, _load_private_key(), algorithm=settings.ALGORITHM))
 
 
 def decode_token(token: str) -> dict[str, object]:

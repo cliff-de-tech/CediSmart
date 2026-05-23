@@ -17,6 +17,7 @@ import logging
 import uuid
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any, cast
 
 import redis.asyncio as aioredis
 from sqlalchemy import case, func, or_, select
@@ -283,7 +284,7 @@ async def update_transaction(
         await _assert_category_accessible(payload.category_id, user_id, db)
         tx.category_id = payload.category_id
     if payload.amount is not None:
-        tx.amount = payload.amount
+        tx.amount = payload.amount  # type: ignore[assignment]
     if payload.transaction_type is not None:
         tx.transaction_type = payload.transaction_type
     if payload.description is not None:
@@ -332,7 +333,7 @@ async def bulk_create_transactions(
     payload: BulkCreateRequest,
     db: AsyncSession,
     redis: aioredis.Redis,
-) -> dict:
+) -> dict[str, Any]:
     """Idempotent bulk transaction create for offline sync.
 
     Each item requires a client_id. If a transaction with the same
@@ -433,7 +434,7 @@ async def get_summary(
     user_id: uuid.UUID,
     db: AsyncSession,
     redis: aioredis.Redis,
-) -> dict:
+) -> dict[str, Any]:
     """Return income/expense summary for the current month vs. last month.
 
     All aggregation is done in a single SQL query using CASE WHEN.
@@ -443,7 +444,7 @@ async def get_summary(
     cached = await redis.get(cache_key)
     if cached:
         try:
-            return json.loads(cached)  # type: ignore[return-value]
+            return cast(dict[str, Any], json.loads(cached))
         except Exception:
             pass  # Cache corrupted — fall through to DB
 

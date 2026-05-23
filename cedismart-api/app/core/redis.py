@@ -1,6 +1,7 @@
 """Redis async connection pool for OTP storage, JWT blocklist, and caching."""
 
 from collections.abc import AsyncGenerator
+from typing import cast
 
 import redis.asyncio as aioredis
 
@@ -15,11 +16,15 @@ async def init_redis() -> aioredis.Redis:
     Called once at application startup.
     """
     global redis_pool  # noqa: PLW0603
-    redis_pool = aioredis.from_url(
-        settings.REDIS_URL,
-        decode_responses=True,
-        max_connections=20,
+    redis_pool = cast(
+        aioredis.Redis,
+        aioredis.from_url(  # type: ignore[no-untyped-call]
+            settings.REDIS_URL,
+            decode_responses=True,
+            max_connections=20,
+        ),
     )
+    assert redis_pool is not None
     return redis_pool
 
 
