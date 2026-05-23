@@ -8,6 +8,9 @@ on:
       - "cedismart-api/**"
       - ".github/workflows/backend-deploy.yml"
 
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: cedismart-api
@@ -34,23 +37,29 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           if [ -z "${RAILWAY_TOKEN:-}" ]; then
-            echo "RAILWAY_TOKEN is not set; skipping deploy."
-            exit 0
+            echo "::error::RAILWAY_TOKEN secret is required for deployment."
+            exit 1
           fi
 
           # Deploy the cedismart-api service defined in Railway project
           railway up --service cedismart-api
 
       - name: Health check — verify deployment is live
-        if: ${{ secrets.RAILWAY_TOKEN != "" && secrets.PRODUCTION_API_URL != "" }}
+        env:
+          PRODUCTION_API_URL: ${{ secrets.PRODUCTION_API_URL }}
         # Wait for Railway to finish deploying before hitting the health endpoint
         run: |
+          if [ -z "${PRODUCTION_API_URL:-}" ]; then
+            echo "::error::PRODUCTION_API_URL secret is required for health check."
+            exit 1
+          fi
+
           echo "Waiting 30s for Railway deployment to stabilise..."
           sleep 30
 
           HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
             --max-time 15 \
-            "${{ secrets.PRODUCTION_API_URL }}/health")
+            "${PRODUCTION_API_URL}/health")
 
           echo "Health check responded with HTTP $HTTP_STATUS"
 

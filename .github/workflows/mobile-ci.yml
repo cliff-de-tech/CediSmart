@@ -12,6 +12,9 @@ on:
     paths:
       - "mobile/**"
 
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: mobile
