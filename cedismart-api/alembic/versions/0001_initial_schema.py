@@ -5,8 +5,9 @@ Revises: (none)
 Create Date: 2026-04-04
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 # revision identifiers
 revision: str = "0001"
@@ -226,9 +227,7 @@ def upgrade() -> None:
             name="fk_transactions_category_id",
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "user_id", "client_id", name="uq_transactions_user_client_id"
-        ),
+        sa.UniqueConstraint("user_id", "client_id", name="uq_transactions_user_client_id"),
     )
     op.create_index(
         "idx_transactions_user_date",
@@ -276,9 +275,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
             nullable=False,
         ),
-        sa.CheckConstraint(
-            "budget_month BETWEEN 1 AND 12", name="ck_budgets_month_range"
-        ),
+        sa.CheckConstraint("budget_month BETWEEN 1 AND 12", name="ck_budgets_month_range"),
         sa.CheckConstraint("amount > 0", name="ck_budgets_amount_positive"),
         sa.ForeignKeyConstraint(
             ["user_id"],

@@ -7,19 +7,19 @@ The database URL in alembic.ini is overridden here with the app's settings.
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
+from alembic import context
 from app.core.config import settings
 from app.core.database import Base
+from app.modules.accounts.models import FinancialAccount  # noqa: F401
 
 # Import all models so that Base.metadata is fully populated.
 from app.modules.auth.models import User  # noqa: F401
-from app.modules.accounts.models import FinancialAccount  # noqa: F401
-from app.modules.transactions.models import Transaction  # noqa: F401
-from app.modules.categories.models import Category  # noqa: F401
 from app.modules.budgets.models import Budget  # noqa: F401
+from app.modules.categories.models import Category  # noqa: F401
+from app.modules.transactions.models import Transaction  # noqa: F401
 
 config = context.config
 
