@@ -35,14 +35,19 @@ jobs:
       - name: Deploy to Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
         run: |
           if [ -z "${RAILWAY_TOKEN:-}" ]; then
             echo "::error::RAILWAY_TOKEN secret is required for deployment."
             exit 1
           fi
 
-          # Deploy the cedismart-api service defined in Railway project
-          railway up --service cedismart-api
+          # Deploy the cedismart-api service; optionally pin project context when provided.
+          if [ -n "${RAILWAY_PROJECT_ID:-}" ]; then
+            railway up --service cedismart-api --project "${RAILWAY_PROJECT_ID}"
+          else
+            railway up --service cedismart-api
+          fi
 
       - name: Health check — verify deployment is live
         env:
