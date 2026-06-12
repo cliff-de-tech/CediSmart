@@ -1,1 +1,82 @@
+# Project-specific
 cedismart-api/test.db
+cedismart_api.egg-info/
+cedismart-api/*.db
+
+# Build / distribution
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Pytest
+.pytest_cache/
+.cache/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Mypy / ruff caches
+.mypy_cache/
+.ruff_cache/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*
+secrets/
+*.pem
+*.key
+
+# Databases
+*.sqlite3
+*.db
+
+# Logs
+*.log
+
+# Project outputs / caches
+graphify-out/
+graphify-out/cache/
+cache/
+
+# Docker
+docker-compose.override.yml
+
+# Local configs
+.env.local
+
+# Docs (local/generated documentation)
+docs/
+docs/superpowers/
+
+# Local agent/CLI configs
+.agents
+.antigravitycli
+.claude
+
