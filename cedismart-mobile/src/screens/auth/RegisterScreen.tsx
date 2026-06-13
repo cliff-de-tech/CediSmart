@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useMutation } from '@tanstack/react-query';
+import { ArrowRight, Shield } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import apiClient from '../../api/client';
 
 const phoneSchema = z.object({
@@ -34,69 +36,111 @@ const RegisterScreen = ({ navigation }: any) => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      className="flex-1 bg-background"
-    >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6">
-        <View className="flex-1 justify-center py-12">
-          <Text className="text-3xl font-bold text-charcoal mb-2">Welcome to CediSmart</Text>
-          <Text className="text-gray-500 mb-8 text-lg">Enter your phone number to get started.</Text>
-
-          <View className="mb-6">
-            <Text className="text-sm font-medium text-gray-700 mb-2 ml-1">Phone Number</Text>
-            <View className="flex-row items-center border-b-2 border-gray-200 py-2 focus:border-primary">
-              <Text className="text-xl text-charcoal mr-2 font-medium">+233</Text>
-              <Controller
-                control={control}
-                name="phone"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <TextInput
-                    className="flex-1 text-xl text-charcoal font-medium"
-                    placeholder="24XXXXXXX"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="phone-pad"
-                    maxLength={9}
-                    onBlur={onBlur}
-                    onChangeText={onChange}
-                    value={value}
-                    autoFocus
-                  />
-                )}
-              />
-            </View>
-            {errors.phone && (
-              <Text className="text-error text-xs mt-2 ml-1">{errors.phone.message}</Text>
-            )}
+    <SafeAreaView className="flex-1 bg-surface">
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        className="flex-1"
+      >
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6">
+          {/* Top Branding Section */}
+          <View className="pt-12 mb-12">
+            <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary mb-3">Join Sovereign Ledger</Text>
+            <Text className="font-headline text-4xl font-bold text-on-surface tracking-tight leading-tight">Create Account</Text>
+            <Text className="font-body text-on-surface-variant mt-4 text-sm leading-relaxed max-w-[280px]">
+              Secure your financial future with Ghana's most trusted digital ledger system.
+            </Text>
           </View>
 
-          {mutation.isError && (
-            <View className="bg-red-50 p-4 rounded-xl mb-6">
-              <Text className="text-error text-sm text-center">
-                {(mutation.error as any)?.response?.data?.error?.message || 'Something went wrong. Please try again.'}
+          {/* Registration Form */}
+          <View className="w-full bg-surface-container-lowest rounded-3xl p-8 shadow-sm">
+            <View className="space-y-8">
+              {/* Phone Number Input Group */}
+              <View className="space-y-3">
+                <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Phone Number</Text>
+                <View className="flex-row items-center bg-surface-container-low rounded-2xl overflow-hidden h-14">
+                  {/* Prefix Container */}
+                  <View className="flex-row items-center px-4 bg-surface-container-high h-full border-r border-outline-variant/10">
+                    <Image 
+                      source={{ uri: 'https://flagsapi.com/GH/flat/64.png' }} 
+                      className="w-6 h-4 rounded-sm mr-2"
+                    />
+                    <Text className="font-body font-bold text-on-surface">+233</Text>
+                  </View>
+                  {/* Input Field */}
+                  <Controller
+                    control={control}
+                    name="phone"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <TextInput
+                        className="flex-1 h-full px-4 font-body text-lg tracking-widest text-on-surface"
+                        placeholder="XXXXXXXXX"
+                        placeholderTextColor="#D1D5DB"
+                        keyboardType="phone-pad"
+                        maxLength={9}
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                      />
+                    )}
+                  />
+                </View>
+                <Text className="font-body text-[10px] text-on-surface-variant leading-relaxed">
+                  Enter your 9-digit mobile number registered with GHS services.
+                </Text>
+                {errors.phone && (
+                  <Text className="text-error text-[10px] font-bold mt-1">{errors.phone.message}</Text>
+                )}
+              </View>
+
+              {/* Primary CTA Button */}
+              <TouchableOpacity
+                onPress={handleSubmit(onSubmit)}
+                disabled={mutation.isPending}
+                className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20"
+              >
+                <View className={`w-full h-14 items-center justify-center flex-row space-x-3 ${mutation.isPending ? 'bg-gray-300' : 'bg-primary'}`}>
+                  <Text className="text-white font-headline font-bold text-base">
+                    {mutation.isPending ? 'Sending...' : 'Send OTP'}
+                  </Text>
+                  <ArrowRight size={20} color="white" />
+                </View>
+              </TouchableOpacity>
+
+              {/* Terms & Privacy */}
+              <Text className="text-center font-body text-[10px] text-on-surface-variant leading-relaxed px-4">
+                By continuing, you agree to our{' '}
+                <Text className="text-primary font-bold underline">Terms of Service</Text>{' '}
+                and{' '}
+                <Text className="text-primary font-bold underline">Privacy Policy</Text>.
               </Text>
             </View>
-          )}
-
-          <TouchableOpacity
-            onPress={handleSubmit(onSubmit)}
-            disabled={mutation.isPending}
-            className={`w-full py-4 rounded-xl items-center justify-center ${mutation.isPending ? 'bg-gray-300' : 'bg-primary shadow-lg shadow-primary/20'}`}
-          >
-            <Text className="text-white font-bold text-lg">
-              {mutation.isPending ? 'Sending OTP...' : 'Continue'}
-            </Text>
-          </TouchableOpacity>
-
-          <View className="mt-8 flex-row justify-center">
-            <Text className="text-gray-500">Already have an account? </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-              <Text className="text-primary font-bold">Login</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+          {/* Footer Actions */}
+          <View className="mt-10 items-center space-y-6 pb-12">
+            <View className="flex-row">
+              <Text className="font-body text-sm text-on-surface-variant">Already have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+                <Text className="text-secondary font-bold">Log In</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View className="flex flex-col items-center space-y-4 pt-8">
+              <View className="flex-row items-center opacity-40 space-x-2">
+                <Shield size={12} color="#1c1b1f" fill="#1c1b1f" />
+                <Text className="font-label text-[9px] uppercase tracking-widest font-bold">End-to-End Encrypted</Text>
+              </View>
+              {/* Ghanaian Heritage Accent */}
+              <View className="flex-row space-x-1 opacity-20">
+                <View className="w-1.5 h-1.5 rounded-full bg-tertiary" />
+                <View className="w-1.5 h-1.5 rounded-full bg-primary" />
+                <View className="w-1.5 h-1.5 rounded-full bg-secondary" />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
