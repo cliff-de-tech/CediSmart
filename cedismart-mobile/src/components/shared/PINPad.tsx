@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Delete } from 'lucide-react-native';
 
 interface PINPadProps {
@@ -9,39 +9,59 @@ interface PINPadProps {
 }
 
 const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, disabled = false }) => {
-  const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'backspace'];
+  const keys = [
+    { digit: '1', letters: '' },
+    { digit: '2', letters: 'ABC' },
+    { digit: '3', letters: 'DEF' },
+    { digit: '4', letters: 'GHI' },
+    { digit: '5', letters: 'JKL' },
+    { digit: '6', letters: 'MNO' },
+    { digit: '7', letters: 'PQRS' },
+    { digit: '8', letters: 'TUV' },
+    { digit: '9', letters: 'WXYZ' },
+    { digit: null, letters: '' },
+    { digit: '0', letters: '' },
+    { digit: 'backspace', letters: '' },
+  ];
 
   return (
-    <View className="w-full px-8 py-4">
+    <View className="w-full max-w-sm self-center px-4">
       <View className="flex-row flex-wrap justify-between">
-        {digits.map((item, index) => {
-          if (item === '') {
-            return <View key={`empty-${index}`} className="w-[28%] aspect-square m-2" />;
+        {keys.map((key, index) => {
+          if (key.digit === null) {
+            return <View key={`empty-${index}`} className="w-[30%] aspect-square m-1" />;
           }
 
-          if (item === 'backspace') {
+          if (key.digit === 'backspace') {
             return (
               <TouchableOpacity
                 key="backspace"
                 onPress={onBackspace}
                 disabled={disabled}
-                className="w-[28%] aspect-square m-2 items-center justify-center rounded-full active:bg-gray-200"
+                className="w-[30%] aspect-square m-1 items-center justify-center rounded-2xl active:bg-surface-container-low transition-all"
                 accessibilityLabel="Backspace"
               >
-                <Delete color="#1C1C2E" size={32} />
+                <Delete color="#1c1b1f" size={28} />
               </TouchableOpacity>
             );
           }
 
           return (
             <TouchableOpacity
-              key={item}
-              onPress={() => onPress(item)}
+              key={key.digit}
+              onPress={() => onPress(key.digit!)}
               disabled={disabled}
-              className="w-[28%] aspect-square m-2 items-center justify-center rounded-full active:bg-gray-200"
-              accessibilityLabel={item}
+              className="w-[30%] aspect-square m-1 items-center justify-center rounded-2xl active:bg-surface-container-low transition-all"
+              accessibilityLabel={key.digit}
             >
-              <Text className="text-3xl font-semibold text-charcoal">{item}</Text>
+              <View className="items-center">
+                <Text className="text-3xl font-headline font-bold text-on-surface">{key.digit}</Text>
+                {key.letters ? (
+                  <Text className="text-[10px] font-bold text-outline-variant uppercase tracking-widest mt-1">
+                    {key.letters}
+                  </Text>
+                ) : null}
+              </View>
             </TouchableOpacity>
           );
         })}

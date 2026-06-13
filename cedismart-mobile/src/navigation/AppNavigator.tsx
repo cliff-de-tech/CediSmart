@@ -1,9 +1,13 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Home, PieChart, Landmark, Settings } from 'lucide-react-native';
+import { Home, PieChart, Landmark, Settings, BarChart3, Wallet, Shield } from 'lucide-react-native';
 import DashboardScreen from '../screens/dashboard/DashboardScreen';
 import AddTransactionScreen from '../screens/transactions/AddTransactionScreen';
+import AccountsScreen from '../screens/settings/AccountsScreen';
+import BudgetsScreen from '../screens/budgets/BudgetsScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
+import ReportsScreen from '../screens/reports/ReportsScreen';
 import { View, Text, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,10 +21,6 @@ const Placeholder = ({ name }: { name: string }) => (
   </View>
 );
 
-const BudgetsPlaceholder = () => <Placeholder name="Budgets" />;
-const AccountsPlaceholder = () => <Placeholder name="Accounts" />;
-const SettingsPlaceholder = () => <Placeholder name="Settings" />;
-
 const TabNavigator = () => {
   const insets = useSafeAreaInsets();
   
@@ -32,47 +32,78 @@ const TabNavigator = () => {
     <Tab.Navigator 
       screenOptions={{ 
         headerShown: false,
-        tabBarActiveTintColor: '#0A6E4A',
-        tabBarInactiveTintColor: '#9CA3AF',
+        tabBarActiveTintColor: '#ffffff',
+        tabBarInactiveTintColor: '#707a6c',
         tabBarStyle: {
-          borderTopWidth: 1,
-          borderTopColor: '#F3F4F6',
-          height: tabHeight,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderTopWidth: 0,
+          backgroundColor: 'rgba(253, 248, 253, 0.95)',
+          height: tabHeight + 12,
           paddingBottom: bottomPadding,
-          paddingTop: 8,
-        }
+          paddingTop: 12,
+          borderTopLeftRadius: 32,
+          borderTopRightRadius: 32,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -8 },
+          shadowOpacity: 0.05,
+          shadowRadius: 24,
+          elevation: 20,
+        },
       }}
     >
       <Tab.Screen 
         name="DashboardTab" 
         component={DashboardScreen} 
         options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          tabBarLabel: 'Ledger',
+          tabBarIcon: ({ color, focused }) => (
+            <View className={focused ? 'bg-primary p-2 rounded-2xl scale-110 shadow-lg shadow-primary/20' : 'p-2'}>
+              <Home color={color} size={20} fill={focused ? 'white' : 'none'} />
+            </View>
+          ),
+          tabBarLabelStyle: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginTop: 4 },
+        }}
+      />
+      <Tab.Screen 
+        name="ReportsTab" 
+        component={ReportsScreen} 
+        options={{
+          tabBarLabel: 'Insights',
+          tabBarIcon: ({ color, focused }) => (
+            <View className={focused ? 'bg-primary p-2 rounded-2xl scale-110 shadow-lg shadow-primary/20' : 'p-2'}>
+              <BarChart3 color={color} size={20} fill={focused ? 'white' : 'none'} />
+            </View>
+          ),
+          tabBarLabelStyle: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginTop: 4 },
         }}
       />
       <Tab.Screen 
         name="BudgetsTab" 
-        component={BudgetsPlaceholder} 
+        component={BudgetsScreen} 
         options={{
-          tabBarLabel: 'Budgets',
-          tabBarIcon: ({ color, size }) => <PieChart color={color} size={size} />,
-        }}
-      />
-      <Tab.Screen 
-        name="AccountsTab" 
-        component={AccountsPlaceholder} 
-        options={{
-          tabBarLabel: 'Accounts',
-          tabBarIcon: ({ color, size }) => <Landmark color={color} size={size} />,
+          tabBarLabel: 'Vault',
+          tabBarIcon: ({ color, focused }) => (
+            <View className={focused ? 'bg-primary p-2 rounded-2xl scale-110 shadow-lg shadow-primary/20' : 'p-2'}>
+              <Shield color={color} size={20} fill={focused ? 'white' : 'none'} />
+            </View>
+          ),
+          tabBarLabelStyle: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginTop: 4 },
         }}
       />
       <Tab.Screen 
         name="SettingsTab" 
-        component={SettingsPlaceholder} 
+        component={SettingsScreen} 
         options={{
-          tabBarLabel: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+          tabBarLabel: 'Setup',
+          tabBarIcon: ({ color, focused }) => (
+            <View className={focused ? 'bg-primary p-2 rounded-2xl scale-110 shadow-lg shadow-primary/20' : 'p-2'}>
+              <Settings color={color} size={20} fill={focused ? 'white' : 'none'} />
+            </View>
+          ),
+          tabBarLabelStyle: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1, marginTop: 4 },
         }}
       />
     </Tab.Navigator>

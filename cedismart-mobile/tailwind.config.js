@@ -4,14 +4,23 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: "#0A6E4A", // deep emerald green
-        accent: "#F5A623",  // warm amber/gold
-        background: "#F8F9FA",
-        surface: "#FFFFFF",
-        charcoal: "#1C1C2E",
-        error: "#DC2626",
-        success: "#16A34A",
-        warning: "#D97706",
+        primary: "#0d631b",
+        "primary-container": "#2e7d32",
+        secondary: "#4c56af",
+        tertiary: "#993300",
+        surface: "#fdf8fd",
+        "surface-container-low": "#f7f2f8",
+        "surface-container-lowest": "#ffffff",
+        "on-surface": "#1c1b1f",
+        "on-surface-variant": "#40493d",
+        "outline-variant": "#bfcaba",
+        error: "#ba1a1a",
+        "error-container": "#ffdad6",
+      },
+      fontFamily: {
+        headline: ["System"], // Fallback to System for now
+        body: ["System"],
+        label: ["System"],
       },
     },
   },
