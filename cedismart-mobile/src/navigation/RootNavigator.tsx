@@ -21,8 +21,12 @@ const RootNavigator = () => {
         } else {
           logout();
         }
-      } catch (error) {
-        console.error('Session hydration failed:', error);
+      } catch (error: any) {
+        console.error('Session hydration failed:', error?.message || error);
+        // Clear potentially stale/invalid tokens so the user
+        // isn't stuck in a broken state on next launch
+        await SecureStore.deleteItemAsync('access_token').catch(() => {});
+        await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
         logout();
       } finally {
         setLoading(false);
