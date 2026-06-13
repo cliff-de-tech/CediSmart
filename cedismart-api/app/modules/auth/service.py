@@ -111,8 +111,9 @@ async def verify_registration(
 
     # Test-mode bypass (only active in non-production environments)
     from app.core.config import settings
+
     if settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
-        pass # Bypass Redis check for testing
+        pass  # Bypass Redis check for testing
     else:
         stored_otp: str | None = await redis.get(redis_key)
 
