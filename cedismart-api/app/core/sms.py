@@ -45,10 +45,10 @@ async def send_otp(phone: str, otp: str) -> None:
     Raises:
         AppException 503: If the SMS gateway is unreachable or returns an error.
     """
-    if not settings.TERMII_API_KEY:
-        # Development stub — TERMII_API_KEY not configured
+    if not settings.TERMII_API_KEY or settings.ENVIRONMENT in ("development", "testing"):
+        # Development stub — TERMII_API_KEY not configured or in dev environment
         logger.warning(
-            "SMS_STUB [no TERMII_API_KEY]: would send OTP to %s — code: %s",
+            "SMS_STUB [dev mode]: would send OTP to %s — code: %s",
             phone,
             otp,
         )

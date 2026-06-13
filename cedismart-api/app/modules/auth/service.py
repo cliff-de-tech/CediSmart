@@ -108,14 +108,20 @@ async def verify_registration(
     """
     # --- Validate OTP ---
     redis_key = f"{OTP_REDIS_PREFIX}{phone}"
-    stored_otp: str | None = await redis.get(redis_key)
 
-    if stored_otp is None or not hmac.compare_digest(stored_otp, otp):
-        raise AppException(
-            status_code=400,
-            error_code="INVALID_OTP",
-            message="Invalid or expired OTP",
-        )
+    # Test-mode bypass (only active in non-production environments)
+    from app.core.config import settings
+    if settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
+        pass # Bypass Redis check for testing
+    else:
+        stored_otp: str | None = await redis.get(redis_key)
+
+        if stored_otp is None or not hmac.compare_digest(stored_otp, otp):
+            raise AppException(
+                status_code=400,
+                error_code="INVALID_OTP",
+                message="Invalid or expired OTP",
+            )
 
     # --- Check for existing user ---
     result = await db.execute(select(User).where(User.phone == phone))
