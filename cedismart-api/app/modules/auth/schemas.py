@@ -3,6 +3,7 @@
 import re
 
 from pydantic import BaseModel, field_validator
+from app.modules.users.schemas import UserResponse
 
 # E.164 format for Ghana: +233 followed by 9 digits
 _GHANA_PHONE_RE = re.compile(r"^\+233\d{9}$")
@@ -152,6 +153,7 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    user: UserResponse
 
 
 class MessageResponse(BaseModel):

@@ -149,7 +149,7 @@ async def verify_registration(
     # --- Clean up OTP ---
     await redis.delete(redis_key)
 
-    return tokens
+    return {**tokens, "user": user}
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +195,8 @@ async def login(
     if not verify_pin(pin, user.pin_hash):
         raise _invalid
 
-    return await _issue_tokens(user.id, redis)
+    tokens = await _issue_tokens(user.id, redis)
+    return {**tokens, "user": user}
 
 
 # ---------------------------------------------------------------------------
