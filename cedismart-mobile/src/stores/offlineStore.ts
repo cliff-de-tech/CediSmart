@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { encryptData, decryptData } from '../utils/secureStorage';
 
 export interface OfflineTransaction {
   client_id: string;
@@ -21,6 +22,30 @@ interface OfflineStoreState {
   clearQueue: () => void;
 }
 
+const encryptedStorage: StateStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    const value = await AsyncStorage.getItem(name);
+    if (!value) return null;
+    try {
+      return await decryptData(value);
+    } catch (e) {
+      console.error('[EncryptedStorage] Decryption failed, returning null', e);
+      return null;
+    }
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      const encryptedValue = await encryptData(value);
+      await AsyncStorage.setItem(name, encryptedValue);
+    } catch (e) {
+      console.error('[EncryptedStorage] Encryption failed', e);
+    }
+  },
+  removeItem: async (name: string): Promise<void> => {
+    await AsyncStorage.removeItem(name);
+  },
+};
+
 export const useOfflineStore = create<OfflineStoreState>()(
   persist(
     (set) => ({
@@ -38,7 +63,7 @@ export const useOfflineStore = create<OfflineStoreState>()(
     }),
     {
       name: 'offline-transactions-storage',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => encryptedStorage),
     }
   )
 );
