@@ -36,12 +36,54 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+// --- Multi-Account Session Helpers ---
+export const getActiveSessionPhone = async (): Promise<string | null> => {
+  return await SecureStore.getItemAsync('active_session_phone');
+};
+
+export const getActiveTokens = async (): Promise<{ access: string | null; refresh: string | null }> => {
+  const activePhone = await getActiveSessionPhone();
+  if (activePhone) {
+    const sanitized = activePhone.replace(/[^\w.-]/g, '');
+    const access = await SecureStore.getItemAsync(`session_access_token_${sanitized}`);
+    const refresh = await SecureStore.getItemAsync(`session_refresh_token_${sanitized}`);
+    return { access, refresh };
+  }
+  // Fallback to legacy
+  const access = await SecureStore.getItemAsync('access_token');
+  const refresh = await SecureStore.getItemAsync('refresh_token');
+  return { access, refresh };
+};
+
+export const setActiveTokens = async (phone: string, access: string, refresh: string): Promise<void> => {
+  const sanitized = phone.replace(/[^\w.-]/g, '');
+  await SecureStore.setItemAsync('active_session_phone', phone);
+  await SecureStore.setItemAsync(`session_access_token_${sanitized}`, access);
+  await SecureStore.setItemAsync(`session_refresh_token_${sanitized}`, refresh);
+  
+  // Legacy fallback support
+  await SecureStore.setItemAsync('access_token', access);
+  await SecureStore.setItemAsync('refresh_token', refresh);
+};
+
+export const clearActiveSession = async (phone: string): Promise<void> => {
+  // NOTE: We intentionally do NOT delete the per-account tokens
+  // (session_access_token_${sanitized}, session_refresh_token_${sanitized})
+  // so the user can switch back to this account later without re-authenticating.
+  const activePhone = await getActiveSessionPhone();
+  if (activePhone === phone) {
+    await SecureStore.deleteItemAsync('active_session_phone');
+    await SecureStore.deleteItemAsync('access_token');
+    await SecureStore.deleteItemAsync('refresh_token');
+  }
+};
+
 // --- Request Interceptor ---
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const token = await SecureStore.getItemAsync('access_token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const { access } = await getActiveTokens();
+    if (access && config.headers) {
+      config.headers.Authorization = `Bearer ${access}`;
     }
     return config;
   },
@@ -72,26 +114,44 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const refreshToken = await SecureStore.getItemAsync('refresh_token');
-        if (!refreshToken) throw new Error('No refresh token');
+        const { refresh } = await getActiveTokens();
+        if (!refresh) throw new Error('No refresh token');
 
         // Attempt to refresh
         const response = await axios.post(`${BASE_URL}/auth/token/refresh`, {
-          refresh_token: refreshToken,
+          refresh_token: refresh,
         });
 
-        const { access_token } = response.data;
+        const { access_token, refresh_token } = response.data;
+        
+        // Save new access token
+        const activePhone = await getActiveSessionPhone();
+        if (activePhone) {
+          const sanitized = activePhone.replace(/[^\w.-]/g, '');
+          await SecureStore.setItemAsync(`session_access_token_${sanitized}`, access_token);
+          if (refresh_token) {
+            await SecureStore.setItemAsync(`session_refresh_token_${sanitized}`, refresh_token);
+          }
+        }
         await SecureStore.setItemAsync('access_token', access_token);
+        if (refresh_token) {
+          await SecureStore.setItemAsync('refresh_token', refresh_token);
+        }
 
         processQueue(null, access_token);
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
+        
         // Force logout on refresh failure
-        await SecureStore.deleteItemAsync('access_token');
-        await SecureStore.deleteItemAsync('refresh_token');
-        // TODO: Trigger global logout via authStore (requires circular dep handling)
+        const activePhone = await getActiveSessionPhone();
+        if (activePhone) {
+          await clearActiveSession(activePhone);
+        } else {
+          await SecureStore.deleteItemAsync('access_token');
+          await SecureStore.deleteItemAsync('refresh_token');
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

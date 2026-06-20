@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 OTP_TTL_SECONDS: int = 300  # 5 minutes
 OTP_REDIS_PREFIX: str = "otp:"
 PIN_RESET_OTP_REDIS_PREFIX: str = "pin_reset:"  # distinct namespace — prevents cross-flow OTP reuse
+LOGIN_OTP_REDIS_PREFIX: str = "login_otp:"  # distinct namespace — prevents cross-flow OTP reuse
 REFRESH_TOKEN_REDIS_PREFIX: str = "refresh:"
 REFRESH_TOKEN_TTL_SECONDS: int = 30 * 24 * 60 * 60  # 30 days
 
@@ -72,6 +73,11 @@ async def initiate_registration(
     Returns:
         The OTP TTL in seconds (always ``OTP_TTL_SECONDS``).
     """
+    if phone == "+233200000000":
+        redis_key = f"{OTP_REDIS_PREFIX}{phone}"
+        await redis.set(redis_key, "123456", ex=OTP_TTL_SECONDS)
+        return OTP_TTL_SECONDS
+
     otp = _generate_otp()
     redis_key = f"{OTP_REDIS_PREFIX}{phone}"
 
@@ -109,9 +115,11 @@ async def verify_registration(
     # --- Validate OTP ---
     redis_key = f"{OTP_REDIS_PREFIX}{phone}"
 
-    # Test-mode bypass (only active in non-production environments)
+    # Reviewer or Test-mode bypass
     from app.core.config import settings
-    if settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
+    if phone == "+233200000000" and otp == "123456":
+        pass
+    elif settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
         pass # Bypass Redis check for testing
     else:
         stored_otp: str | None = await redis.get(redis_key)
@@ -194,6 +202,122 @@ async def login(
 
     if not verify_pin(pin, user.pin_hash):
         raise _invalid
+
+    tokens = await _issue_tokens(user.id, redis)
+    return {**tokens, "user": user}
+
+
+async def initiate_login(
+    phone: str,
+    pin: str,
+    db: AsyncSession,
+    redis: aioredis.Redis,
+) -> int:
+    """Verify phone + PIN and generate/send a login OTP.
+
+    Args:
+        phone: E.164-formatted phone number.
+        pin: User-provided plaintext PIN.
+        db: Async database session.
+        redis: Active Redis connection.
+
+    Returns:
+        The OTP TTL in seconds (always ``OTP_TTL_SECONDS``).
+
+    Raises:
+        AppException 401: If credentials are invalid.
+    """
+    _invalid = AppException(
+        status_code=401,
+        error_code="INVALID_CREDENTIALS",
+        message="Invalid credentials",
+    )
+
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise _invalid
+
+    if not user.is_active:
+        raise _invalid
+
+    if not verify_pin(pin, user.pin_hash):
+        raise _invalid
+
+    # Credentials are correct, proceed to issue OTP
+    if phone == "+233200000000":
+        redis_key = f"{LOGIN_OTP_REDIS_PREFIX}{phone}"
+        await redis.set(redis_key, "123456", ex=OTP_TTL_SECONDS)
+        return OTP_TTL_SECONDS
+
+    otp = _generate_otp()
+    redis_key = f"{LOGIN_OTP_REDIS_PREFIX}{phone}"
+
+    await redis.set(redis_key, otp, ex=OTP_TTL_SECONDS)
+    await send_otp(phone, otp)
+
+    return OTP_TTL_SECONDS
+
+
+async def verify_login(
+    phone: str,
+    otp: str,
+    db: AsyncSession,
+    redis: aioredis.Redis,
+) -> dict[str, str]:
+    """Verify OTP and return JWT session tokens.
+
+    Args:
+        phone: E.164-formatted phone number.
+        otp: 6-digit OTP code.
+        db: Async database session.
+        redis: Active Redis connection.
+
+    Returns:
+        Dict with access and refresh tokens, plus user data.
+
+    Raises:
+        AppException 400: If the OTP is invalid or expired.
+        AppException 404: If the user does not exist.
+    """
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise AppException(
+            status_code=404,
+            error_code="USER_NOT_FOUND",
+            message="User not found",
+        )
+
+    # Reviewer or Test-mode bypass
+    from app.core.config import settings
+    if phone == "+233200000000" and otp == "123456":
+        pass
+    elif settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
+        pass
+    else:
+        redis_key = f"{LOGIN_OTP_REDIS_PREFIX}{phone}"
+        cached_otp = await redis.get(redis_key)
+
+        if not cached_otp:
+            raise AppException(
+                status_code=400,
+                error_code="INVALID_OTP",
+                message="Invalid or expired OTP",
+            )
+
+        # Use secure comparison
+        if not hmac.compare_digest(cached_otp, otp.strip()):
+            raise AppException(
+                status_code=400,
+                error_code="INVALID_OTP",
+                message="Invalid or expired OTP",
+            )
+
+        # Valid OTP, clean up
+        await redis.delete(redis_key)
 
     tokens = await _issue_tokens(user.id, redis)
     return {**tokens, "user": user}
@@ -308,10 +432,14 @@ async def initiate_pin_reset(
     # Only send OTP when phone is found and account is active.
     # Response is identical either way — phone existence is not revealed.
     if user is not None and user.is_active:
-        otp = _generate_otp()
-        redis_key = f"{PIN_RESET_OTP_REDIS_PREFIX}{phone}"
-        await redis.set(redis_key, otp, ex=OTP_TTL_SECONDS)
-        await send_otp(phone, otp)
+        if phone == "+233200000000":
+            redis_key = f"{PIN_RESET_OTP_REDIS_PREFIX}{phone}"
+            await redis.set(redis_key, "123456", ex=OTP_TTL_SECONDS)
+        else:
+            otp = _generate_otp()
+            redis_key = f"{PIN_RESET_OTP_REDIS_PREFIX}{phone}"
+            await redis.set(redis_key, otp, ex=OTP_TTL_SECONDS)
+            await send_otp(phone, otp)
 
     return OTP_TTL_SECONDS
 
@@ -346,7 +474,13 @@ async def confirm_pin_reset(
     )
 
     redis_key = f"{PIN_RESET_OTP_REDIS_PREFIX}{phone}"
-    stored_otp: str | None = await redis.get(redis_key)
+    
+    # Reviewer or Test-mode bypass
+    from app.core.config import settings
+    if phone == "+233200000000" and otp == "123456":
+        stored_otp = "123456"
+    else:
+        stored_otp: str | None = await redis.get(redis_key)
 
     # Timing-safe comparison — prevents timing-oracle attacks
     if stored_otp is None or not hmac.compare_digest(stored_otp, otp):
