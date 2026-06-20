@@ -14,7 +14,7 @@ from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.core.redis import get_redis
 from app.modules.users import service
-from app.modules.users.schemas import UserResponse, UserUpdateRequest
+from app.modules.users.schemas import UserResponse, UserUpdateRequest, KYCVerifyRequest
 
 router = APIRouter()
 
@@ -93,3 +93,28 @@ async def delete_me(
     is_active is set to False.
     """
     await service.delete_current_user(user_id=user_id, db=db, redis=redis)
+
+
+# ---------------------------------------------------------------------------
+# POST /verify-kyc
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/verify-kyc",
+    response_model=UserResponse,
+    status_code=200,
+    summary="Verify user identity with Ghana Card using Smile ID",
+)
+async def verify_kyc(
+    body: KYCVerifyRequest,
+    user_id: CurrentUser,
+    db: DBSession,
+) -> UserResponse:
+    """Verify current user identity using their Ghana Card.
+    
+    Verifies that the provided card number exists in the National Identification
+    Authority (NIA) database via Smile ID, and that the name and DOB match.
+    """
+    user = await service.verify_user_kyc(user_id=user_id, payload=body, db=db)
+    return UserResponse.model_validate(user)

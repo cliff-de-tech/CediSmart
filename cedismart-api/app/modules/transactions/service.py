@@ -553,3 +553,195 @@ async def get_summary(
 
     await redis.set(cache_key, json.dumps(result), ex=SUMMARY_CACHE_TTL)
     return result
+
+
+async def parse_sms_with_gemini(
+    sms_content: str, db: AsyncSession, user_id: uuid.UUID
+) -> dict[str, Any]:
+    """Parse SMS transaction notifications using Gemini 1.5 Flash API or a fallback rules-based engine."""
+    from app.core.config import settings
+    import httpx
+
+    sms_text = sms_content.strip()
+    parsed_data = None
+
+    if settings.GEMINI_API_KEY:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+
+        prompt = (
+            "Analyze the following SMS transaction notification and extract transaction details. "
+            "Determine if it is an income (receive, cash-in, deposit) or expense (send, cash-out, payment, fee, withdrawal). "
+            "Identify the amount of the transaction. "
+            "Identify the counterparty / recipient / sender or activity as description. "
+            "Suggest a category (e.g. food, transfer, utilities, cash-out, leisure, or other). "
+            f"SMS: \"{sms_text}\""
+        )
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "amount": {"type": "NUMBER"},
+                        "transaction_type": {"type": "STRING", "enum": ["income", "expense"]},
+                        "description": {"type": "STRING"},
+                        "category_suggestion": {"type": "STRING"},
+                        "notes": {"type": "STRING"}
+                    },
+                    "required": ["amount", "transaction_type", "description"]
+                }
+            }
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(url, json=payload)
+                if response.status_code == 200:
+                    resp_json = response.json()
+                    text_out = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+                    parsed_data = json.loads(text_out)
+                else:
+                    logger.error("Gemini API error (status %d): %s", response.status_code, response.text)
+        except Exception as e:
+            logger.error("Failed to parse SMS using Gemini API: %s", str(e))
+
+    if not parsed_data:
+        logger.info("Using local regex fallback parser for SMS")
+        parsed_data = _parse_sms_fallback(sms_text)
+
+    category_id = None
+    if parsed_data.get("category_suggestion"):
+        suggested = parsed_data["category_suggestion"].strip().lower()
+        stmt = select(Category).where(
+            func.lower(Category.name) == suggested
+        )
+        result = await db.execute(stmt)
+        cat_obj = result.scalar_one_or_none()
+        if cat_obj:
+            category_id = cat_obj.id
+        else:
+            stmt_all = select(Category).where(Category.category_type == parsed_data["transaction_type"])
+            res_all = await db.execute(stmt_all)
+            cats = res_all.scalars().all()
+            for c in cats:
+                if c.name.lower() in suggested or suggested in c.name.lower():
+                    category_id = c.id
+                    break
+
+            if not category_id and cats:
+                other_cat = next((c for c in cats if "other" in c.name.lower() or "misc" in c.name.lower()), None)
+                if other_cat:
+                    category_id = other_cat.id
+                else:
+                    category_id = cats[0].id
+
+    return {
+        "amount": parsed_data.get("amount", 0.0),
+        "transaction_type": parsed_data.get("transaction_type", "expense"),
+        "description": parsed_data.get("description", "SMS Import"),
+        "category_id": category_id,
+        "category_name": parsed_data.get("category_suggestion", "Other").title(),
+        "notes": parsed_data.get("notes", f"Parsed SMS: {sms_text}")
+    }
+
+
+def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
+    """Fallback rule-based regex parsing for common Ghana Mobile Money transaction SMS structures."""
+    import re
+    sms_text_lower = sms_text.lower()
+
+    amount = 0.0
+    transaction_type = "expense"
+    description = "SMS Import"
+    category_suggestion = "other"
+    notes = f"Regex Parsed SMS: {sms_text}"
+
+    # 1. Extract amount
+    amount_match = re.search(r'(?:ghs|ghc|₵)\s*(\d+(?:\.\d{2})?)', sms_text, re.IGNORECASE)
+    if not amount_match:
+        amount_match = re.search(r'(\d+\.\d{2})', sms_text)
+
+    if amount_match:
+        try:
+            amount = float(amount_match.group(1))
+        except ValueError:
+            pass
+
+    # 2. Determine Transaction Type (income vs expense)
+    income_keywords = [
+        "received from",
+        "received of",
+        "received",
+        "cash in",
+        "deposited",
+        "refunded",
+        "credited",
+        "deposit",
+    ]
+    is_income = any(kw in sms_text_lower for kw in income_keywords)
+
+    if is_income:
+        transaction_type = "income"
+        category_suggestion = "other income"
+
+        sender_patterns = [
+            r'received\s+from\s+([^.]+)',
+            r'received\s+of\s+(?:ghs|ghc|₵)?\s*\d+(?:\.\d{2})?\s+from\s+([^.]+)',
+            r'received\s+of\s+([^.]+)\s+from',
+            r'deposited\s+into.*by\s+([^.]+)',
+            r'deposited\s+by\s+([^.]+)',
+            r'transfer\s+from\s+([^.]+)',
+        ]
+        for pattern in sender_patterns:
+            match = re.search(pattern, sms_text, re.IGNORECASE)
+            if match:
+                description = match.group(1).strip()
+                break
+    else:
+        transaction_type = "expense"
+        category_suggestion = "utilities"
+
+        recipient_patterns = [
+            r'sent\s+(?:ghs|ghc|₵)?\s*\d+(?:\.\d{2})?\s+to\s+([^.]+)',
+            r'sent\s+to\s+([^.]+)',
+            r'paid\s+to\s+([^.]+)',
+            r'payment\s+to\s+([^.]+)',
+            r'payment\s+of\s+.*?\s+made\s+to\s+([^.]+)',
+            r'transferred\s+to\s+([^.]+)',
+        ]
+        for pattern in recipient_patterns:
+            match = re.search(pattern, sms_text, re.IGNORECASE)
+            if match:
+                description = match.group(1).strip()
+                break
+
+        if description == "SMS Import":
+            if "withdrawn" in sms_text_lower or "cash out" in sms_text_lower:
+                description = "Agent Withdrawal"
+                category_suggestion = "cash out"
+
+        desc_lower = description.lower()
+        if any(w in desc_lower for w in ["ecg", "electricity", "water", "gwcl"]):
+            category_suggestion = "bills"
+        elif any(w in desc_lower for w in ["ride", "bolt", "uber", "yango", "transport"]):
+            category_suggestion = "transport"
+        elif any(w in desc_lower for w in ["food", "restaurant", "kfc", "chop", "canteen"]):
+            category_suggestion = "food"
+        elif any(w in desc_lower for w in ["telecel", "mtn", "airtel", "bundle", "credit", "internet"]):
+            category_suggestion = "telecom"
+
+    return {
+        "amount": amount,
+        "transaction_type": transaction_type,
+        "description": description,
+        "category_suggestion": category_suggestion,
+        "notes": notes,
+    }

@@ -17,6 +17,7 @@ class UserUpdateRequest(BaseModel):
     full_name: str | None = Field(None, min_length=1, max_length=100)
     email: EmailStr | None = None
     currency: str | None = Field(None, min_length=3, max_length=3)
+    is_premium: bool | None = None
 
     @field_validator("currency")
     @classmethod
@@ -24,6 +25,12 @@ class UserUpdateRequest(BaseModel):
         if v is not None and v.upper() not in SUPPORTED_CURRENCIES:
             raise ValueError(f"currency must be one of: {', '.join(sorted(SUPPORTED_CURRENCIES))}")
         return v.upper() if v else v
+
+
+class KYCVerifyRequest(BaseModel):
+    ghana_card_number: str = Field(..., pattern=r"^GHA-\d{9}-\d$")
+    full_name: str = Field(..., min_length=1, max_length=100)
+    dob: str = Field(..., pattern=r"^\d{4}-\d{2}-\d{2}$")  # YYYY-MM-DD
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +46,8 @@ class UserResponse(BaseModel):
     currency: str
     is_premium: bool
     premium_expires_at: datetime | None
+    kyc_verified: bool
+    ghana_card: str | None
     created_at: datetime
 
     model_config = {"from_attributes": True}

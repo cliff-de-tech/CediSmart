@@ -274,24 +274,28 @@ async def get_trends_report(
     months: int,
     db: AsyncSession,
     redis: aioredis.Redis,
+    end_year: int | None = None,
+    end_month: int | None = None,
 ) -> dict[str, Any]:
-    """Month-over-month income/expense trend for the last N months.
+    """Month-over-month income/expense trend for the last N months ending at end_year/end_month.
 
     Uses generate_series to ensure all months are present even if they
     have zero transactions — prevents gaps in frontend charts.
     Amounts returned as "0.00" (never null) for empty months.
     """
-    cache_key = _cache_key("trends", user_id, months)
+    now = datetime.now(UTC)
+    end_y = end_year or now.year
+    end_m = end_month or now.month
+
+    cache_key = _cache_key("trends", user_id, months, end_y, end_m)
     cached = await _get_cached(cache_key, redis)
     if cached:
         return cached
 
-    now = datetime.now(UTC)
-
     # Compute the start month (N months ago, inclusive of current)
     # E.g., months=6 and current = 2026-04 → start from 2025-11
-    start_year = now.year
-    start_month = now.month - months + 1
+    start_year = end_y
+    start_month = end_m - months + 1
     while start_month <= 0:
         start_month += 12
         start_year -= 1
@@ -303,7 +307,7 @@ async def get_trends_report(
     # the set-returning-function-per-column cross-product issue.
     month_col = func.generate_series(
         start_date,
-        date(now.year, now.month, 1),
+        date(end_y, end_m, 1),
         text("INTERVAL '1 month'"),
     ).column_valued("m")
 

@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     TERMII_API_KEY: str = ""
     TERMII_SENDER_ID: str = "CediSmart"
 
+    # --- Smile ID ---
+    SMILE_ID_PARTNER_ID: str = ""
+    SMILE_ID_API_KEY: str = ""
+    SMILE_ID_ENV: str = "sandbox"
+
+    # --- Gemini (AI SMS Parsing) ---
+    GEMINI_API_KEY: str = ""
+
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:

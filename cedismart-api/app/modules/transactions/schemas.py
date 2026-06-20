@@ -162,3 +162,16 @@ class MonthComparison(BaseModel):
 class TransactionSummaryResponse(BaseModel):
     current_month: MonthSummary
     current_month_vs_last: MonthComparison
+
+
+class SMSParseRequest(BaseModel):
+    sms: str = Field(..., min_length=5, max_length=1000)
+
+
+class SMSParseResponse(BaseModel):
+    amount: Decimal
+    transaction_type: str
+    description: str
+    category_id: uuid.UUID | None = None
+    category_name: str
+    notes: str | None = None

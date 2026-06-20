@@ -28,6 +28,8 @@ from app.modules.transactions.schemas import (
     TransactionResponse,
     TransactionSummaryResponse,
     TransactionUpdateRequest,
+    SMSParseRequest,
+    SMSParseResponse,
 )
 
 router = APIRouter()
@@ -256,3 +258,31 @@ async def delete_transaction(
         db=db,
         redis=redis,
     )
+
+
+# ---------------------------------------------------------------------------
+# POST /parse-sms
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/parse-sms",
+    response_model=SMSParseResponse,
+    status_code=200,
+    summary="Parse raw SMS transaction alerts using Gemini AI",
+)
+async def parse_sms(
+    payload: SMSParseRequest,
+    user_id: CurrentUser,
+    db: DBSession,
+) -> SMSParseResponse:
+    """Parse a raw transactional SMS (e.g. from MTN MoMo or Telecel Cash) using
+    the Gemini AI assistant, resolving the transaction type, amount, category,
+    and description details.
+    """
+    res = await service.parse_sms_with_gemini(
+        sms_content=payload.sms,
+        db=db,
+        user_id=user_id,
+    )
+    return SMSParseResponse(**res)
