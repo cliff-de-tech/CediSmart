@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CediSmart - Secure Your Account</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#313034",
+                        "secondary-container": "#959efd",
+                        "tertiary-container": "#c24300",
+                        "tertiary-fixed": "#ffdbcf",
+                        "tertiary-fixed-dim": "#ffb59a",
+                        "inverse-on-surface": "#f4eff5",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-container": "#cbffc2",
+                        "error": "#ba1a1a",
+                        "on-secondary-fixed": "#000767",
+                        "surface-container-highest": "#e5e1e7",
+                        "on-surface": "#1c1b1f",
+                        "outline": "#707a6c",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed-variant": "#005312",
+                        "outline-variant": "#bfcaba",
+                        "primary-fixed": "#a3f69c",
+                        "on-background": "#1c1b1f",
+                        "on-tertiary-fixed": "#380d00",
+                        "surface-variant": "#e5e1e7",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed-variant": "#802a00",
+                        "surface": "#fdf8fd",
+                        "surface-container-low": "#f7f2f8",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed-dim": "#bdc2ff",
+                        "on-secondary-container": "#27308a",
+                        "surface-container-high": "#ebe7ec",
+                        "on-secondary-fixed-variant": "#343d96",
+                        "surface-bright": "#fdf8fd",
+                        "on-tertiary-container": "#ffeee8",
+                        "inverse-primary": "#88d982",
+                        "on-error": "#ffffff",
+                        "primary-fixed-dim": "#88d982",
+                        "surface-dim": "#ddd9de",
+                        "tertiary": "#993300",
+                        "secondary": "#4c56af",
+                        "on-primary-fixed": "#002204",
+                        "surface-container": "#f1ecf2",
+                        "on-secondary": "#ffffff",
+                        "primary-container": "#2e7d32",
+                        "background": "#fdf8fd",
+                        "on-surface-variant": "#40493d",
+                        "secondary-fixed": "#e0e0ff",
+                        "primary": "#0d631b",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#1b6d24"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glass-effect {
+            backdrop-filter: blur(20px);
+            background: rgba(253, 248, 253, 0.8);
+        }
+        .pin-dot-active {
+            background-color: #0d631b;
+            transform: scale(1.2);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-container">
+<!-- Top Navigation Anchor -->
+<header class="fixed top-0 left-0 w-full z-50 bg-surface/80 backdrop-blur-md">
+<div class="flex items-center justify-between px-5 h-16 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-4">
+<button class="p-2 -ml-2 hover:bg-surface-container-low rounded-full transition-transform active:scale-95">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<span class="font-headline font-black text-primary text-xl tracking-tight">CediSmart</span>
+</div>
+<button class="p-2 hover:bg-surface-container-low rounded-full transition-transform active:scale-95">
+<span class="material-symbols-outlined text-zinc-500">more_vert</span>
+</button>
+</div>
+</header>
+<main class="min-h-screen pt-24 pb-12 flex flex-col items-center max-w-md mx-auto px-6">
+<!-- Header Section -->
+<div class="text-center mb-12">
+<div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-container mb-6">
+<span class="material-symbols-outlined text-on-primary-container text-3xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">shield</span>
+</div>
+<h1 class="font-headline font-extrabold text-3xl text-on-surface mb-3 tracking-tight">Secure Your Account</h1>
+<p class="text-on-surface-variant font-medium text-sm leading-relaxed px-4">
+                Set up a 6-digit transaction PIN to protect your wealth and authorize transfers safely.
+            </p>
+</div>
+<!-- PIN Status Indicator (Visual 6 dots) -->
+<div class="w-full flex flex-col items-center space-y-8">
+<div class="flex flex-col items-center">
+<span class="font-label text-xs uppercase tracking-[0.2em] text-secondary font-bold mb-6">Enter PIN</span>
+<div class="flex gap-4">
+<!-- Dots represent the 6 digits -->
+<div class="w-4 h-4 rounded-full bg-surface-container-highest pin-dot-active shadow-sm transition-all duration-300"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-highest pin-dot-active shadow-sm transition-all duration-300"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-highest pin-dot-active shadow-sm transition-all duration-300"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-highest shadow-sm transition-all duration-300"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-highest shadow-sm transition-all duration-300"></div>
+<div class="w-4 h-4 rounded-full bg-surface-container-highest shadow-sm transition-all duration-300"></div>
+</div>
+</div>
+<!-- Error Feedback Area (Conditional Rendering Emulation) -->
+<div class="h-6 flex items-center gap-2 text-error opacity-0">
+<span class="material-symbols-outlined text-sm">info</span>
+<span class="font-label text-xs font-semibold">PINs do not match</span>
+</div>
+</div>
+<!-- Custom PINpad Grid -->
+<div class="mt-auto w-full max-w-sm grid grid-cols-3 gap-y-4 gap-x-6">
+<!-- Row 1 -->
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">1</span>
+</button>
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">2</span>
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">ABC</span>
+</button>
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">3</span>
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">DEF</span>
+</button>
+<!-- Row 2 -->
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">4</span>
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">GHI</span>
+</button>
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">5</span>
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">JKL</span>
+</button>
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">6</span>
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">MNO</span>
+</button>
+<!-- Row 3 -->
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">7</span>
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">PQRS</span>
+</button>
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">8</span>
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">TUV</span>
+</button>
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">9</span>
+<span class="text-[10px] font-bold text-outline-variant uppercase tracking-widest">WXYZ</span>
+</button>
+<!-- Row 4 -->
+<div class="aspect-square flex items-center justify-center">
+<!-- Empty for spacing -->
+</div>
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group">
+<span class="font-headline font-bold text-2xl group-hover:text-primary">0</span>
+</button>
+<button class="aspect-square flex flex-col items-center justify-center rounded-xl hover:bg-surface-container-low active:scale-90 transition-all group text-on-surface-variant">
+<span class="material-symbols-outlined text-2xl">backspace</span>
+</button>
+</div>
+<!-- Footnote Branding -->
+<div class="mt-12 text-center opacity-30 select-none">
+<span class="font-headline font-black text-on-surface tracking-widest text-[10px] uppercase">CediSmart Secure Layer</span>
+</div>
+</main>
+<!-- Bottom Action Sheet / Confirmation Simulation -->
+<div class="fixed bottom-0 left-0 w-full p-6 pointer-events-none">
+<div class="max-w-md mx-auto">
+<!-- Hidden by default, shown for confirmation -->
+<div class="hidden bg-surface-container-lowest rounded-full p-2 shadow-2xl pointer-events-auto border border-outline-variant/20 flex items-center">
+<div class="bg-primary text-white font-headline font-bold rounded-full h-12 flex-1 flex items-center justify-center active:scale-95 transition-all">
+                    Confirm PIN
+                </div>
+</div>
+</div>
+</div>
+<!-- Decorative Success State Gradient Overlay (Subtle) -->
+<div class="fixed inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-secondary/5 -z-10"></div>
+<!-- Ghana Inspired Tonal Background Texture -->
+<div class="fixed inset-0 -z-20 opacity-[0.03] pointer-events-none overflow-hidden">
+<div class="absolute top-10 right-10 w-64 h-64 border-8 border-primary rounded-full blur-3xl"></div>
+<div class="absolute bottom-20 left-10 w-96 h-96 border-8 border-tertiary rounded-full blur-3xl"></div>
+</div>
+</body></html>

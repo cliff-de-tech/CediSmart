@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CediSmart - Register</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "inverse-surface": "#313034",
+              "secondary-container": "#959efd",
+              "tertiary-container": "#c24300",
+              "tertiary-fixed": "#ffdbcf",
+              "tertiary-fixed-dim": "#ffb59a",
+              "inverse-on-surface": "#f4eff5",
+              "on-tertiary": "#ffffff",
+              "on-primary-container": "#cbffc2",
+              "error": "#ba1a1a",
+              "on-secondary-fixed": "#000767",
+              "surface-container-highest": "#e5e1e7",
+              "on-surface": "#1c1b1f",
+              "outline": "#707a6c",
+              "error-container": "#ffdad6",
+              "on-primary-fixed-variant": "#005312",
+              "outline-variant": "#bfcaba",
+              "primary-fixed": "#a3f69c",
+              "on-background": "#1c1b1f",
+              "on-tertiary-fixed": "#380d00",
+              "surface-variant": "#e5e1e7",
+              "on-error-container": "#93000a",
+              "on-tertiary-fixed-variant": "#802a00",
+              "surface": "#fdf8fd",
+              "surface-container-low": "#f7f2f8",
+              "surface-container-lowest": "#ffffff",
+              "secondary-fixed-dim": "#bdc2ff",
+              "on-secondary-container": "#27308a",
+              "surface-container-high": "#ebe7ec",
+              "on-secondary-fixed-variant": "#343d96",
+              "surface-bright": "#fdf8fd",
+              "on-tertiary-container": "#ffeee8",
+              "inverse-primary": "#88d982",
+              "on-error": "#ffffff",
+              "primary-fixed-dim": "#88d982",
+              "surface-dim": "#ddd9de",
+              "tertiary": "#993300",
+              "secondary": "#4c56af",
+              "on-primary-fixed": "#002204",
+              "surface-container": "#f1ecf2",
+              "on-secondary": "#ffffff",
+              "primary-container": "#2e7d32",
+              "background": "#fdf8fd",
+              "on-surface-variant": "#40493d",
+              "secondary-fixed": "#e0e0ff",
+              "primary": "#0d631b",
+              "on-primary": "#ffffff",
+              "surface-tint": "#1b6d24"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .glass-effect {
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface font-body text-on-surface selection:bg-primary-fixed-dim overflow-x-hidden">
+<!-- Top Navigation Bar (Suppressed Shell - Back Only) -->
+<nav class="flex items-center justify-between px-5 h-16 w-full max-w-7xl mx-auto fixed top-0 left-0 right-0 z-50">
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-zinc-100 transition-transform active:scale-95">
+<span class="material-symbols-outlined text-primary">arrow_back</span>
+</button>
+<div class="font-headline font-black text-primary text-xl tracking-tight">CediSmart</div>
+<div class="w-10"></div> <!-- Spacer for symmetry -->
+</nav>
+<main class="min-h-screen flex flex-col items-center justify-center px-6 pt-20 pb-12">
+<!-- Editorial Header Section -->
+<div class="w-full max-w-md mb-12 text-center md:text-left">
+<span class="font-label text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-3 block">Join Sovereign Ledger</span>
+<h1 class="font-headline text-4xl font-bold text-on-surface tracking-tight leading-tight">Create Account</h1>
+<p class="font-body text-on-surface-variant mt-4 text-sm leading-relaxed max-w-[280px] md:max-w-none">Secure your financial future with Ghana's most trusted digital ledger system.</p>
+</div>
+<!-- Registration Form Container -->
+<div class="w-full max-w-md bg-surface-container-lowest rounded-xl p-8 shadow-[0_4px_32px_rgba(0,0,0,0.02)] relative overflow-hidden">
+<!-- Subtle Watermark Background Pattern -->
+<div class="absolute -right-12 -top-12 opacity-[0.03] pointer-events-none">
+<svg fill="currentColor" height="200" viewbox="0 0 100 100" width="200">
+<path d="M50 0 L100 50 L50 100 L0 50 Z"></path>
+</svg>
+</div>
+<form class="space-y-8 relative z-10" onsubmit="return false;">
+<!-- Phone Number Input Group -->
+<div class="space-y-3">
+<label class="font-label text-xs font-bold uppercase tracking-widest text-on-surface-variant">Phone Number</label>
+<div class="flex items-center space-x-0 group">
+<!-- Prefix Container -->
+<div class="flex items-center space-x-2 bg-surface-container-low px-4 h-14 rounded-l-xl border-r border-outline-variant/20">
+<img alt="Ghana Flag" class="w-5 h-auto rounded-sm" data-alt="Small flag of Ghana icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3zGFqi8_g5pkwU7bG49YLOYM2YGDKxsADBxW8VbKNENOvyNT1UviFyUSuUAPjEq_y_DNRQaMWBNKTQdsz6lxTNqXvSV7qnURVxIjt9kpCoI36n1tEIzzg3jZ8ru9OE4Ptyk2KdaoYDnfWclFGDpzXNqANUrYoomJ4NF777BCYIl7azWkdrGKy8o6LoT0Z_8fGbip8a8fcPOHPflV496f1PfX_a0r_Bb62zyZwt76zDRCn7YFNX42hVfLmrh16ZioOhhhVZzaz0WA"/>
+<span class="font-body font-semibold text-on-surface">+233</span>
+</div>
+<!-- Input Field -->
+<input class="flex-1 h-14 bg-surface-container-low border-none focus:ring-2 focus:ring-primary/20 rounded-r-xl font-body text-lg tracking-[0.1em] placeholder:text-zinc-300 placeholder:tracking-normal transition-all" maxlength="9" pattern="[0-9]{9}" placeholder="XXXXXXXXX" required="" type="tel"/>
+</div>
+<p class="font-body text-[11px] text-zinc-500">Enter your 9-digit mobile number registered with GHS services.</p>
+</div>
+<!-- Primary CTA Button -->
+<button class="w-full h-14 bg-gradient-to-r from-primary to-primary-container text-on-primary font-headline font-bold text-base rounded-xl flex items-center justify-center space-x-3 shadow-lg shadow-primary/10 active:scale-[0.98] transition-all hover:brightness-110" type="submit">
+<span>Send OTP</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">arrow_forward</span>
+</button>
+<!-- Terms & Privacy -->
+<p class="text-center font-body text-xs text-on-surface-variant leading-relaxed px-4">
+                    By continuing, you agree to our 
+                    <a class="text-primary font-semibold underline decoration-primary/20 hover:decoration-primary" href="#">Terms of Service</a> 
+                    and 
+                    <a class="text-primary font-semibold underline decoration-primary/20 hover:decoration-primary" href="#">Privacy Policy</a>.
+                </p>
+</form>
+</div>
+<!-- Footer Actions -->
+<div class="mt-10 text-center space-y-6">
+<p class="font-body text-sm text-on-surface-variant">
+                Already have an account? 
+                <a class="text-primary font-bold hover:underline transition-all" href="#">Log In</a>
+</p>
+<div class="flex flex-col items-center space-y-4 pt-8">
+<div class="flex items-center space-x-2 opacity-40">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">shield</span>
+<span class="font-label text-[10px] uppercase tracking-widest font-bold">End-to-End Encrypted</span>
+</div>
+<!-- Ghanaian Heritage Accent (Subtle Pattern) -->
+<div class="flex space-x-1 opacity-10">
+<div class="w-2 h-2 rounded-full bg-tertiary"></div>
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+</div>
+</div>
+</div>
+</main>
+<!-- Decoration Layer -->
+<div class="fixed top-0 right-0 -z-10 w-1/3 h-1/2 bg-gradient-to-bl from-primary/5 to-transparent blur-3xl pointer-events-none"></div>
+<div class="fixed bottom-0 left-0 -z-10 w-1/2 h-1/2 bg-gradient-to-tr from-secondary/5 to-transparent blur-3xl pointer-events-none"></div>
+</body></html>

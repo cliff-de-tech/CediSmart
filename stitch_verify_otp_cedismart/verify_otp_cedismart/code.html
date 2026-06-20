@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "inverse-surface": "#313034",
+              "secondary-container": "#959efd",
+              "tertiary-container": "#c24300",
+              "tertiary-fixed": "#ffdbcf",
+              "tertiary-fixed-dim": "#ffb59a",
+              "inverse-on-surface": "#f4eff5",
+              "on-tertiary": "#ffffff",
+              "on-primary-container": "#cbffc2",
+              "error": "#ba1a1a",
+              "on-secondary-fixed": "#000767",
+              "surface-container-highest": "#e5e1e7",
+              "on-surface": "#1c1b1f",
+              "outline": "#707a6c",
+              "error-container": "#ffdad6",
+              "on-primary-fixed-variant": "#005312",
+              "outline-variant": "#bfcaba",
+              "primary-fixed": "#a3f69c",
+              "on-background": "#1c1b1f",
+              "on-tertiary-fixed": "#380d00",
+              "surface-variant": "#e5e1e7",
+              "on-error-container": "#93000a",
+              "on-tertiary-fixed-variant": "#802a00",
+              "surface": "#fdf8fd",
+              "surface-container-low": "#f7f2f8",
+              "surface-container-lowest": "#ffffff",
+              "secondary-fixed-dim": "#bdc2ff",
+              "on-secondary-container": "#27308a",
+              "surface-container-high": "#ebe7ec",
+              "on-secondary-fixed-variant": "#343d96",
+              "surface-bright": "#fdf8fd",
+              "on-tertiary-container": "#ffeee8",
+              "inverse-primary": "#88d982",
+              "on-error": "#ffffff",
+              "primary-fixed-dim": "#88d982",
+              "surface-dim": "#ddd9de",
+              "tertiary": "#993300",
+              "secondary": "#4c56af",
+              "on-primary-fixed": "#002204",
+              "surface-container": "#f1ecf2",
+              "on-secondary": "#ffffff",
+              "primary-container": "#2e7d32",
+              "background": "#fdf8fd",
+              "on-surface-variant": "#40493d",
+              "secondary-fixed": "#e0e0ff",
+              "primary": "#0d631b",
+              "on-primary": "#ffffff",
+              "surface-tint": "#1b6d24"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #fdf8fd;
+      }
+      .glass-effect {
+        backdrop-filter: blur(20px);
+        background: rgba(253, 248, 253, 0.8);
+      }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface text-on-surface min-h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="fixed top-0 left-0 w-full z-50 bg-[#fdf8fd] dark:bg-zinc-950">
+<div class="flex items-center justify-between px-5 h-16 w-full max-w-7xl mx-auto">
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined text-[#0d631b] dark:text-[#2e7d32] active:scale-95 transition-transform" data-icon="arrow_back">arrow_back</button>
+<h1 class="font-['Manrope'] font-bold text-lg tracking-tight text-[#0d631b] dark:text-[#2e7d32]">Verify Phone</h1>
+</div>
+<button class="material-symbols-outlined text-[#0d631b] dark:text-[#2e7d32] active:scale-95 transition-transform" data-icon="more_vert">more_vert</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col items-center justify-center px-8 pt-20 pb-12 max-w-lg mx-auto w-full">
+<!-- Brand Identity Intro -->
+<div class="w-full text-center mb-10">
+<div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-surface-container-low mb-6 shadow-sm">
+<span class="material-symbols-outlined text-primary text-4xl" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span>
+</div>
+<h2 class="font-headline font-extrabold text-3xl text-on-surface tracking-tight mb-2">Security Check</h2>
+<p class="font-body text-on-surface-variant leading-relaxed">
+                OTP sent to <span class="font-semibold text-on-surface">+233 24 XXX XXXX</span>
+</p>
+</div>
+<!-- OTP Input Grid -->
+<div class="w-full mb-8">
+<div class="grid grid-cols-6 gap-3 mb-8">
+<input class="w-full aspect-square text-center font-headline font-bold text-2xl bg-surface-container-lowest border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm" maxlength="1" type="text" value="4"/>
+<input class="w-full aspect-square text-center font-headline font-bold text-2xl bg-surface-container-lowest border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm" maxlength="1" type="text" value="8"/>
+<input class="w-full aspect-square text-center font-headline font-bold text-2xl bg-surface-container-lowest border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm" maxlength="1" placeholder="•" type="text"/>
+<input class="w-full aspect-square text-center font-headline font-bold text-2xl bg-surface-container-lowest border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm" maxlength="1" placeholder="•" type="text"/>
+<input class="w-full aspect-square text-center font-headline font-bold text-2xl bg-surface-container-lowest border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm" maxlength="1" placeholder="•" type="text"/>
+<input class="w-full aspect-square text-center font-headline font-bold text-2xl bg-surface-container-lowest border border-outline-variant/20 rounded-xl focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all shadow-sm" maxlength="1" placeholder="•" type="text"/>
+</div>
+<!-- Timer & Action -->
+<div class="flex flex-col items-center gap-4">
+<div class="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-container-low border border-outline-variant/10">
+<span class="material-symbols-outlined text-secondary text-sm" data-icon="schedule">schedule</span>
+<span class="font-label text-xs font-semibold uppercase tracking-widest text-on-surface-variant">Resend in 04:59</span>
+</div>
+<button class="font-label text-sm font-semibold text-secondary opacity-50 cursor-not-allowed">
+                    Resend Code
+                </button>
+</div>
+</div>
+<!-- Primary CTA -->
+<div class="w-full mt-auto">
+<button class="w-full h-14 bg-surface-container-highest text-on-surface-variant font-headline font-bold rounded-xl transition-all cursor-not-allowed mb-4 flex items-center justify-center gap-2 group">
+                Verify
+                <span class="material-symbols-outlined text-lg" data-icon="arrow_forward">arrow_forward</span>
+</button>
+<p class="text-center font-body text-xs text-on-surface-variant px-4">
+                By verifying, you agree to CediSmart's <span class="text-primary font-semibold">Terms of Service</span> and <span class="text-primary font-semibold">Privacy Policy</span>.
+            </p>
+</div>
+</main>
+<!-- Asymmetric Background Decorative Elements (Editorial Style) -->
+<div class="fixed top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
+<div class="fixed bottom-10 -left-20 w-80 h-80 bg-secondary/5 rounded-full blur-3xl -z-10"></div>
+<!-- Help Action (Ghost Style) -->
+<div class="fixed bottom-10 right-8 md:right-12">
+<button class="flex items-center gap-2 bg-surface-container-lowest/80 backdrop-blur-md px-4 py-3 rounded-full shadow-lg border border-outline-variant/10 text-primary active:scale-95 transition-all">
+<span class="material-symbols-outlined text-xl" data-icon="help_outline">help_outline</span>
+<span class="font-label text-xs font-bold uppercase tracking-wider">Support</span>
+</button>
+</div>
+</body></html>
