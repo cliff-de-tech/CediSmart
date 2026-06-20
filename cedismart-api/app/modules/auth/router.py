@@ -18,12 +18,14 @@ from app.core.redis import get_redis
 from app.modules.auth import service
 from app.modules.auth.schemas import (
     LoginRequest,
+    LoginVerifyRequest,
     MessageResponse,
     PinResetConfirmRequest,
     PinResetInitiateRequest,
     RegisterInitiateRequest,
     RegisterVerifyRequest,
     TokenRefreshRequest,
+    TokenRefreshResponse,
     TokenResponse,
 )
 
@@ -94,6 +96,60 @@ async def register_verify(
 
 
 # ---------------------------------------------------------------------------
+# POST /login/initiate
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/login/initiate",
+    response_model=MessageResponse,
+    status_code=200,
+    summary="Initiate login by verifying PIN and sending OTP",
+)
+@limiter.limit("5/15minutes")
+async def login_initiate(
+    request: Request,
+    body: LoginRequest,
+    db: DBSession,
+    redis: RedisConn,
+) -> MessageResponse:
+    """Verify credentials and send a login OTP to the user's phone."""
+    expires_in = await service.initiate_login(
+        phone=body.phone,
+        pin=body.pin,
+        db=db,
+        redis=redis,
+    )
+    return MessageResponse(message="OTP sent", expires_in=expires_in)
+
+
+# ---------------------------------------------------------------------------
+# POST /login/verify
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/login/verify",
+    response_model=TokenResponse,
+    status_code=200,
+    summary="Verify login OTP and return tokens",
+)
+async def login_verify(
+    body: LoginVerifyRequest,
+    db: DBSession,
+    redis: RedisConn,
+) -> TokenResponse:
+    """Verify the OTP and return full JWT tokens for login."""
+    tokens = await service.verify_login(
+        phone=body.phone,
+        otp=body.otp,
+        db=db,
+        redis=redis,
+    )
+    return TokenResponse(**tokens)
+
+
+# ---------------------------------------------------------------------------
 # POST /login
 # ---------------------------------------------------------------------------
 
@@ -132,14 +188,14 @@ async def login(
 
 @router.post(
     "/token/refresh",
-    response_model=TokenResponse,
+    response_model=TokenRefreshResponse,
     status_code=200,
     summary="Refresh access token",
 )
 async def token_refresh(
     body: TokenRefreshRequest,
     redis: RedisConn,
-) -> TokenResponse:
+) -> TokenRefreshResponse:
     """Exchange a valid refresh token for a new access token.
 
     The refresh token must exist in Redis (not revoked) and have a valid
@@ -149,7 +205,7 @@ async def token_refresh(
         refresh_token_str=body.refresh_token,
         redis=redis,
     )
-    return TokenResponse(
+    return TokenRefreshResponse(
         access_token=new_access_token,
         refresh_token=body.refresh_token,
         token_type="bearer",

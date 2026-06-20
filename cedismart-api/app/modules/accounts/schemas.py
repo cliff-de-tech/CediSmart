@@ -42,6 +42,14 @@ class AccountCreateRequest(BaseModel):
 class AccountUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=100)
     provider: str | None = Field(None, max_length=50)
+    opening_balance: Decimal | None = Field(None, ge=Decimal("0"))
+
+    @field_validator("opening_balance")
+    @classmethod
+    def validate_opening_balance(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None and v > Decimal("999999999999.99"):
+            raise ValueError("opening_balance exceeds maximum allowed value")
+        return v
 
 
 # ---------------------------------------------------------------------------

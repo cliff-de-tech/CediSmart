@@ -88,6 +88,29 @@ class LoginRequest(BaseModel):
         return v
 
 
+class LoginVerifyRequest(BaseModel):
+    """Verify login OTP to obtain final tokens."""
+
+    phone: str
+    otp: str
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        v = v.strip()
+        if not _GHANA_PHONE_RE.match(v):
+            raise ValueError("Phone must be in E.164 format: +233XXXXXXXXX")
+        return v
+
+    @field_validator("otp")
+    @classmethod
+    def validate_otp(cls, v: str) -> str:
+        v = v.strip()
+        if not re.fullmatch(r"\d{6}", v):
+            raise ValueError("OTP must be exactly 6 digits")
+        return v
+
+
 class TokenRefreshRequest(BaseModel):
     """Request a new access token using a valid refresh token."""
 
@@ -154,6 +177,14 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class TokenRefreshResponse(BaseModel):
+    """Successful token refresh response containing a new access token."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
 
 
 class MessageResponse(BaseModel):

@@ -33,6 +33,8 @@ class User(TimestampMixin, Base):
     premium_expires_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    kyc_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    ghana_card: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # --- Relationships ---
     accounts: Mapped[list["FinancialAccount"]] = relationship(

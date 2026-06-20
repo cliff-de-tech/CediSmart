@@ -277,6 +277,8 @@ async def update_account(
         account.name = payload.name
     if payload.provider is not None:
         account.provider = payload.provider
+    if payload.opening_balance is not None:
+        account.opening_balance = payload.opening_balance
 
     await db.flush()
 
