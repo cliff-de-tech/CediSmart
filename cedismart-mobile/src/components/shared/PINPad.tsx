@@ -1,14 +1,20 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { Delete } from 'lucide-react-native';
+import { Delete, Fingerprint, ScanFace } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { useThemeStore } from '../../stores/themeStore';
 
 interface PINPadProps {
   onPress: (digit: string) => void;
   onBackspace: () => void;
+  onBiometricPress?: () => void;
+  biometricType?: 'fingerprint' | 'face' | null;
   disabled?: boolean;
 }
 
-const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, disabled = false }) => {
+const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, onBiometricPress, biometricType = 'fingerprint', disabled = false }) => {
+  const isDark = useThemeStore((state) => state.theme) === 'dark';
+
   const keys = [
     { digit: '1', letters: '' },
     { digit: '2', letters: 'ABC' },
@@ -29,6 +35,26 @@ const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, disabled = false 
       <View className="flex-row flex-wrap justify-between">
         {keys.map((key, index) => {
           if (key.digit === null) {
+            if (onBiometricPress) {
+              return (
+                <TouchableOpacity
+                  key="biometric"
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    onBiometricPress();
+                  }}
+                  disabled={disabled}
+                  className={`w-[30%] aspect-square m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
+                  accessibilityLabel="Biometric Authentication"
+                >
+                  {biometricType === 'face' ? (
+                    <ScanFace color={isDark ? '#e1e3e0' : '#1c1b1f'} size={28} />
+                  ) : (
+                    <Fingerprint color={isDark ? '#e1e3e0' : '#1c1b1f'} size={28} />
+                  )}
+                </TouchableOpacity>
+              );
+            }
             return <View key={`empty-${index}`} className="w-[30%] aspect-square m-1" />;
           }
 
@@ -36,12 +62,15 @@ const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, disabled = false 
             return (
               <TouchableOpacity
                 key="backspace"
-                onPress={onBackspace}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  onBackspace();
+                }}
                 disabled={disabled}
-                className="w-[30%] aspect-square m-1 items-center justify-center rounded-2xl active:bg-surface-container-low transition-all"
+                className={`w-[30%] aspect-square m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
                 accessibilityLabel="Backspace"
               >
-                <Delete color="#1c1b1f" size={28} />
+                <Delete color={isDark ? '#e1e3e0' : '#1c1b1f'} size={28} />
               </TouchableOpacity>
             );
           }
@@ -49,15 +78,18 @@ const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, disabled = false 
           return (
             <TouchableOpacity
               key={key.digit}
-              onPress={() => onPress(key.digit!)}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                onPress(key.digit!);
+              }}
               disabled={disabled}
-              className="w-[30%] aspect-square m-1 items-center justify-center rounded-2xl active:bg-surface-container-low transition-all"
+              className={`w-[30%] aspect-square m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
               accessibilityLabel={key.digit}
             >
               <View className="items-center">
-                <Text className="text-3xl font-headline font-bold text-on-surface">{key.digit}</Text>
+                <Text className={`text-3xl font-headline font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{key.digit}</Text>
                 {key.letters ? (
-                  <Text className="text-[10px] font-bold text-outline-variant uppercase tracking-widest mt-1">
+                  <Text className={`text-[10px] font-bold ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} uppercase tracking-widest mt-1`}>
                     {key.letters}
                   </Text>
                 ) : null}

@@ -7,10 +7,24 @@
 ![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
+![React Native](https://img.shields.io/badge/React%20Native-0.81.5-61dafb)
 ![License](https://img.shields.io/badge/license-Proprietary-red)
 
-[![API README](https://img.shields.io/badge/docs-API%20README-1f6feb)](./cedismart-api/README.md)
-[![OpenAPI (local)](https://img.shields.io/badge/openapi-local%20%2Fdocs-6f42c1)](http://localhost:8000/docs)
+**📚 Documentation:**
+[API README](./cedismart-api/README.md) · [Mobile README](./cedismart-mobile/README.md) · [Web README](./cedismart-web/README.md) · [OpenAPI Docs (local)](http://localhost:8000/docs)
+
+---
+
+## 📚 Quick Start By Role
+
+| I'm a... | Start here |
+|---|---|
+| **Backend Engineer** | [API README](./cedismart-api/README.md) — Full setup, architecture, testing |
+| **Mobile Developer** | [Mobile README](./cedismart-mobile/README.md) — Expo setup, navigation, offline sync |
+| **Frontend/Web Dev** | [Web README](./cedismart-web/README.md) — HTML/CSS/JS setup, API integration |
+| **DevOps/Deployment** | [API README § Deployment](./cedismart-api/README.md#deployment) — Railway, Docker, CI/CD |
+| **Product Manager** | [Budget Blueprint](./docs/budget-app-blueprint.md) — Features, roadmap, design |
+| **Compliance/Legal** | [Docs README](./docs/README.md) — Privacy, terms, regulations |
 
 ---
 
@@ -27,6 +41,7 @@
   - [Testing](#testing)
   - [CI/CD](#cicd)
 - [Mobile App — In Progress](#mobile-app--in-progress)
+- [Web App — MVP](#web-app--mvp)
 - [Project Status](#project-status)
 - [Running Locally](#running-locally)
 - [About](#about)
@@ -230,7 +245,9 @@ Three GitHub Actions workflows:
 
 ## Mobile App — In Progress
 
-React Native (Expo SDK 51, Managed Workflow) with TypeScript strict mode.
+React Native (Expo SDK 54, Managed Workflow) with TypeScript strict mode.
+
+> 📱 **See [Mobile README](./cedismart-mobile/README.md) for full setup instructions.**
 
 | Layer | Technology |
 |---|---|
@@ -244,7 +261,26 @@ React Native (Expo SDK 51, Managed Workflow) with TypeScript strict mode.
 | Forms | React Hook Form + Zod |
 | Error monitoring | Sentry |
 
-Planned screens: Registration → OTP → Set PIN → Login → Dashboard → Transactions → Add Transaction → Budgets → Reports → Accounts → Settings.
+**Planned screens:** Registration → OTP → Set PIN → Login → Dashboard → Transactions → Add Transaction → Budgets → Reports → Accounts → Settings.
+
+---
+
+## Web App — MVP
+
+Responsive web interface for desktop and tablet users. Built with vanilla HTML/CSS/JS + Tailwind, no framework overhead for MVP.
+
+> 🌐 **See [Web README](./cedismart-web/README.md) for full setup instructions.**
+
+| Layer | Technology |
+|---|---|
+| Markup | HTML5 + Semantic elements |
+| Styling | Tailwind CSS v3 |
+| Scripting | Vanilla JavaScript (ES6+) |
+| HTTP | Fetch API + custom wrapper |
+| State | LocalStorage + IndexedDB |
+| Build (optional) | Vite |
+
+**Core features:** Dashboard, transaction management, budget tracking, analytics, account management, settings, OAuth login.
 
 ---
 
@@ -265,32 +301,69 @@ Planned screens: Registration → OTP → Set PIN → Login → Dashboard → Tr
 
 ## Running Locally
 
-```bash
-# Clone
-git clone https://github.com/cliff-de-tech/CediSmart.git
-cd CediSmart/cedismart-api
+### Backend API
 
-# Install
+```bash
+cd cedismart-api
+
+# Create virtual environment
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
+
+# Install dependencies
 pip install -e ".[dev]"
 
 # Configure
 cp .env.example .env               # Fill in DATABASE_URL, RSA keys, etc.
 
-# Migrate + seed
+# Run migrations
 alembic upgrade head
-python -m scripts.seed_categories
 
-# Run
+# Start server
 uvicorn app.main:app --reload --port 8000
-# Docs at http://localhost:8000/docs (DEBUG=true only)
-
-# Test
-python -m pytest --cov=app --cov-fail-under=80
 ```
 
-Full setup guide: [`cedismart-api/README.md`](./cedismart-api/README.md)
+**Docs at:** `http://localhost:8000/docs` (DEBUG=true only)
+
+**Full guide:** [cedismart-api/README.md](./cedismart-api/README.md)
+
+---
+
+### Mobile App
+
+```bash
+cd cedismart-mobile
+
+# Install dependencies
+npm install
+
+# Start Expo dev server
+npm start
+
+# Press i (iOS Simulator), a (Android), or w (Web)
+```
+
+**Full guide:** [cedismart-mobile/README.md](./cedismart-mobile/README.md)
+
+---
+
+### Web App
+
+```bash
+cd cedismart-web
+
+# Option 1: Simple HTTP server (no build)
+python -m http.server 8080
+# or: npx http-server
+
+# Option 2: With Vite (hot reload)
+npm install
+npm run dev
+```
+
+**Open:** `http://localhost:8080` (or `http://localhost:5173` with Vite)
+
+**Full guide:** [cedismart-web/README.md](./cedismart-web/README.md)
 
 ---
 

@@ -2,6 +2,7 @@ import React, { useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useQuery } from '@tanstack/react-query';
+import { useThemeStore } from '../../stores/themeStore';
 import apiClient from '../../api/client';
 import { Tag } from 'lucide-react-native';
 
@@ -19,7 +20,9 @@ interface CategoryPickerProps {
 }
 
 const CategoryPicker: React.FC<CategoryPickerProps> = ({ bottomSheetRef, type, onSelect }) => {
-  const snapPoints = useMemo(() => ['50%', '90%'], []);
+  const theme = useThemeStore((state) => state.theme);
+  const isDark = theme === 'dark';
+  const snapPoints = useMemo(() => ['50%', '100%'], []);
 
   const { data: categories, isLoading } = useQuery<Category[]>({
     queryKey: ['categories', type],
@@ -48,11 +51,11 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ bottomSheetRef, type, o
       snapPoints={snapPoints}
       backdropComponent={renderBackdrop}
       enablePanDownToClose
-      backgroundStyle={{ backgroundColor: '#F8F9FA', borderRadius: 24 }}
-      handleIndicatorStyle={{ backgroundColor: '#D1D5DB', width: 40 }}
+      backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 24 }}
+      handleIndicatorStyle={{ backgroundColor: theme === 'dark' ? '#374151' : '#D1D5DB', width: 40 }}
     >
       <View className="px-6 pb-4 flex-1">
-        <Text className="text-xl font-bold text-charcoal mb-4">
+        <Text className={`text-xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-4`}>
           Select {type === 'income' ? 'Income' : 'Expense'} Category
         </Text>
         
@@ -71,12 +74,12 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ bottomSheetRef, type, o
               >
                 <View 
                   className="w-14 h-14 rounded-full items-center justify-center mb-2"
-                  style={{ backgroundColor: item.color ? `${item.color}20` : '#F3F4F6' }}
+                  style={{ backgroundColor: item.color ? `${item.color}20` : (theme === 'dark' ? '#1c221e' : '#F3F4F6') }}
                 >
-                  <Tag size={24} color={item.color || '#9CA3AF'} />
+                  <Tag size={24} color={item.color || (theme === 'dark' ? '#b2b6b1' : '#9CA3AF')} />
                 </View>
                 <Text 
-                  className="text-xs text-charcoal text-center" 
+                  className={`text-xs ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-center`} 
                   numberOfLines={2}
                 >
                   {item.name}
@@ -85,7 +88,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ bottomSheetRef, type, o
             )}
             contentContainerStyle={{ paddingBottom: 40 }}
             ListEmptyComponent={
-              <Text className="text-center text-gray-500 mt-8">No categories found.</Text>
+              <Text className={`text-center ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-8`}>No categories found.</Text>
             }
           />
         )}

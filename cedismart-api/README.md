@@ -4,6 +4,9 @@
 
 CediSmart helps users track spending, manage budgets, and take control of their finances — designed from day one for mobile money (MTN MoMo, Vodafone Cash) and the realities of the Ghanaian market: phone-first identity, offline support, and GHS as the primary currency.
 
+**📚 Project Documentation:**
+[Main README](../README.md) · [Mobile App](../cedismart-mobile/README.md) · [Web App](../cedismart-web/README.md) · [Docs](../docs/README.md)
+
 ---
 
 ## Table of Contents
