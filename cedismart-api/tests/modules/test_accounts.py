@@ -122,6 +122,21 @@ async def test_update_account(client: AsyncClient, make_user) -> None:
     assert resp.json()["name"] == "Vodafone Cash"
 
 
+async def test_update_account_opening_balance(client: AsyncClient, make_user) -> None:
+    user = await make_user()
+    headers = make_auth_headers(user.id)
+    account = await _create_account(client, headers)
+
+    resp = await client.patch(
+        f"/api/v1/accounts/{account['id']}",
+        json={"opening_balance": "550.50"},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["opening_balance"] == "550.50"
+    assert resp.json()["balance"] == "550.50"
+
+
 # ---------------------------------------------------------------------------
 # DELETE /{id}
 # ---------------------------------------------------------------------------

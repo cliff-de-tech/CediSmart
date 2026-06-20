@@ -60,7 +60,7 @@ async def test_register_verify_invalid_otp(client: AsyncClient, fake_redis: Fake
 
     resp = await client.post(
         "/api/v1/auth/register/verify",
-        json={"phone": phone, "otp": "000000", "pin": "123456", "full_name": "Kwame"},
+        json={"phone": phone, "otp": "999999", "pin": "123456", "full_name": "Kwame"},
     )
     assert_error_response(resp, 400, "INVALID_OTP")
 
@@ -292,5 +292,67 @@ async def test_pin_reset_confirm_invalid_otp(
     resp = await client.post(
         "/api/v1/auth/pin/reset/confirm",
         json={"phone": phone, "otp": "000000", "new_pin": "654321"},
+    )
+    assert_error_response(resp, 400, "INVALID_OTP")
+
+
+# ---------------------------------------------------------------------------
+# POST /api/v1/auth/login/initiate & POST /api/v1/auth/login/verify
+# ---------------------------------------------------------------------------
+
+
+async def test_login_otp_flow_success(
+    client: AsyncClient, fake_redis: FakeRedis, make_user, mock_send_otp
+) -> None:
+    phone = "+233201234567"
+    await make_user(phone=phone, pin="123456")
+
+    # 1. Initiate login
+    resp_init = await client.post(
+        "/api/v1/auth/login/initiate",
+        json={"phone": phone, "pin": "123456"},
+    )
+    assert resp_init.status_code == 200
+    assert resp_init.json()["message"] == "OTP sent"
+    mock_send_otp.assert_called_once()
+
+    # Get generated OTP from FakeRedis
+    otp_val = await fake_redis.get(f"login_otp:{phone}")
+    assert otp_val is not None
+    otp_code = otp_val
+
+    # 2. Verify login OTP
+    resp_verify = await client.post(
+        "/api/v1/auth/login/verify",
+        json={"phone": phone, "otp": otp_code},
+    )
+    assert resp_verify.status_code == 200
+    data = resp_verify.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert data["user"]["phone"] == phone
+
+
+async def test_login_initiate_invalid_credentials(client: AsyncClient, make_user) -> None:
+    phone = "+233201234567"
+    await make_user(phone=phone, pin="123456")
+
+    resp = await client.post(
+        "/api/v1/auth/login/initiate",
+        json={"phone": phone, "pin": "999999"},
+    )
+    assert_error_response(resp, 401, "INVALID_CREDENTIALS")
+
+
+async def test_login_verify_invalid_otp(
+    client: AsyncClient, fake_redis: FakeRedis, make_user
+) -> None:
+    phone = "+233201234567"
+    await make_user(phone=phone, pin="123456")
+    await fake_redis.set(f"login_otp:{phone}", "112233")
+
+    resp = await client.post(
+        "/api/v1/auth/login/verify",
+        json={"phone": phone, "otp": "999999"},
     )
     assert_error_response(resp, 400, "INVALID_OTP")

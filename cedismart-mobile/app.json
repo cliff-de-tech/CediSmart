@@ -1,17 +1,24 @@
 {
   "expo": {
-    "name": "cedismart-mobile",
-    "slug": "cedismart-mobile",
+    "name": "CediSmart",
+    "slug": "cedismart",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.cedismart.app",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "CediSmart uses Face ID to allow you to log in quickly and securely.",
+        "NSPhotoLibraryUsageDescription": "CediSmart requires photo gallery access to let you upload and crop your profile avatar.",
+        "NSCameraUsageDescription": "CediSmart requires camera access to capture your profile photo."
+      }
     },
     "android": {
+      "package": "com.cedismart.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0d631b",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -20,6 +27,41 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "@howincodes/expo-dynamic-app-icon",
+        {
+          "classic_emerald": {
+            "ios": "./assets/classic_emerald.png",
+            "android": {
+              "foregroundImage": "./assets/classic_emerald.png",
+              "backgroundColor": "#0d631b"
+            }
+          },
+          "luminous_emerald": {
+            "ios": "./assets/luminous_emerald.png",
+            "android": {
+              "foregroundImage": "./assets/luminous_emerald.png",
+              "backgroundColor": "#0d631b"
+            }
+          },
+          "pro_obsidian_gold": {
+            "ios": "./assets/pro_obsidian_gold.png",
+            "android": {
+              "foregroundImage": "./assets/pro_obsidian_gold.png",
+              "backgroundColor": "#000000"
+            }
+          },
+          "sovereign_amber": {
+            "ios": "./assets/sovereign_amber.png",
+            "android": {
+              "foregroundImage": "./assets/sovereign_amber.png",
+              "backgroundColor": "#d97706"
+            }
+          }
+        }
+      ]
+    ]
   }
 }

@@ -229,3 +229,39 @@ async def test_get_summary(client: AsyncClient, make_user) -> None:
     body = resp.json()
     assert "current_month" in body
     assert "current_month_vs_last" in body
+
+
+# ---------------------------------------------------------------------------
+# POST /parse-sms
+# ---------------------------------------------------------------------------
+
+
+async def test_parse_sms_income_fallback(client: AsyncClient, make_user) -> None:
+    _, _, _, headers = await _setup(client, make_user)
+
+    resp = await client.post(
+        "/api/v1/transactions/parse-sms",
+        json={"sms": "Payment received of GHS 150.00 from John Doe."},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert float(body["amount"]) == 150.00
+    assert body["transaction_type"] == "income"
+    assert "John Doe" in body["description"]
+    assert body["category_name"] is not None
+
+
+async def test_parse_sms_expense_fallback(client: AsyncClient, make_user) -> None:
+    _, _, _, headers = await _setup(client, make_user)
+
+    resp = await client.post(
+        "/api/v1/transactions/parse-sms",
+        json={"sms": "You have sent GHS 45.00 to Telecel Bundle."},
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert float(body["amount"]) == 45.00
+    assert body["transaction_type"] == "expense"
+    assert body["description"] == "Telecel Bundle"
