@@ -589,8 +589,14 @@ const DashboardScreen = ({ navigation }: any) => {
             </Text>
           </View>
 
-          {/* Net Position Hero Card */}
-          <View className="relative overflow-hidden rounded-[40px] bg-charcoal p-8 shadow-2xl mb-10">
+          <View 
+            className="relative overflow-hidden rounded-[40px] p-8 shadow-2xl mb-10"
+            style={{
+              backgroundColor: '#122214',
+              borderColor: 'rgba(34, 197, 94, 0.2)',
+              borderWidth: 1
+            }}
+          >
             {/* Watermark */}
             <View className="absolute top-0 right-0 opacity-10 translate-x-1/4 -translate-y-1/4">
               <Landmark size={240} color="white" strokeWidth={1} />
