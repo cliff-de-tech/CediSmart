@@ -3,10 +3,19 @@ import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform
 import { useMutation } from '@tanstack/react-query';
 import { Shield, ArrowRight, Lock, Clock, HelpCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import apiClient from '../../api/client';
+import * as SecureStore from 'expo-secure-store';
+import apiClient, { setActiveTokens } from '../../api/client';
+import { useThemeStore } from '../../stores/themeStore';
+import { useAuthStore } from '../../stores/authStore';
+import { CoinBackground } from '../../components/shared/CoinBackground';
 
 const OTPVerifyScreen = ({ route, navigation }: any) => {
-  const { phone } = route.params;
+  const { phone, flow = 'register', pin } = route.params;
+  const theme = useThemeStore((state) => state.theme);
+  const isDark = theme === 'dark';
+  const { login } = useAuthStore();
+  const [verifyError, setVerifyError] = useState('');
+
   const [step, setStep] = useState<'otp' | 'details'>('otp');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(300);
@@ -29,6 +38,7 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
   };
 
   const handleOtpChange = (value: string, index: number) => {
+    setVerifyError('');
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
@@ -38,7 +48,12 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
     }
 
     if (index === 5 && value !== '' && newOtp.every(digit => digit !== '')) {
-      setTimeout(() => setStep('details'), 400);
+      const fullOtp = newOtp.join('');
+      if (flow === 'login') {
+        setTimeout(() => loginOtpMutation.mutate(fullOtp), 200);
+      } else {
+        setTimeout(() => setStep('details'), 400);
+      }
     }
   };
 
@@ -49,13 +64,53 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
   };
 
   const resendMutation = useMutation({
-    mutationFn: () => apiClient.post('/auth/register/initiate', { phone }),
-    onSuccess: () => setTimer(300),
+    mutationFn: () => {
+      if (flow === 'login') {
+        return apiClient.post('/auth/login/initiate', { phone, pin });
+      }
+      return apiClient.post('/auth/register/initiate', { phone });
+    },
+    onSuccess: () => {
+      setTimer(300);
+      setVerifyError('');
+    },
+  });
+
+  const loginOtpMutation = useMutation({
+    mutationFn: (otpCode: string) => {
+      return apiClient.post('/auth/login/verify', { phone, otp: otpCode });
+    },
+    onSuccess: async (response) => {
+      const { access_token, refresh_token, user } = response.data;
+      
+      // Store session tokens using the active session helper
+      await setActiveTokens(user.phone || phone, access_token, refresh_token);
+      
+      // Save PIN in SecureStore for biometric convenience
+      if (pin) {
+        const sanitizedPhone = (user.phone || phone).replace(/[^\w.-]/g, '');
+        await SecureStore.setItemAsync(`user_pin_${sanitizedPhone}`, pin);
+      }
+      
+      // Trigger local login to hydrate state
+      login(user);
+    },
+    onError: (err: any) => {
+      console.error('[Login OTP Verify] Failed:', err?.response?.data || err);
+      const serverError = err?.response?.data?.error;
+      const errorMsg = typeof serverError === 'string' 
+        ? serverError 
+        : serverError?.message || 'Verification failed. Please check the code.';
+      setVerifyError(errorMsg);
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    }
   });
 
   if (step === 'details') {
     return (
-      <SafeAreaView className="flex-1 bg-surface">
+      <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
+        <CoinBackground />
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           className="flex-1"
@@ -66,31 +121,31 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
             
             <View className="flex-1 justify-center py-12">
               <View className="mb-10">
-                <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-secondary mb-3">Sovereign Identity</Text>
-                <Text className="font-headline text-4xl font-bold text-on-surface tracking-tight leading-tight">About You</Text>
-                <Text className="font-body text-on-surface-variant mt-4 text-sm leading-relaxed">Help us personalize your ledger experience.</Text>
+                <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-primary mb-3">Sovereign Identity</Text>
+                <Text className={`font-headline text-4xl font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight leading-tight`}>About You</Text>
+                <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-4 text-sm leading-relaxed`}>Help us personalize your ledger experience.</Text>
               </View>
 
-              <View className="bg-surface-container-lowest rounded-3xl p-8 shadow-sm">
-                <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-4">Title</Text>
+              <View className={`${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} rounded-3xl p-8 shadow-sm`}>
+                <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-4`}>Title</Text>
                 <View className="flex-row space-x-2 mb-8">
                   {(['Mr.', 'Mrs.', 'Ms.', 'None'] as const).map((t) => (
                     <TouchableOpacity
                       key={t}
                       onPress={() => setTitle(t)}
-                      className={`flex-1 py-3 items-center rounded-xl border ${title === t ? 'bg-primary border-primary shadow-sm shadow-primary/20' : 'bg-surface-container-low border-outline-variant/10'}`}
+                      className={`flex-1 py-3 items-center rounded-xl border ${title === t ? 'bg-primary border-primary shadow-sm shadow-primary/20' : `${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}`}
                     >
-                      <Text className={`font-label text-xs font-bold ${title === t ? 'text-white' : 'text-gray-400'}`}>{t === 'None' ? 'N/A' : t}</Text>
+                      <Text className={`font-label text-xs font-bold ${title === t ? 'text-white' : isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t === 'None' ? 'N/A' : t}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
 
                 <View className="mb-10">
-                  <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-4">Full Name</Text>
+                  <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-4`}>Full Name</Text>
                   <TextInput
-                    className="bg-surface-container-low px-5 py-4 rounded-2xl font-body text-lg text-on-surface"
+                    className={`${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} px-5 py-4 rounded-2xl font-body text-lg ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} border ${isDark ? 'border-dark-outline-variant/20' : 'border-transparent'}`}
                     placeholder="e.g. Kofi Mensah"
-                    placeholderTextColor="#D1D5DB"
+                    placeholderTextColor={isDark ? '#434942' : '#D1D5DB'}
                     value={fullName}
                     onChangeText={setFullName}
                     autoFocus
@@ -106,7 +161,7 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
                   disabled={!fullName.trim()}
                   className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20"
                 >
-                  <View className={`w-full h-14 items-center justify-center flex-row space-x-3 ${!fullName.trim() ? 'bg-gray-300' : 'bg-primary'}`}>
+                  <View className={`w-full h-14 items-center justify-center flex-row space-x-3 ${!fullName.trim() ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') : 'bg-primary'}`}>
                     <Text className="text-white font-headline font-bold text-base">Continue</Text>
                     <ArrowRight size={20} color="white" />
                   </View>
@@ -120,7 +175,8 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-surface">
+    <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
+      <CoinBackground />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
@@ -132,13 +188,13 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
           
           <View className="flex-1 justify-center items-center py-12">
             {/* Lock Icon */}
-            <View className="w-20 h-20 rounded-full bg-surface-container-low items-center justify-center mb-8 shadow-sm">
-              <Lock size={32} color="#0d631b" fill="#0d631b" opacity={0.8} />
+            <View className={`w-20 h-20 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} items-center justify-center mb-8 shadow-sm`}>
+              <Lock size={32} color={isDark ? '#2e7d32' : '#0d631b'} fill={isDark ? '#2e7d32' : '#0d631b'} opacity={0.8} />
             </View>
 
-            <Text className="font-headline font-extrabold text-3xl text-on-surface tracking-tight mb-2">Security Check</Text>
-            <Text className="font-body text-on-surface-variant leading-relaxed text-center mb-10">
-              OTP sent to <Text className="font-semibold text-on-surface">{phone}</Text>
+            <Text className={`font-headline font-extrabold text-3xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight mb-2`}>Security Check</Text>
+            <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed text-center mb-10`}>
+              OTP sent to <Text className={`font-semibold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{phone}</Text>
             </Text>
 
             {/* OTP Input Grid */}
@@ -147,12 +203,12 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
                 <TextInput
                   key={index}
                   ref={(el) => { inputRefs.current[index] = el; }}
-                  className="w-[14%] aspect-square bg-surface-container-lowest border border-outline-variant/20 rounded-xl text-center font-headline font-bold text-2xl text-on-surface shadow-sm focus:border-primary"
+                  className={`w-[14%] aspect-square ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} border ${isDark ? 'border-dark-outline-variant/30' : 'border-outline-variant/20'} rounded-xl text-center font-headline font-bold text-2xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} shadow-sm ${isDark ? 'focus:border-[#2e7d32]' : 'focus:border-primary'}`}
                   keyboardType="number-pad"
                   maxLength={1}
                   value={digit}
                   placeholder={digit === '' ? '•' : ''}
-                  placeholderTextColor="#D1D5DB"
+                  placeholderTextColor={isDark ? '#434942' : '#D1D5DB'}
                   onChangeText={(value) => handleOtpChange(value, index)}
                   onKeyPress={(e) => handleKeyPress(e, index)}
                   autoFocus={index === 0}
@@ -162,9 +218,9 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
 
             {/* Timer & Action */}
             <View className="items-center space-y-4 mb-12">
-              <View className="flex-row items-center space-x-2 px-4 py-2 rounded-full bg-surface-container-low border border-outline-variant/10">
-                <Clock size={14} color="#4c56af" />
-                <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              <View className={`flex-row items-center space-x-2 px-4 py-2 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
+                <Clock size={14} color={isDark ? '#2e7d32' : '#0d631b'} />
+                <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
                   Resend in {formatTime(timer)}
                 </Text>
               </View>
@@ -173,24 +229,49 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
                 onPress={() => timer === 0 && resendMutation.mutate()} 
                 disabled={timer > 0 || resendMutation.isPending}
               >
-                <Text className={`font-label text-sm font-bold ${timer > 0 ? 'text-secondary opacity-30' : 'text-secondary'}`}>
+                <Text className={`font-label text-sm font-bold ${timer > 0 ? 'text-primary opacity-30' : 'text-primary'}`}>
                   Resend Code
                 </Text>
               </TouchableOpacity>
             </View>
 
+            {verifyError ? (
+              <Text className="text-error text-sm font-semibold mb-4 text-center">{verifyError}</Text>
+            ) : null}
+
             <TouchableOpacity
-              disabled={otp.some(d => d === '')}
+              onPress={() => {
+                if (!otp.some(d => d === '')) {
+                  if (flow === 'login') {
+                    loginOtpMutation.mutate(otp.join(''));
+                  } else {
+                    setStep('details');
+                  }
+                }
+              }}
+              disabled={otp.some(d => d === '') || loginOtpMutation.isPending}
               className="w-full h-14 rounded-2xl overflow-hidden shadow-lg shadow-primary/10"
             >
-              <View className={`w-full h-full items-center justify-center flex-row space-x-2 ${otp.some(d => d === '') ? 'bg-surface-container-highest' : 'bg-primary'}`}>
-                <Text className={`font-headline font-bold text-base ${otp.some(d => d === '') ? 'text-on-surface-variant' : 'text-white'}`}>Verify</Text>
-                <ArrowRight size={18} color={otp.some(d => d === '') ? '#40493d' : 'white'} />
+              <View className={`w-full h-full items-center justify-center flex-row space-x-2 ${
+                otp.some(d => d === '') || loginOtpMutation.isPending 
+                  ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') 
+                  : 'bg-primary'
+              }`}>
+                <Text className={`font-headline font-bold text-base ${
+                  otp.some(d => d === '') || loginOtpMutation.isPending 
+                    ? (isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant') 
+                    : 'text-white'
+                }`}>
+                  {loginOtpMutation.isPending ? 'Verifying...' : 'Verify'}
+                </Text>
+                {!loginOtpMutation.isPending && (
+                  <ArrowRight size={18} color={otp.some(d => d === '') ? (isDark ? '#b2b6b1' : '#40493d') : 'white'} />
+                )}
               </View>
             </TouchableOpacity>
 
-            <Text className="text-center font-body text-[10px] text-on-surface-variant px-8 mt-6">
-              By verifying, you agree to CediSmart's <Text className="text-primary font-bold">Terms of Service</Text> and <Text className="text-primary font-bold">Privacy Policy</Text>.
+            <Text className={`text-center font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} px-8 mt-6`}>
+              By verifying, you agree to CediSmart's <Text className={`${isDark ? 'text-[#2e7d32]' : 'text-primary'} font-bold`}>Terms of Service</Text> and <Text className={`${isDark ? 'text-[#2e7d32]' : 'text-primary'} font-bold`}>Privacy Policy</Text>.
             </Text>
           </View>
         </ScrollView>
@@ -198,9 +279,9 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
 
       {/* Support Action */}
       <View className="absolute bottom-10 right-8">
-        <TouchableOpacity className="flex-row items-center space-x-2 bg-surface-container-lowest/80 px-4 py-3 rounded-full shadow-lg border border-outline-variant/10">
-          <HelpCircle size={20} color="#0d631b" />
-          <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-primary">Support</Text>
+        <TouchableOpacity className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
+          <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
+          <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

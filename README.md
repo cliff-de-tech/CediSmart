@@ -52,7 +52,7 @@
 
 Most budgeting apps are designed for bank-account-first economies. Ghana is different.
 
-- The majority of financial activity flows through **MTN MoMo and Vodafone Cash**, not traditional bank accounts
+- The majority of financial activity flows through **MTN MoMo and Vodafone/Telecel Cash**, not traditional bank accounts
 - A significant portion of users are on **prepaid data** — every kilobyte counts
 - Networks drop. Transactions must survive being offline
 - Identity is a **phone number**, not an email address

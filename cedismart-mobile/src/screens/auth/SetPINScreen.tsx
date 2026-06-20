@@ -7,10 +7,14 @@ import { Shield, Info, CheckCircle } from 'lucide-react-native';
 import PINPad from '../../components/shared/PINPad';
 import apiClient from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
+import { useThemeStore } from '../../stores/themeStore';
+import { CoinBackground } from '../../components/shared/CoinBackground';
 
 const SetPINScreen = ({ route, navigation }: any) => {
   const { phone, otp, full_name } = route.params;
   const login = useAuthStore((state) => state.login);
+  const theme = useThemeStore((state) => state.theme);
+  const isDark = theme === 'dark';
   
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [pin, setPin] = useState('');
@@ -100,7 +104,7 @@ const SetPINScreen = ({ route, navigation }: any) => {
           <View
             key={i}
             className={`w-4 h-4 rounded-full shadow-sm transition-all duration-300 ${
-              i < currentPin.length ? 'bg-primary scale-125' : 'bg-surface-container-highest'
+              i < currentPin.length ? 'bg-primary scale-125' : isDark ? 'bg-dark-surface-container-low' : 'bg-gray-200'
             }`}
           />
         ))}
@@ -109,7 +113,8 @@ const SetPINScreen = ({ route, navigation }: any) => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-surface">
+    <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
+      <CoinBackground />
       <View className="flex-1 justify-between py-12 px-6">
         {/* Decoration Layer */}
         <View className="absolute inset-0 -z-10 opacity-[0.03] overflow-hidden">
@@ -119,11 +124,11 @@ const SetPINScreen = ({ route, navigation }: any) => {
 
         {/* Header Section */}
         <View className="items-center mt-8">
-          <View className="w-16 h-16 rounded-full bg-primary-container items-center justify-center mb-6">
-            <Shield size={32} color="#ffffff" fill="white" />
+          <View className={`w-16 h-16 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary-container'} items-center justify-center mb-6`}>
+            <Shield size={32} color={isDark ? '#2e7d32' : '#ffffff'} fill={isDark ? '#2e7d32' : 'white'} />
           </View>
-          <Text className="font-headline font-extrabold text-3xl text-on-surface mb-3 tracking-tight">Secure Your Account</Text>
-          <Text className="text-on-surface-variant font-medium text-sm text-center leading-relaxed px-4">
+          <Text className={`font-headline font-extrabold text-3xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} mb-3 tracking-tight`}>Secure Your Account</Text>
+          <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} font-medium text-sm text-center leading-relaxed px-4`}>
             Set up a 6-digit transaction PIN to protect your wealth and authorize transfers safely.
           </Text>
         </View>
@@ -133,7 +138,7 @@ const SetPINScreen = ({ route, navigation }: any) => {
           style={{ transform: [{ translateX: shakeAnimation }] }}
           className="items-center"
         >
-          <Text className="font-label text-xs uppercase tracking-widest text-secondary font-bold mb-6">
+          <Text className="font-label text-xs uppercase tracking-widest text-primary font-bold mb-6">
             {step === 'create' ? 'Enter PIN' : 'Confirm PIN'}
           </Text>
           {renderDots()}
@@ -152,7 +157,7 @@ const SetPINScreen = ({ route, navigation }: any) => {
             disabled={verifyMutation.isPending}
           />
           <View className="mt-12 items-center opacity-30">
-            <Text className="font-headline font-black text-on-surface tracking-widest text-[10px] uppercase">
+            <Text className={`font-headline font-black ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-widest text-[10px] uppercase`}>
               CediSmart Secure Layer
             </Text>
           </View>
@@ -161,10 +166,10 @@ const SetPINScreen = ({ route, navigation }: any) => {
 
       {/* Confirmation Overlay (Optional/Future V2) */}
       {verifyMutation.isPending && (
-        <View className="absolute inset-0 bg-surface/50 items-center justify-center">
-          <View className="bg-white p-10 rounded-3xl shadow-2xl items-center">
-            <CheckCircle size={48} color="#0d631b" />
-            <Text className="mt-4 font-headline font-bold text-lg">Verifying...</Text>
+        <View className={`absolute inset-0 ${isDark ? 'bg-dark-background/70' : 'bg-surface/50'} items-center justify-center`}>
+          <View className={`${isDark ? 'bg-dark-surface-container-lowest' : 'bg-white'} p-10 rounded-3xl shadow-2xl items-center border ${isDark ? 'border-dark-outline-variant/10' : 'border-transparent'}`}>
+            <CheckCircle size={48} color={isDark ? '#2e7d32' : '#0d631b'} />
+            <Text className={`mt-4 font-headline font-bold text-lg ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>Verifying...</Text>
           </View>
         </View>
       )}
