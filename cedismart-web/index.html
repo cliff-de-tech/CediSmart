@@ -17,17 +17,24 @@
   <!-- Navigation Bar -->
   <header>
     <div class="nav-container">
-      <a href="#" class="logo">
+      <a href="#" class="logo" id="header-logo">
         <img src="assets/app_icon.jpg" alt="CediSmart Logo">
         CediSmart<span>Pro</span>
       </a>
       <ul class="nav-menu">
-        <li><a href="#features" class="nav-link">Features</a></li>
-        <li><a href="#demo" class="nav-link">Live Demo</a></li>
-        <li><a href="#download" class="nav-link">Download</a></li>
-        <li><a href="#faq" class="nav-link">FAQs</a></li>
+        <li><a href="#features" class="nav-link" id="nav-features">Features</a></li>
+        <li><a href="#demo" class="nav-link" id="nav-demo">Live Demo</a></li>
+        <li><a href="#download" class="nav-link" id="nav-download">Download</a></li>
+        <li><a href="#faq" class="nav-link" id="nav-faq">FAQs</a></li>
+        <li class="mobile-only"><a href="#download" class="btn-header" id="nav-mobile-cta" style="display: inline-block; width: 100%; text-align: center; margin-top: 20px;">Get CediSmart</a></li>
       </ul>
-      <a href="#download" class="btn-header">Get the App</a>
+      <a href="#download" class="btn-header" id="nav-desktop-cta">Get the App</a>
+      <!-- Hamburger Toggle Button for Mobile -->
+      <button class="hamburger-menu" id="hamburger-btn" aria-label="Toggle Navigation Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
     </div>
   </header>
 
@@ -181,7 +188,7 @@
           <li>Once downloaded, open the file from your notifications or files app.</li>
           <li>If prompted, enable <em>"Allow installation from this source"</em> or select <em>"Install anyway"</em>.</li>
         </ol>
-        <a href="#" class="btn-primary" style="width: 100%; justify-content: center; padding: 18px;">
+        <a href="https://github.com/cliff-de-tech/CediSmart/releases/latest/download/CediSmart.apk" class="btn-primary" id="download-apk-btn" style="width: 100%; justify-content: center; padding: 18px;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           Download Standalone APK (v1.0.0)
         </a>
@@ -200,7 +207,7 @@
           <li>Tap the <strong>Join Apple TestFlight</strong> button below to open the invite portal.</li>
           <li>Accept the invitation and select <strong>Install</strong> to add CediSmart to your device.</li>
         </ol>
-        <a href="#" class="btn-secondary" style="width: 100%; justify-content: center; padding: 18px; border-color: var(--accent);">
+        <a href="https://testflight.apple.com/join/V58e3q2W" class="btn-secondary" id="join-testflight-btn" style="width: 100%; justify-content: center; padding: 18px; border-color: var(--accent);">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
           Join iOS TestFlight Release
         </a>
