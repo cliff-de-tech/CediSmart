@@ -14,7 +14,7 @@ from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.core.redis import get_redis
 from app.modules.users import service
-from app.modules.users.schemas import UserResponse, UserUpdateRequest, KYCVerifyRequest
+from app.modules.users.schemas import UserResponse, UserUpdateRequest, KYCVerifyRequest, BugReportRequest, BugReportResponse
 
 router = APIRouter()
 
@@ -118,3 +118,25 @@ async def verify_kyc(
     """
     user = await service.verify_user_kyc(user_id=user_id, payload=body, db=db)
     return UserResponse.model_validate(user)
+
+
+# ---------------------------------------------------------------------------
+# POST /report-bug
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/report-bug",
+    response_model=BugReportResponse,
+    status_code=200,
+    summary="Report a bug and link to GitHub issue",
+)
+async def report_bug(
+    body: BugReportRequest,
+    user_id: CurrentUser,
+    db: DBSession,
+) -> BugReportResponse:
+    """Report a bug. Submits a GitHub issue or logs locally depending on config."""
+    res = await service.report_user_bug(user_id=user_id, payload=body, db=db)
+    return BugReportResponse(**res)
+

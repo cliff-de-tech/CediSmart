@@ -182,20 +182,99 @@ const AccountsScreen = ({ navigation }: any) => {
   });
 
   const handleLink = () => {
-    if (!identifier.trim()) {
+    const cleanId = identifier.trim().replace(/\s+/g, '');
+    if (!cleanId) {
       Alert.alert('Missing Info', `Please enter your ${linkingType === 'momo' ? 'phone number' : 'account number'}.`);
+      return;
+    }
+
+    if (linkingType === 'momo') {
+      // Validate mobile number: exactly 10 digits starting with 0
+      const phoneRegex = /^0\d{9}$/;
+      if (!phoneRegex.test(cleanId)) {
+        Alert.alert('Invalid Number', 'Please enter a valid 10-digit phone number starting with 0.');
+        return;
+      }
+
+      // Ghanaian network operators prefix validation
+      const prefix = cleanId.substring(0, 3);
+      if (selectedProvider === 'MTN MoMo') {
+        const mtnPrefixes = ['024', '054', '055', '059', '025', '053'];
+        if (!mtnPrefixes.includes(prefix)) {
+          Alert.alert(
+            'Invalid Provider Number',
+            `The phone number prefix (${prefix}) does not match MTN MoMo.\n\nValid MTN prefixes: ${mtnPrefixes.join(', ')}`
+          );
+          return;
+        }
+      } else if (selectedProvider === 'Telecel Cash') {
+        const telecelPrefixes = ['020', '050'];
+        if (!telecelPrefixes.includes(prefix)) {
+          Alert.alert(
+            'Invalid Provider Number',
+            `The phone number prefix (${prefix}) does not match Telecel Cash.\n\nValid Telecel prefixes: ${telecelPrefixes.join(', ')}`
+          );
+          return;
+        }
+      } else if (selectedProvider === 'AirtelTigo Money') {
+        const atPrefixes = ['026', '056', '027', '057'];
+        if (!atPrefixes.includes(prefix)) {
+          Alert.alert(
+            'Invalid Provider Number',
+            `The phone number prefix (${prefix}) does not match AirtelTigo Money.\n\nValid AirtelTigo prefixes: ${atPrefixes.join(', ')}`
+          );
+          return;
+        }
+      }
+    } else {
+      // Validate bank account: strictly 10 to 16 digits
+      const bankRegex = /^\d{10,16}$/;
+      if (!bankRegex.test(cleanId)) {
+        Alert.alert('Invalid Account', 'Please enter a valid bank account number (10 to 16 digits).');
+        return;
+      }
+    }
+
+    const parsedBalance = parseFloat(startingBalance);
+    if (isNaN(parsedBalance) || parsedBalance < 0) {
+      Alert.alert('Invalid Balance', 'Please enter a valid starting balance.');
       return;
     }
 
     setIsAuthorizing(true);
     setTimeout(() => {
       setIsAuthorizing(false);
-      createMutation.mutate({
-        name: linkingType === 'momo' ? `${selectedProvider} Wallet` : `${selectedProvider} Account`,
-        account_type: linkingType === 'momo' ? 'mobile_money' : 'bank',
-        provider: selectedProvider,
-        opening_balance: parseFloat(startingBalance) || 0
-      });
+      // Simulate Consent Gateway name verification
+      const resolvedName = cleanId.endsWith('99') ? 'Ama Serwaa' : (user?.full_name || 'Verified User');
+      
+      if (resolvedName !== user?.full_name) {
+        Alert.alert(
+          'Verification Failed',
+          `Consent Gateway resolved this account to '${resolvedName}', which does not match your verified Ghana Card name ('${user?.full_name || 'Holder'}').\n\nFor compliance and security, you can only link portals registered under your own name.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // If it matches, prompt to confirm
+      Alert.alert(
+        'Confirm Account Details',
+        `Consent Gateway resolved this account to:\n\nName: ${resolvedName}\nProvider: ${selectedProvider}\n\nDo you authorize CediSmart to link this portal?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Link Portal',
+            onPress: () => {
+              createMutation.mutate({
+                name: linkingType === 'momo' ? `${selectedProvider} Wallet` : `${selectedProvider} Account`,
+                account_type: linkingType === 'momo' ? 'mobile_money' : 'bank',
+                provider: selectedProvider,
+                opening_balance: parsedBalance
+              });
+            }
+          }
+        ]
+      );
     }, 2000);
   };
 
@@ -606,7 +685,7 @@ const AccountsScreen = ({ navigation }: any) => {
               </View>
 
               <View>
-                <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Simulated Current Balance (GHS)</Text>
+                <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Simulated Current Balance (₵)</Text>
                 <View className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} px-4 py-4 rounded-xl border shadow-sm`}>
                   <Text className={`text-lg font-bold ${isDark ? 'text-[#2e7d32]' : 'text-primary'} mr-2`}>₵</Text>
                   <TextInput
@@ -662,7 +741,7 @@ const AccountsScreen = ({ navigation }: any) => {
 
             {/* Manual Entry Input */}
             <View className="mb-6">
-              <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Cash Balance (GHS)</Text>
+              <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Cash Balance (₵)</Text>
               <View className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} px-4 py-4 rounded-xl border shadow-sm`}>
                 <Text className={`text-lg font-bold ${isDark ? 'text-[#2e7d32]' : 'text-primary'} mr-2`}>₵</Text>
                 <TextInput

@@ -28,7 +28,7 @@ A modern, offline-capable mobile app for the CediSmart fintech platform. Built w
 
 ✅ **Phone-first authentication** — OTP via SMS  
 ✅ **Offline transactions** — Queue and sync when connectivity returns  
-✅ **Multiple account types** — Bank, Mobile Money (MTN, Vodafone), Cash  
+✅ **Multiple account types** — Bank, Mobile Money (MTN MoMo, Telecel Cash, AirtelTigo Money), Cash  
 ✅ **Budget tracking** — Real-time progress against monthly targets  
 ✅ **Transaction history** — Fast, searchable transaction log  
 ✅ **Spending analytics** — Monthly trends, category breakdown  
@@ -272,22 +272,19 @@ npm start
 ```
 RootNavigator
 ├── AuthNavigator (when not logged in)
-│   ├── RegisterScreen
-│   ├── VerifyOtpScreen
-│   ├── SetPinScreen
-│   └── LoginScreen
+│   ├── WelcomeScreen (welcome & gate check)
+│   ├── RegisterScreen (registration initiation)
+│   ├── OTPVerifyScreen (verification code check)
+│   ├── SetPINScreen (initial PIN creation)
+│   └── LoginScreen (phone + PIN authentication)
 │
 └── AppNavigator (when logged in)
-    ├── Dashboard (home)
-    ├── Transactions
-    ├── Budgets
-    ├── Reports
-    ├── Accounts
-    ├── Settings
-    └── ModalNavigator (overlays)
-        ├── AddTransactionModal
-        ├── EditTransactionModal
-        └── SettingsModal
+    ├── DashboardScreen (main dashboard hero card + activity)
+    ├── AddTransactionScreen (manually enter transaction details)
+    ├── BudgetsScreen (manage monthly spending goals)
+    ├── ReportsScreen (spending trends and breakdown)
+    ├── AccountsScreen (link MoMo portals and bank accounts)
+    └── SettingsScreen (profile, change PIN, Ghana Card KYC)
 ```
 
 Each navigator manages its own state via React Navigation's linking configuration.

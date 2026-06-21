@@ -51,3 +51,15 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class BugReportRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=100)
+    description: str = Field(..., min_length=10, max_length=2000)
+    device_info: dict[str, str] | None = None
+
+
+class BugReportResponse(BaseModel):
+    issue_number: int | None = None
+    issue_url: str | None = None
+    status: str

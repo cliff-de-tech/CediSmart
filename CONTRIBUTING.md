@@ -177,7 +177,7 @@ npm run type-check && npm run lint && npm run format
 
 **Web:**
 - No linting configured yet; follow existing code style
-- Use Tailwind utilities consistently
+- Use Vanilla CSS custom properties and layout classes in style.css consistently (no external framework dependencies)
 - Ensure responsive design works at all breakpoints
 
 ### 6. Documentation

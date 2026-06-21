@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator, Dimensions } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug } from 'lucide-react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -96,6 +96,13 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [isOnline, setIsOnline] = useState(true);
   const [appLockSetting, setAppLockSetting] = useState('never');
   const [budgetThreshold, setBudgetThreshold] = useState(0.8);
+
+  // Bug reporting states
+  const [bugTitle, setBugTitle] = useState('');
+  const [bugDescription, setBugDescription] = useState('');
+  const [isSubmittingBug, setIsSubmittingBug] = useState(false);
+  const [isBugModalVisible, setIsBugModalVisible] = useState(false);
+
 
   const queryClient = useQueryClient();
   const { syncTransactions } = useOfflineSync();
@@ -211,67 +218,125 @@ const SettingsScreen = ({ navigation, route }: any) => {
 
   const handleKycVerification = async () => {
     setKycError('');
+    
+    // 1. Ghana Card Number Validation
     const cardRegex = /^GHA-\d{9}-\d$/;
     if (!cardRegex.test(cardNum.trim())) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       setKycError('Format must be GHA-XXXXXXXXX-X (9 digits, e.g. GHA-123456789-0)');
       return;
     }
-    if (!fullNameKyc.trim()) {
+
+    // 2. Full Name Validation (At least First + Last name, alphabetical + spaces only)
+    const cleanKycName = fullNameKyc.trim();
+    if (!cleanKycName) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       setKycError('Please enter your full name as shown on the card');
       return;
     }
-    if (!dobKyc.trim()) {
+    const nameWords = cleanKycName.split(/\s+/);
+    if (nameWords.length < 2) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      setKycError('Please enter both your first and last name');
+      return;
+    }
+    const invalidCharRegex = /[^a-zA-Z\s'-]/;
+    if (invalidCharRegex.test(cleanKycName)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      setKycError('Name can only contain letters, spaces, hyphens, and apostrophes');
+      return;
+    }
+
+    // 3. Date of Birth Validation (Format, Valid date, and minimum age 15)
+    const dobTrimmed = dobKyc.trim();
+    if (!dobTrimmed) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
       setKycError('Please enter your Date of Birth');
       return;
     }
+    const dobRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dobRegex.test(dobTrimmed)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      setKycError('Date of Birth must be in YYYY-MM-DD format');
+      return;
+    }
+    const [year, month, day] = dobTrimmed.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    if (
+      dateObj.getFullYear() !== year ||
+      dateObj.getMonth() !== month - 1 ||
+      dateObj.getDate() !== day
+    ) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      setKycError('Please enter a valid Date of Birth');
+      return;
+    }
+    
+    const today = new Date();
+    let age = today.getFullYear() - year;
+    const m = today.getMonth() - (month - 1);
+    if (m < 0 || (m === 0 && today.getDate() < day)) {
+      age--;
+    }
+    if (age < 15) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      setKycError('You must be at least 15 years old to verify with a Ghana Card');
+      return;
+    }
+    if (age > 120) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+      setKycError('Please enter a valid Date of Birth');
+      return;
+    }
 
     setIsVerifying(true);
-    setTimeout(async () => {
-      try {
-        setIsVerifying(false);
-        setIsKycVerified(true);
-        setGhanaCardNumber(cardNum.trim());
-        if (user?.id) {
-          await AsyncStorage.setItem(`kyc_verified_${user.id}`, 'true');
-          await AsyncStorage.setItem(`ghana_card_${user.id}`, cardNum.trim());
-        }
-        if (!user?.full_name && fullNameKyc.trim()) {
-          try {
-            await apiClient.patch('/users/me', { full_name: fullNameKyc.trim() });
-            updateUser({ full_name: fullNameKyc.trim() });
-          } catch (e) {}
-        }
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        Alert.alert(
-          'Verification Successful',
-          'Your identity has been verified successfully (Tier 1 Verified)!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (route?.params?.redirectTo) {
-                  const target = route.params.redirectTo;
-                  // Clear parameters
-                  navigation.setParams({ openKyc: undefined, redirectTo: undefined });
-                  // Navigate back
-                  navigation.navigate(target);
-                }
+    try {
+      const response = await apiClient.post('/users/verify-kyc', {
+        ghana_card_number: cardNum.trim(),
+        full_name: fullNameKyc.trim(),
+        dob: dobTrimmed
+      });
+
+      setIsVerifying(false);
+      setIsKycVerified(true);
+      setGhanaCardNumber(cardNum.trim());
+      if (user?.id) {
+        await AsyncStorage.setItem(`kyc_verified_${user.id}`, 'true');
+        await AsyncStorage.setItem(`ghana_card_${user.id}`, cardNum.trim());
+      }
+      
+      // Update local auth store with the newly verified user state
+      updateUser(response.data);
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      Alert.alert(
+        'Verification Successful',
+        'Your identity has been verified successfully (Tier 1 Verified)!',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (route?.params?.redirectTo) {
+                const target = route.params.redirectTo;
+                // Clear parameters
+                navigation.setParams({ openKyc: undefined, redirectTo: undefined });
+                // Navigate back
+                navigation.navigate(target);
               }
             }
-          ]
-        );
-        kycSheetRef.current?.close();
-        setCardNum('');
-        setFullNameKyc('');
-        setDobKyc('');
-      } catch (error) {
-        setIsVerifying(false);
-        setKycError('NIA verification gateway timed out. Please try again.');
-      }
-    }, 1500);
+          }
+        ]
+      );
+      kycSheetRef.current?.close();
+      setCardNum('');
+      setFullNameKyc('');
+      setDobKyc('');
+    } catch (error: any) {
+      setIsVerifying(false);
+      const errMsg = error.response?.data?.error?.message || 'NIA verification gateway timed out. Please try again.';
+      setKycError(errMsg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    }
   };
 
   // Theme & Notifications States
@@ -731,15 +796,20 @@ const SettingsScreen = ({ navigation, route }: any) => {
           onPress: async (text?: string) => {
             if (text === 'DELETE') {
               try {
+                const phoneToRemove = user?.phone;
                 await apiClient.delete('/users/me');
-                await SecureStore.deleteItemAsync('access_token');
-                await SecureStore.deleteItemAsync('refresh_token');
+                if (phoneToRemove) {
+                  await removeSavedAccount(phoneToRemove);
+                } else {
+                  await SecureStore.deleteItemAsync('access_token');
+                  await SecureStore.deleteItemAsync('refresh_token');
+                  logout();
+                }
                 try {
                   // Clear last logged in user reference
                   await AsyncStorage.removeItem('last_logged_in_phone');
                 } catch (err) {}
                 clearQueue(); // Remove any pending offline transactions
-                logout(); // Clear Zustand state
                 Alert.alert('Success', 'Your account has been deleted.');
               } catch (error) {
                 Alert.alert('Error', 'Failed to delete account. Please try again.');
@@ -753,14 +823,83 @@ const SettingsScreen = ({ navigation, route }: any) => {
     );
   };
 
+  const handleReportBug = async () => {
+    if (!bugTitle.trim() || !bugDescription.trim()) {
+      Alert.alert('Required Fields', 'Please fill in both the title and description.');
+      return;
+    }
+    if (bugTitle.trim().length < 3) {
+      Alert.alert('Validation Error', 'Title must be at least 3 characters.');
+      return;
+    }
+    if (bugDescription.trim().length < 10) {
+      Alert.alert('Validation Error', 'Description must be at least 10 characters.');
+      return;
+    }
+
+    setIsSubmittingBug(true);
+    try {
+      const { width, height } = Dimensions.get('window');
+      const response = await apiClient.post('/users/report-bug', {
+        title: bugTitle.trim(),
+        description: bugDescription.trim(),
+        device_info: {
+          os: Platform.OS,
+          os_version: String(Platform.Version),
+          screen_dimensions: `${Math.round(width)}x${Math.round(height)}`,
+          theme_mode: theme,
+        }
+      });
+
+      setIsSubmittingBug(false);
+      setIsBugModalVisible(false);
+      setBugTitle('');
+      setBugDescription('');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      
+      if (response.data.status === 'submitted') {
+        Alert.alert(
+          'Bug Reported Successfully',
+          `Thank you for your report! It has been submitted as GitHub Issue #${response.data.issue_number}.`
+        );
+      } else {
+        Alert.alert(
+          'Feedback Received',
+          'Thank you! Your bug report has been logged successfully.'
+        );
+      }
+    } catch (error: any) {
+      setIsSubmittingBug(false);
+      const serverError = error.response?.data?.error;
+      const errMsg = typeof serverError === 'string'
+        ? serverError
+        : serverError?.message || 'Failed to submit bug report. Please check your internet connection and try again.';
+      Alert.alert('Error', errMsg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    }
+  };
+
   const saveName = async () => {
-    if (!newName.trim()) {
+    const cleanName = newName.trim();
+    if (!cleanName) {
       setIsEditingName(false);
       return;
     }
+    
+    const words = cleanName.split(/\s+/);
+    if (words.length < 2) {
+      Alert.alert('Invalid Name', 'Please enter both your first and last name.');
+      return;
+    }
+    const invalidCharRegex = /[^a-zA-Z\s'-]/;
+    if (invalidCharRegex.test(cleanName)) {
+      Alert.alert('Invalid Name', 'Name can only contain letters, spaces, hyphens, and apostrophes.');
+      return;
+    }
+
     try {
-      await apiClient.patch('/users/me', { full_name: newName.trim() });
-      updateUser({ full_name: newName.trim() });
+      await apiClient.patch('/users/me', { full_name: cleanName });
+      updateUser({ full_name: cleanName });
       setIsEditingName(false);
     } catch (error) {
       Alert.alert('Error', 'Failed to update name.');
@@ -860,7 +999,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
       }
 
       // Generate CSV Content
-      const headers = ['Date', 'Type', 'Category', 'Account', 'Amount (GHS)', 'Description', 'Notes'];
+      const headers = ['Date', 'Type', 'Category', 'Account', 'Amount (₵)', 'Description', 'Notes'];
       const rows = allTx.map((tx: any) => {
         const date = tx.transaction_date;
         const type = tx.transaction_type ? tx.transaction_type.toUpperCase() : '';
@@ -1079,7 +1218,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 } else {
                   Alert.alert(
                     'Upgrade to Pro',
-                    'Get unlimited vaults, CSV exports, and link unlimited bank/MoMo accounts for GHS 10/month.',
+                    'Get unlimited vaults, CSV exports, and link unlimited bank/MoMo accounts for ₵10/month.',
                     [
                       { text: 'Cancel', style: 'cancel' },
                       { text: 'Upgrade Now', onPress: handleUpgrade }
@@ -1219,6 +1358,17 @@ const SettingsScreen = ({ navigation, route }: any) => {
             />
           </View>
 
+          {/* Support Section */}
+          <View className="mt-6">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Support</Text>
+            <SettingItem 
+              icon={Bug} 
+              title="Report a Bug" 
+              value="Submit issues to developers" 
+              onPress={() => setIsBugModalVisible(true)}
+            />
+          </View>
+
           {/* Danger Zone */}
           <View className="mt-10 mb-24">
             <TouchableOpacity 
@@ -1243,6 +1393,85 @@ const SettingsScreen = ({ navigation, route }: any) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Report Bug Modal */}
+      <Modal
+        visible={isBugModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsBugModalVisible(false)}
+      >
+        <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-surface/95' : 'bg-white/95'}`}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            className="flex-1 justify-center"
+          >
+            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
+              <View className={`w-full p-6 rounded-3xl ${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-white shadow-xl border border-gray-100'}`}>
+                {/* Header */}
+                <View className="flex-row justify-between items-center mb-6">
+                  <View className="flex-row items-center">
+                    <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-red-950/30' : 'bg-red-55'} items-center justify-center mr-3`}>
+                      <Bug size={20} color="#DC2626" />
+                    </View>
+                    <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Report a Bug</Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={() => setIsBugModalVisible(false)}
+                    className={`w-8 h-8 rounded-full ${isDark ? 'bg-dark-surface-container-high' : 'bg-gray-100'} items-center justify-center`}
+                  >
+                    <X size={18} color={isDark ? '#e1e3e0' : '#4B5563'} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Subtitle */}
+                <Text className={`text-sm mb-6 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Help us improve CediSmart. Describe the issue in detail, and our support team will instantly track, escalate, and resolve it to keep your experience flawless.
+                </Text>
+
+                {/* Bug Title */}
+                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bug Title</Text>
+                <TextInput
+                  value={bugTitle}
+                  onChangeText={setBugTitle}
+                  placeholder="e.g. App crashes on PIN creation"
+                  placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
+                  className={`w-full p-4 mb-4 rounded-xl border ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20 text-white' : 'bg-gray-50 border-gray-200 text-charcoal'} font-medium`}
+                />
+
+                {/* Bug Description */}
+                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Description</Text>
+                <TextInput
+                  value={bugDescription}
+                  onChangeText={setBugDescription}
+                  placeholder="Please describe what happened, steps to reproduce, and any error message you saw..."
+                  placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                  className={`w-full p-4 mb-6 rounded-xl border h-36 ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20 text-white' : 'bg-gray-50 border-gray-200 text-charcoal'} font-medium`}
+                />
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  onPress={handleReportBug}
+                  disabled={isSubmittingBug}
+                  className={`w-full py-4 rounded-xl flex-row justify-center items-center ${isSubmittingBug ? 'bg-gray-400' : 'bg-primary'}`}
+                >
+                  {isSubmittingBug ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <>
+                      <Text className="text-white font-bold text-base mr-2">Submit Bug Report</Text>
+                      <Check size={18} color="white" />
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
 
       {/* Change PIN Bottom Sheet */}
       <BottomSheet

@@ -197,3 +197,154 @@ async def test_verify_kyc_unconfigured(client: AsyncClient, make_user) -> None:
         assert resp.status_code == 400
         body = resp.json()
         assert body["error"]["code"] == "KYC_CONFIG_ERROR"
+
+
+async def test_verify_kyc_duplicate_card(client: AsyncClient, make_user, db_session) -> None:
+    # 1. Create a user who already has this card verified
+    user_a = await make_user(phone="+233201111111")
+    
+    # Manually update their ghana_card and save to DB
+    user_a.ghana_card = "GHA-123456789-0"
+    user_a.kyc_verified = True
+    await db_session.commit()
+
+    # 2. Create another user trying to link the same card
+    user_b = await make_user(phone="+233202222222")
+    headers = make_auth_headers(user_b.id)
+
+    resp = await client.post(
+        "/api/v1/users/verify-kyc",
+        json={
+            "ghana_card_number": "GHA-123456789-0",
+            "full_name": "Kofi Adu",
+            "dob": "1990-01-01"
+        },
+        headers=headers
+    )
+
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["error"]["code"] == "GHANA_CARD_ALREADY_LINKED"
+    assert "already verified on another account" in body["error"]["message"]
+
+
+async def test_delete_me_with_related_data(client: AsyncClient, make_user) -> None:
+    # 1. Setup: create user, account, category
+    user = await make_user(phone="+233203333333")
+    headers = make_auth_headers(user.id)
+
+    account_resp = await client.post(
+        "/api/v1/accounts/",
+        json={"name": "Cash Wallet", "account_type": "cash", "opening_balance": "1000.00"},
+        headers=headers,
+    )
+    assert account_resp.status_code == 201
+    account_id = account_resp.json()["id"]
+
+    cat_resp = await client.post(
+        "/api/v1/categories/",
+        json={"name": "Transport", "icon": "bus", "color": "#123456", "category_type": "expense"},
+        headers=headers,
+    )
+    assert cat_resp.status_code == 201
+    category_id = cat_resp.json()["id"]
+
+    # 2. Setup budget
+    budget_resp = await client.post(
+        "/api/v1/budgets/",
+        json={
+            "category_id": category_id,
+            "amount": "500.00",
+            "budget_year": 2026,
+            "budget_month": 6,
+        },
+        headers=headers,
+    )
+    assert budget_resp.status_code in [200, 201]
+
+    # 3. Setup transaction
+    tx_resp = await client.post(
+        "/api/v1/transactions/",
+        json={
+            "account_id": account_id,
+            "category_id": category_id,
+            "amount": "150.00",
+            "transaction_type": "expense",
+            "description": "Trotro fare",
+            "transaction_date": "2026-06-21",
+        },
+        headers=headers,
+    )
+    assert tx_resp.status_code == 201
+
+    # 4. Perform Delete Account
+    delete_resp = await client.delete("/api/v1/users/me", headers=headers)
+    assert delete_resp.status_code == 204
+
+
+async def test_report_bug_logged_locally(client: AsyncClient, make_user) -> None:
+    from unittest.mock import patch
+    user = await make_user()
+    headers = make_auth_headers(user.id)
+
+    with patch("app.core.config.settings.GITHUB_ACCESS_TOKEN", ""):
+        resp = await client.post(
+            "/api/v1/users/report-bug",
+            json={
+                "title": "Bug in login screen",
+                "description": "It crashes when typing double spaces in phone number field",
+                "device_info": {"os": "Android 13", "screen": "1080x2400"}
+            },
+            headers=headers
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "logged_locally"
+        assert body["issue_number"] is None
+        assert body["issue_url"] is None
+
+
+async def test_report_bug_submitted(client: AsyncClient, make_user) -> None:
+    from unittest.mock import patch, MagicMock, AsyncMock
+    user = await make_user()
+    headers = make_auth_headers(user.id)
+
+    mock_response = MagicMock()
+    mock_response.status_code = 201
+    mock_response.json.return_value = {
+        "number": 42,
+        "html_url": "https://github.com/cliff-de-tech/CediSmart/issues/42"
+    }
+
+    mock_client = MagicMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+
+    with patch("app.core.config.settings.GITHUB_ACCESS_TOKEN", "mock_token"), \
+         patch("app.modules.users.service.httpx.AsyncClient") as mock_client_class:
+
+        mock_client_class.return_value.__aenter__.return_value = mock_client
+
+        resp = await client.post(
+            "/api/v1/users/report-bug",
+            json={
+                "title": "Database connection error",
+                "description": "The application fails to connect to database periodically",
+                "device_info": {"os": "iOS 17", "screen": "1170x2532"}
+            },
+            headers=headers
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "submitted"
+        assert body["issue_number"] == 42
+        assert body["issue_url"] == "https://github.com/cliff-de-tech/CediSmart/issues/42"
+
+        mock_client.post.assert_called_once()
+        args, kwargs = mock_client.post.call_args
+        assert "mock_token" in kwargs["headers"]["Authorization"]
+        assert kwargs["json"]["title"] == "Database connection error"
+
+
+
+

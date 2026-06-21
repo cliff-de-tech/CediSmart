@@ -91,7 +91,7 @@ const RegisterScreen = ({ navigation }: any) => {
                   />
                 </View>
                 <Text className={`font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed`}>
-                  Enter your 9-digit mobile number registered with GHS services.
+                  Enter your 9-digit mobile number registered with telecom services.
                 </Text>
                 {errors.phone && (
                   <Text className="text-error text-[10px] font-bold mt-1">{errors.phone.message}</Text>

@@ -38,15 +38,17 @@ class User(TimestampMixin, Base):
 
     # --- Relationships ---
     accounts: Mapped[list["FinancialAccount"]] = relationship(
-        "FinancialAccount", back_populates="user", lazy="selectin"
+        "FinancialAccount", back_populates="user", lazy="selectin", cascade="all, delete-orphan", passive_deletes=True
     )
     transactions: Mapped[list["Transaction"]] = relationship(
-        "Transaction", back_populates="user", lazy="noload"
+        "Transaction", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
     )
     categories: Mapped[list["Category"]] = relationship(
-        "Category", back_populates="user", lazy="noload"
+        "Category", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
     )
-    budgets: Mapped[list["Budget"]] = relationship("Budget", back_populates="user", lazy="noload")
+    budgets: Mapped[list["Budget"]] = relationship(
+        "Budget", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
+    )
 
     def __repr__(self) -> str:
         return f"<User id={self.id} phone={self.phone}>"

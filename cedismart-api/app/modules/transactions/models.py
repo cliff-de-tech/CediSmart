@@ -62,9 +62,11 @@ class Transaction(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     account_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("financial_accounts.id"), nullable=False
+        ForeignKey("financial_accounts.id", ondelete="CASCADE"), nullable=False
     )
-    category_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categories.id"), nullable=False)
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
+    )
     amount: Mapped[float] = mapped_column(
         Numeric(14, 2), nullable=False
     )  # ALWAYS positive; direction from transaction_type

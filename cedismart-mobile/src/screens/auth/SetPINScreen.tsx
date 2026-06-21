@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Animated, TouchableOpacity } from 'react-native';
+import { View, Text, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
@@ -166,9 +166,9 @@ const SetPINScreen = ({ route, navigation }: any) => {
 
       {/* Confirmation Overlay (Optional/Future V2) */}
       {verifyMutation.isPending && (
-        <View className={`absolute inset-0 ${isDark ? 'bg-dark-background/70' : 'bg-surface/50'} items-center justify-center`}>
+        <View className={`absolute top-0 left-0 right-0 bottom-0 w-full h-full ${isDark ? 'bg-dark-background/70' : 'bg-surface/50'} items-center justify-center z-50`}>
           <View className={`${isDark ? 'bg-dark-surface-container-lowest' : 'bg-white'} p-10 rounded-3xl shadow-2xl items-center border ${isDark ? 'border-dark-outline-variant/10' : 'border-transparent'}`}>
-            <CheckCircle size={48} color={isDark ? '#2e7d32' : '#0d631b'} />
+            <ActivityIndicator size="large" color={isDark ? '#2e7d32' : '#0d631b'} />
             <Text className={`mt-4 font-headline font-bold text-lg ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>Verifying...</Text>
           </View>
         </View>

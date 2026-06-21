@@ -69,8 +69,9 @@ CediSmart is a **monorepo** containing a production-grade REST API (complete) an
 
 ```text
 CediSmart/
-├── cedismart-api/      # FastAPI backend — Python 3.11+
-└── mobile/             # React Native (Expo) — in progress
+├── cedismart-api/      # FastAPI backend — Python 3.12+
+├── cedismart-mobile/   # React Native (Expo) — Mobile App
+└── cedismart-web/      # Landing Page Website & APK Download Portal
 ```
 
 ---
@@ -265,22 +266,18 @@ React Native (Expo SDK 54, Managed Workflow) with TypeScript strict mode.
 
 ---
 
-## Web App — MVP
+## Web Landing Page & Showcase
 
-Responsive web interface for desktop and tablet users. Built with vanilla HTML/CSS/JS + Tailwind, no framework overhead for MVP.
+Responsive product marketing landing page and direct Android APK download website for CediSmart. Built using Vanilla HTML/CSS/JS, optimized for conversions, store compliance reviews, and lightweight preview animations.
 
-> 🌐 **See [Web README](./cedismart-web/README.md) for full setup instructions.**
+> 🌐 **See [Web README](./cedismart-web/README.md) for full deployment instructions.**
 
-| Layer | Technology |
+| Component | Purpose |
 |---|---|
-| Markup | HTML5 + Semantic elements |
-| Styling | Tailwind CSS v3 |
-| Scripting | Vanilla JavaScript (ES6+) |
-| HTTP | Fetch API + custom wrapper |
-| State | LocalStorage + IndexedDB |
-| Build (optional) | Vite |
-
-**Core features:** Dashboard, transaction management, budget tracking, analytics, account management, settings, OAuth login.
+| Showcase UI | Interactive sections demonstrating app features with dark forest themes |
+| Mockup Simulator | Client-side dashboard mock demonstrating secure GHS balance masking |
+| APK Distribution | Direct download buttons linking to production APK installation binaries |
+| Legal Pages | Publicly hosted Privacy Policy and Terms of Service documents |
 
 ---
 
@@ -288,14 +285,14 @@ Responsive web interface for desktop and tablet users. Built with vanilla HTML/C
 
 | Phase | Description | Status |
 |---|---|---|
-| 1 | Planning & Architecture | Partial |
-| 2 | Backend Core (all prompts) | **Complete** |
-| 3 | Frontend Core (React Native) | In progress |
-| 4 | Integration (manual) | Not started |
-| 5 | Testing & Hardening | Partial (backend coverage done) |
-| 6 | Deployment | Not started |
+| 1 | Planning & Architecture | **Complete** |
+| 2 | Backend Core API | **Complete** |
+| 3 | Mobile Application (Expo) | **Complete** |
+| 4 | Monorepo Integration | **Complete** |
+| 5 | Testing, Security & Hardening | **Complete** (100% type-safe, 80 pytest tests passing) |
+| 6 | Landing Portal & Compliance | **Complete** |
 
-> 📌 **Roadmap focus (Q2 2026):** finish mobile core flows, then backend/mobile integration and end-to-end QA.
+> 📌 **Project State:** Feature-complete, fully integrated, validated, and ready for Apple App Store and Google Play Console reviewer submissions.
 
 ---
 

@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # --- Gemini (AI SMS Parsing) ---
     GEMINI_API_KEY: str = ""
 
+    # --- GitHub Bug Reporting ---
+    GITHUB_ACCESS_TOKEN: str = ""
+    GITHUB_REPO: str = "cliff-de-tech/CediSmart"
+
     @field_validator("DATABASE_URL")
     @classmethod
     def validate_database_url(cls, v: str) -> str:
@@ -61,3 +65,6 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Trigger reload
+

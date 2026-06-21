@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
 from app.modules.auth.models import User
-from app.modules.users.schemas import UserUpdateRequest, KYCVerifyRequest
+from app.modules.users.schemas import UserUpdateRequest, KYCVerifyRequest, BugReportRequest
 
 # Matches the prefix defined in auth/service.py
 _REFRESH_TOKEN_REDIS_PREFIX = "refresh:"
@@ -117,6 +117,17 @@ async def verify_user_kyc(
     if user.kyc_verified:
         return user
 
+    # Prevent duplicate Ghana Card linking
+    stmt = select(User).where(User.ghana_card == payload.ghana_card_number, User.id != user_id)
+    result = await db.execute(stmt)
+    existing_user_with_card = result.scalars().first()
+    if existing_user_with_card:
+        raise AppException(
+            status_code=400,
+            error_code="GHANA_CARD_ALREADY_LINKED",
+            message="This Ghana Card is already verified on another account.",
+        )
+
     partner_id = settings.SMILE_ID_PARTNER_ID
     api_key = settings.SMILE_ID_API_KEY
     env = settings.SMILE_ID_ENV
@@ -188,3 +199,108 @@ async def verify_user_kyc(
 
     await db.flush()
     return user
+
+
+async def report_user_bug(
+    user_id: uuid.UUID,
+    payload: BugReportRequest,
+    db: AsyncSession,
+) -> dict:
+    """Submit a user bug report to GitHub or log it locally."""
+    from app.core.config import settings
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    user = await get_current_user(user_id, db)
+
+    # Format the issue body nicely in Markdown
+    device_info_str = ""
+    if payload.device_info:
+        device_info_str = "\n".join(f"- **{k}**: {v}" for k, v in payload.device_info.items())
+    else:
+        device_info_str = "None provided"
+
+    body = f"""### Bug Description
+{payload.description}
+
+### Reporter Details
+- **User ID**: {user.id}
+- **Name**: {user.full_name or 'N/A'}
+- **Phone**: {user.phone}
+- **Email**: {user.email or 'N/A'}
+
+### Device Information
+{device_info_str}
+
+### Environment
+- **Environment**: {settings.ENVIRONMENT}
+"""
+
+    token = settings.GITHUB_ACCESS_TOKEN
+    repo = settings.GITHUB_REPO
+
+    if not token:
+        logger.warning(
+            "GITHUB_ACCESS_TOKEN is not configured. Logging bug report locally.\n"
+            "Title: %s\nBody:\n%s",
+            payload.title,
+            body,
+        )
+        return {
+            "issue_number": None,
+            "issue_url": None,
+            "status": "logged_locally",
+        }
+
+    # GitHub issues API endpoint
+    # repo format: "owner/repo"
+    url = f"https://api.github.com/repos/{repo}/issues"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "CediSmart-API",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    json_data = {
+        "title": payload.title,
+        "body": body,
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(url, headers=headers, json=json_data, timeout=10.0)
+            if response.status_code == 201:
+                data = response.json()
+                return {
+                    "issue_number": data.get("number"),
+                    "issue_url": data.get("html_url"),
+                    "status": "submitted",
+                }
+            else:
+                logger.error(
+                    "GitHub API returned error status %d: %s. Logging report locally.\n"
+                    "Title: %s\nBody:\n%s",
+                    response.status_code,
+                    response.text,
+                    payload.title,
+                    body,
+                )
+                return {
+                    "issue_number": None,
+                    "issue_url": None,
+                    "status": "logged_locally",
+                }
+        except Exception as e:
+            logger.error(
+                "Failed to connect to GitHub API: %s. Logging report locally.\n"
+                "Title: %s\nBody:\n%s",
+                str(e),
+                payload.title,
+                body,
+            )
+            return {
+                "issue_number": None,
+                "issue_url": None,
+                "status": "logged_locally",
+            }

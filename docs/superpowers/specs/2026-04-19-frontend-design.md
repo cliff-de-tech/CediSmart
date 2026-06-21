@@ -42,7 +42,7 @@ cedismart-mobile/ inside the existing CediSmart/ monorepo, alongside cedismart-a
 
 | Concern | Technology |
 |---|---|
-| Framework | Expo SDK 51, Managed Workflow |
+| Framework | Expo SDK 54, Managed Workflow |
 | Language | TypeScript strict mode -- zero any |
 | Navigation | React Navigation v6 (Native Stack) |
 | Server state | TanStack Query v5 |
@@ -94,13 +94,16 @@ RootNavigator watches authStore.isAuthenticated. Any 401 that exhausts refresh d
 
 RootNavigator
   AuthNavigator (Stack)
-    RegisterScreen -> OTPVerifyScreen -> SetPINScreen (new user)
+    WelcomeScreen -> RegisterScreen -> OTPVerifyScreen -> SetPINScreen (new user)
     LoginScreen (returning user)
-  AppNavigator (Bottom Tabs)
-    DashboardScreen -> AddTransactionScreen (modal)
-    TransactionsScreen (placeholder)
-    BudgetsScreen (placeholder)
-    ReportsScreen (placeholder)
+  AppNavigator (Stack)
+    MainTabs (Bottom Tabs)
+      DashboardScreen (Ledger)
+      ReportsScreen (Insights)
+      BudgetsScreen (Vault)
+      SettingsScreen (Setup)
+    AccountsScreen
+    AddTransactionScreen (modal)
 
 ---
 
@@ -341,4 +344,7 @@ CI: tsc --noEmit + eslint --max-warnings 0 + Jest.
 - SMS MoMo parsing (V2)
 - Push notifications (V2)
 - Railway production deployment (Phase 4 prerequisite)
+
+> [!NOTE]
+> All subsequent phases (Phase 4, Phase 5, Phase 6) are now fully complete. All screens, backend reporting, transaction lists, budget limits, user cascades, and production deployment pipeline configurations have been successfully implemented.
 

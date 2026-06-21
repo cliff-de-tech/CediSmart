@@ -252,7 +252,7 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
                       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
                       await triggerLocalNotification(
                         'Budget Limit Exceeded! ⚠️',
-                        `You have spent GHS ${spent.toFixed(2)} of your GHS ${limit.toFixed(2)} budget on ${matchedBudget.category?.name || 'this category'}.`
+                        `You have spent ₵${spent.toFixed(2)} of your ₵${limit.toFixed(2)} budget on ${matchedBudget.category?.name || 'this category'}.`
                       );
                     } else if (ratio >= alertAtThreshold) {
                       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
@@ -302,7 +302,7 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
           <Text className={`text-xl font-headline font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight`}>Add Transaction</Text>
         </View>
         <View className={`px-3 py-1 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-high'}`}>
-          <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-outline'}`}>GHS WALLET</Text>
+          <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-outline'}`}>₵ WALLET</Text>
         </View>
       </View>
 
@@ -391,7 +391,7 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
             <View className="mb-12 items-center">
               <Text className={`font-label uppercase tracking-widest text-[10px] ${isDark ? 'text-gray-400' : 'text-outline'} mb-4`}>Enter Amount</Text>
               <View className="flex-row items-baseline space-x-3">
-                <Text className="font-headline font-bold text-2xl text-primary">GHS</Text>
+                <Text className="font-headline font-bold text-2xl text-primary">₵</Text>
                 <Controller
                   control={control}
                   name="amount"

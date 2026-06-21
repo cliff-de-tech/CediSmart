@@ -57,7 +57,7 @@ This software incorporates third-party open-source libraries. See below for thei
 
 #### Web
 
-- **Tailwind CSS** — MIT License
+- **Vanilla CSS3** — Native custom stylesheets (No framework dependencies)
 
 All third-party libraries are used in compliance with their respective licenses.
 
