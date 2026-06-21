@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./cedismart-api
+      dockerfile: Dockerfile
+    restart: always
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://cliff_dev:Owura_123@postgres:5432/cedismart
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+    env_file:
+      - ./cedismart-api/.env
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: cliff_dev
+      POSTGRES_PASSWORD: Owura_123
+      POSTGRES_DB: cedismart
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    ports:
+      # Keep database port closed to external traffic for security,
+      # but if you need to run migrations locally or inspect it,
+      # you can un-comment the ports mapping:
+      # - "5433:5432"
+      - "127.0.0.1:5433:5432"
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_prod_data:/data
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  caddy_data:
+  caddy_config:
