@@ -74,6 +74,14 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
       setTimer(300);
       setVerifyError('');
     },
+    onError: (err: any) => {
+      console.error('[Resend OTP] Failed:', err?.response?.data || err);
+      const serverError = err?.response?.data?.error;
+      const errorMsg = typeof serverError === 'string'
+        ? serverError
+        : serverError?.message || 'Failed to resend code. Please try again.';
+      setVerifyError(errorMsg);
+    }
   });
 
   const loginOtpMutation = useMutation({

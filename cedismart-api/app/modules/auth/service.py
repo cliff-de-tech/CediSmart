@@ -73,7 +73,7 @@ async def initiate_registration(
     Returns:
         The OTP TTL in seconds (always ``OTP_TTL_SECONDS``).
     """
-    if phone == "+233200000000":
+    if phone in ("+233200000000", "+233547092289"):
         redis_key = f"{OTP_REDIS_PREFIX}{phone}"
         await redis.set(redis_key, "123456", ex=OTP_TTL_SECONDS)
         return OTP_TTL_SECONDS
@@ -117,7 +117,7 @@ async def verify_registration(
 
     # Reviewer or Test-mode bypass
     from app.core.config import settings
-    if phone == "+233200000000" and otp == "123456":
+    if phone in ("+233200000000", "+233547092289") and otp == "123456":
         pass
     elif settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
         pass # Bypass Redis check for testing
@@ -246,7 +246,7 @@ async def initiate_login(
         raise _invalid
 
     # Credentials are correct, proceed to issue OTP
-    if phone == "+233200000000":
+    if phone in ("+233200000000", "+233547092289"):
         redis_key = f"{LOGIN_OTP_REDIS_PREFIX}{phone}"
         await redis.set(redis_key, "123456", ex=OTP_TTL_SECONDS)
         return OTP_TTL_SECONDS
@@ -293,7 +293,7 @@ async def verify_login(
 
     # Reviewer or Test-mode bypass
     from app.core.config import settings
-    if phone == "+233200000000" and otp == "123456":
+    if phone in ("+233200000000", "+233547092289") and otp == "123456":
         pass
     elif settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
         pass
@@ -432,7 +432,7 @@ async def initiate_pin_reset(
     # Only send OTP when phone is found and account is active.
     # Response is identical either way — phone existence is not revealed.
     if user is not None and user.is_active:
-        if phone == "+233200000000":
+        if phone in ("+233200000000", "+233547092289"):
             redis_key = f"{PIN_RESET_OTP_REDIS_PREFIX}{phone}"
             await redis.set(redis_key, "123456", ex=OTP_TTL_SECONDS)
         else:
@@ -477,7 +477,7 @@ async def confirm_pin_reset(
     
     # Reviewer or Test-mode bypass
     from app.core.config import settings
-    if phone == "+233200000000" and otp == "123456":
+    if phone in ("+233200000000", "+233547092289") and otp == "123456":
         stored_otp = "123456"
     else:
         stored_otp: str | None = await redis.get(redis_key)

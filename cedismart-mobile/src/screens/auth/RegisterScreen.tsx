@@ -100,7 +100,9 @@ const RegisterScreen = ({ navigation }: any) => {
 
               {mutation.error ? (
                 <Text className="text-error text-xs font-semibold text-center mb-4">
-                  {(mutation.error as any)?.response?.data?.error?.message || 'Failed to send OTP. Please try again.'}
+                  {typeof (mutation.error as any)?.response?.data?.error === 'string'
+                    ? (mutation.error as any)?.response?.data?.error
+                    : (mutation.error as any)?.response?.data?.error?.message || 'Failed to send OTP. Please try again.'}
                 </Text>
               ) : null}
 

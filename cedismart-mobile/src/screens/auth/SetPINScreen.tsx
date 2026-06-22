@@ -88,7 +88,11 @@ const SetPINScreen = ({ route, navigation }: any) => {
       login(user);
     },
     onError: (err: any) => {
-      setError(err?.response?.data?.error?.message || 'Verification failed.');
+      setError(
+        typeof err?.response?.data?.error === 'string'
+          ? err?.response?.data?.error
+          : err?.response?.data?.error?.message || 'Verification failed.'
+      );
       setPin('');
       setConfirmPin('');
       setStep('create');

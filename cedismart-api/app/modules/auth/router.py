@@ -50,7 +50,7 @@ DBSession = Annotated[AsyncSession, Depends(get_db)]
     status_code=200,
     summary="Send OTP to phone number",
 )
-@limiter.limit("3/15minutes")
+@limiter.limit("30/15minutes")
 async def register_initiate(
     request: Request,
     body: RegisterInitiateRequest,
@@ -106,7 +106,7 @@ async def register_verify(
     status_code=200,
     summary="Initiate login by verifying PIN and sending OTP",
 )
-@limiter.limit("5/15minutes")
+@limiter.limit("30/15minutes")
 async def login_initiate(
     request: Request,
     body: LoginRequest,
@@ -160,7 +160,7 @@ async def login_verify(
     status_code=200,
     summary="Login with phone + PIN",
 )
-@limiter.limit("5/15minutes")
+@limiter.limit("30/15minutes")
 async def login(
     request: Request,
     body: LoginRequest,
@@ -252,7 +252,7 @@ async def logout(
     status_code=200,
     summary="Send PIN reset OTP",
 )
-@limiter.limit("3/15minutes")
+@limiter.limit("30/15minutes")
 async def pin_reset_initiate(
     request: Request,
     body: PinResetInitiateRequest,
@@ -288,7 +288,7 @@ async def pin_reset_initiate(
     status_code=200,
     summary="Verify OTP and set new PIN",
 )
-@limiter.limit("5/15minutes")
+@limiter.limit("30/15minutes")
 async def pin_reset_confirm(
     request: Request,
     body: PinResetConfirmRequest,
