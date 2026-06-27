@@ -65,7 +65,7 @@ CediSmart is built from first principles for this reality — not adapted from a
 
 ## What This Is
 
-CediSmart is a **monorepo** containing a production-grade REST API (complete) and a React Native mobile app (in progress). It is not a tutorial project. It handles real money and is engineered accordingly.
+CediSmart is a **monorepo** containing a production-grade REST API (complete) and a React Native mobile app (complete). It is not a tutorial project. It tracks personal financial budgets and is engineered with strict banking-grade accuracy and security standards.
 
 ```text
 CediSmart/
