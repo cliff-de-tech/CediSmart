@@ -1,7 +1,8 @@
-# <img src="./assets/cedismart-brand-title.svg" alt="CediSmart" height="56" />
+<p align="center">
+  <img src="./assets/cedismart-brand-banner.svg" alt="CediSmart Header Banner" width="100%" />
+</p>
 
-> A production-grade, full-stack personal finance platform built for the Ghanaian market.
-> Phone-first. Mobile-money aware. Offline-capable.
+
 
 ![Backend CI](https://github.com/cliff-de-tech/CediSmart/actions/workflows/backend-ci.yml/badge.svg)
 ![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)
