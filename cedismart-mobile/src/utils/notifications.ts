@@ -28,6 +28,13 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       return null;
     }
 
+    // Remote push notifications are removed from Expo Go starting SDK 53.
+    // Skip remote token retrieval in Expo Go to avoid warnings/crashes.
+    if (Constants.appOwnership === 'expo') {
+      console.log('[Notifications] Running in Expo Go. Remote push registration skipped.');
+      return 'expo-go-dummy-token';
+    }
+
     const projectId =
       Constants.expoConfig?.extra?.eas?.projectId ??
       Constants.easConfig?.projectId;
