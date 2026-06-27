@@ -7,8 +7,17 @@ import { useColorScheme } from 'nativewind';
 import { useThemeStore } from './src/stores/themeStore';
 import RootNavigator from './src/navigation/RootNavigator';
 
-// Create a client
-const queryClient = new QueryClient();
+// Create a query client with optimized default settings for mobile
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // Keep data fresh for 5 minutes (avoids spinner loops on tab change)
+      gcTime: 1000 * 60 * 30,    // Cache inactive queries for 30 minutes
+      refetchOnWindowFocus: false, // Not needed on mobile apps
+      retry: 1,
+    },
+  },
+});
 
 export default function App() {
   const { setColorScheme } = useColorScheme();

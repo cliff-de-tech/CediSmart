@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, FlatList, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { PieChart, Plus, ChevronDown, Tag, Trash2 } from 'lucide-react-native';
@@ -61,13 +61,26 @@ const BudgetsScreen = () => {
   }, [user?.id]);
 
   // 1. Fetch current month's budgets
-  const { data: budgets, isLoading } = useQuery<Budget[]>({
+  const { data: budgets, isLoading, refetch } = useQuery<Budget[]>({
     queryKey: ['budgets'],
     queryFn: async () => {
       const response = await apiClient.get('/budgets/');
       return response.data;
     }
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (e) {
+      console.error('Failed to manually refresh budgets:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const totals = useMemo(() => {
     if (!budgets) return { budgeted: 0, spent: 0 };
@@ -167,6 +180,14 @@ const BudgetsScreen = () => {
           <ActivityIndicator size="large" color="#0A6E4A" className="mt-8" />
         ) : (
           <FlatList
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh} 
+                tintColor={isDark ? '#FFFFFF' : '#0A6E4A'}
+                colors={['#0A6E4A']}
+              />
+            }
             data={budgets}
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}

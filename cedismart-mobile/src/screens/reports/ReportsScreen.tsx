@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, ActivityIndicator, Dimensions, RefreshControl } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, LineChart } from "react-native-gifted-charts";
 import { Calendar, ChevronLeft, ChevronRight, PieChart as PieIcon, TrendingUp, ArrowDownCircle, ArrowUpCircle } from 'lucide-react-native';
@@ -53,15 +53,22 @@ const ReportsScreen = () => {
     }
   });
 
-  useFocusEffect(
-    useCallback(() => {
-      if (user?.id) {
-        refetchSummary();
-        refetchCategory();
-        refetchTrend();
-      }
-    }, [user?.id, refetchSummary, refetchCategory, refetchTrend])
-  );
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchSummary(),
+        refetchCategory(),
+        refetchTrend(),
+      ]);
+    } catch (e) {
+      console.error('Failed to manually refresh reports data:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchSummary, refetchCategory, refetchTrend]);
 
   const changeMonth = (offset: number) => {
     const nextDate = new Date(currentDate);
@@ -131,7 +138,19 @@ const ReportsScreen = () => {
         </View>
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        className="flex-1" 
+        contentContainerStyle={{ paddingBottom: 100 }} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={isDark ? '#FFFFFF' : '#0A6E4A'}
+            colors={['#0A6E4A']}
+          />
+        }
+      >
         {isLoading ? (
           <ActivityIndicator size="large" color="#0A6E4A" className="mt-20" />
         ) : (

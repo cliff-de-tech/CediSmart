@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useCallback, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image, Dimensions, Linking, Alert, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image, Dimensions, Linking, Alert, TextInput, Modal, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -208,7 +208,26 @@ const DashboardScreen = ({ navigation }: any) => {
     return accounts.reduce((acc, curr) => acc + parseFloat(curr.balance), 0);
   }, [accounts]);
 
-  // Sync avatar, KYC status, accounts, and summary when screen comes into focus
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchAccounts(),
+        refetchSummary(),
+        refetchTransactions(),
+        refetchBudgets(),
+        refetchAllTransactions(),
+      ]);
+    } catch (e) {
+      console.error('Failed to manually refresh dashboard data:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchAccounts, refetchSummary, refetchTransactions, refetchBudgets, refetchAllTransactions]);
+
+  // Sync avatar, KYC status, and saved accounts when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadSavedAccounts();
@@ -223,11 +242,6 @@ const DashboardScreen = ({ navigation }: any) => {
         AsyncStorage.getItem(`kyc_verified_${user.id}`).then((val) => {
           setIsKycVerified(val === 'true');
         });
-        refetchAccounts();
-        refetchSummary();
-        refetchTransactions();
-        refetchBudgets();
-        refetchAllTransactions();
         
         if (user?.is_premium) {
           AsyncStorage.getItem('pending_confetti').then((val) => {
@@ -252,7 +266,7 @@ const DashboardScreen = ({ navigation }: any) => {
           })
         ).then(() => setAccountAvatars(avatarMap));
       });
-    }, [user?.id, user?.is_premium, refetchAccounts, refetchSummary, refetchTransactions, refetchBudgets, refetchAllTransactions, loadSavedAccounts])
+    }, [user?.id, user?.is_premium, loadSavedAccounts])
   );
 
   // Trigger confetti and premium haptics when offline transactions are successfully synced in the background!
@@ -579,7 +593,18 @@ const DashboardScreen = ({ navigation }: any) => {
         </View>
       </View>
 
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        className="flex-1" 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={isDark ? '#FFFFFF' : '#0A6E4A'}
+            colors={['#0A6E4A']}
+          />
+        }
+      >
         <View className="px-6 pt-6 pb-24">
           {/* Header Section */}
           <View className="mb-8">

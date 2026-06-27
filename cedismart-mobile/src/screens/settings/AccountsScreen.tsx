@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Modal, RefreshControl } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff } from 'lucide-react-native';
@@ -91,13 +91,26 @@ const AccountsScreen = ({ navigation }: any) => {
     return unsubscribe;
   }, [navigation, user?.id]);
 
-  const { data: accounts, isLoading } = useQuery<Account[]>({
+  const { data: accounts, isLoading, refetch } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: async () => {
       const response = await apiClient.get('/accounts/');
       return response.data;
     }
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (e) {
+      console.error('Failed to manually refresh accounts:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
   const totalBalance = useMemo(() => {
     if (!accounts) return 0;
@@ -337,7 +350,18 @@ const AccountsScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
       <CoinBackground />
-      <ScrollView className="flex-1 px-6 py-8" showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        className="flex-1 px-6 py-8" 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={isDark ? '#FFFFFF' : '#1C1C2E'}
+            colors={['#1C1C2E']}
+          />
+        }
+      >
         <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2`}>My Accounts</Text>
         <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-8`}>Add/Track your sources of Income.</Text>
 
