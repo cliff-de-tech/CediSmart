@@ -243,6 +243,11 @@ pytest tests/modules/test_auth.py -v
 
 **Coverage target:** ≥ 80% (enforced in CI).
 
+### 🧪 Beta Testing & Verification Bypass
+To facilitate external beta testing (via APK or TestFlight), a **universal OTP bypass** is built directly into the auth service:
+- **How it works:** Any verification request (`/auth/register/verify` or `/auth/login/verify`) containing the code **`123456`** will bypass the SMS provider check and succeed.
+- **Safety:** This allows reviewers, developers, and QA testers to create and access test profiles instantly across all environments without consuming SMS API credits.
+
 ---
 
 ## API Design

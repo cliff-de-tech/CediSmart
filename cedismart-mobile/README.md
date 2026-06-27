@@ -437,6 +437,17 @@ eas build --platform ios --profile production
 
 ---
 
+## 🧪 Beta Testing & Verification Bypass
+
+To streamline the testing process for beta testers and store reviewers, a **universal OTP bypass** is configured:
+
+1. **Initiate Sign Up / Log In**: Enter any valid phone number format on the registration/login screen.
+2. **Security Verification**: On the OTP entry screen, enter **`123456`**.
+3. **Outcome**: The verification process will instantly succeed in all environments, allowing you to proceed with setting up a PIN or accessing the dashboard.
+4. **App Display**: The registration and login screens display a helpful **"Beta Mode"** notice explaining this bypass code.
+
+---
+
 ## Contributing
 
 1. **Branch naming:** `feature/`, `bugfix/`, `chore/` prefixes
