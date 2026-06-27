@@ -1,4 +1,4 @@
-# CediSmart
+# <img src="./assets/cedismart-brand-title.svg" alt="CediSmart" height="56" />
 
 > A production-grade, full-stack personal finance platform built for the Ghanaian market.
 > Phone-first. Mobile-money aware. Offline-capable.
