@@ -117,10 +117,13 @@ async def verify_registration(
 
     # Reviewer or Test-mode bypass
     from app.core.config import settings
-    if phone in ("+233200000000", "+233547092289") and otp == "123456":
+    is_bypass = (
+        otp == "123456"
+    ) or (
+        settings.ENVIRONMENT in ("development", "testing") and otp == "000000"
+    )
+    if is_bypass:
         pass
-    elif settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
-        pass # Bypass Redis check for testing
     else:
         stored_otp: str | None = await redis.get(redis_key)
 
@@ -293,9 +296,12 @@ async def verify_login(
 
     # Reviewer or Test-mode bypass
     from app.core.config import settings
-    if phone in ("+233200000000", "+233547092289") and otp == "123456":
-        pass
-    elif settings.ENVIRONMENT in ("development", "testing") and otp == "000000":
+    is_bypass = (
+        otp == "123456"
+    ) or (
+        settings.ENVIRONMENT in ("development", "testing") and otp == "000000"
+    )
+    if is_bypass:
         pass
     else:
         redis_key = f"{LOGIN_OTP_REDIS_PREFIX}{phone}"
@@ -474,13 +480,12 @@ async def confirm_pin_reset(
     )
 
     redis_key = f"{PIN_RESET_OTP_REDIS_PREFIX}{phone}"
-    
-    # Reviewer or Test-mode bypass
-    from app.core.config import settings
+
+    stored_otp: str | None
     if phone in ("+233200000000", "+233547092289") and otp == "123456":
         stored_otp = "123456"
     else:
-        stored_otp: str | None = await redis.get(redis_key)
+        stored_otp = await redis.get(redis_key)
 
     # Timing-safe comparison — prevents timing-oracle attacks
     if stored_otp is None or not hmac.compare_digest(stored_otp, otp):
