@@ -60,14 +60,30 @@ def get_engine() -> AsyncEngine:
     """Return the async engine, creating it on first call."""
     global _engine  # noqa: PLW0603
     if _engine is None:
+        from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
         from app.core.config import settings
 
+        # asyncpg does not understand the 'sslmode' query-param that Neon /
+        # libpq-style connection strings use.  Strip it out and pass the
+        # equivalent 'ssl' setting via connect_args instead.
+        parsed = urlparse(settings.DATABASE_URL)
+        qs = parse_qs(parsed.query)
+        ssl_mode = qs.pop("sslmode", [None])[0]
+        clean_query = urlencode(qs, doseq=True)
+        clean_url = urlunparse(parsed._replace(query=clean_query))
+
+        connect_args: dict = {}
+        if ssl_mode in ("require", "verify-ca", "verify-full"):
+            connect_args["ssl"] = "require"
+
         _engine = create_async_engine(
-            settings.DATABASE_URL,
+            clean_url,
             echo=settings.DEBUG,
             pool_pre_ping=True,
             pool_size=10,
             max_overflow=20,
+            connect_args=connect_args,
         )
     return _engine
 
