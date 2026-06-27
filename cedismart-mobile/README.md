@@ -446,6 +446,15 @@ To streamline the testing process for beta testers and store reviewers, a **univ
 3. **Outcome**: The verification process will instantly succeed in all environments, allowing you to proceed with setting up a PIN or accessing the dashboard.
 4. **App Display**: The registration and login screens display a helpful **"Beta Mode"** notice explaining this bypass code.
 
+## 🚀 Future Mobile Updates
+
+Key client-side updates planned for subsequent releases:
+- 📲 **Native SMS Parser**: Android background receiver implementation using permissions `RECEIVE_SMS` and `READ_SMS` to auto-capture MoMo logs.
+- 🔌 **Bank API Sync**: Visual linkages and oauth setup for banks and MoMo wallets via Paystack or Mono.
+- ⏰ **Bill Calendars**: Dashboard list and alerts/reminders for recurring expenses.
+- 👥 **Group Ledgers**: Visual SUSU group creation, member ledger logs, and contribution tracking.
+- 🔒 **SSL Pinning**: Certificate pinning in the Axios wrapper configuration to prevent MitM snooping.
+
 ---
 
 ## Contributing

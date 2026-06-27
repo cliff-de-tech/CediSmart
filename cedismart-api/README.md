@@ -359,6 +359,14 @@ Enforced **server-side** in the service layer — never client-side only.
 | Budgets / month       | 5    | Unlimited |
 | History               | 3 mo | Unlimited |
 
+## 🚀 Future API Updates
+
+Key backend engine updates planned for subsequent releases:
+- ⏰ **ARQ Susu/Recurring Scheduler**: Background cron worker engine utilizing Redis to process monthly recurring transaction postings.
+- 👥 **Susu Group Relations**: Multi-tenant database schema changes to link transactions to shared saving pools and compute group balances.
+- 💸 **Exchange Rates Engine**: Integration with open-exchange APIs to periodically fetch rates and calculate non-GHS values in PostgreSQL.
+- 🛡️ **Gateway Safety**: Setting up Termii SMS request rate limits per IP and phone prefix to block OTP script exploits.
+
 ---
 
 ## Contributing

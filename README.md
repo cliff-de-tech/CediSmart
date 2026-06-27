@@ -303,6 +303,20 @@ Responsive product marketing landing page and direct Android APK download websit
 
 ---
 
+## 🚀 Future Product Roadmap
+
+Subsequent updates following the MVP release will focus on automation, transaction syncing, and scaling the platform:
+- 📲 **Automated SMS Background Parser (Android)**: Native SMS interception to automatically log transactions from mobile money and bank notifications.
+- 🔌 **Open Banking APIs**: Live syncing of accounts and cards using payment platforms like Paystack, Mono, or Fincra.
+- ⏰ **Automated Recurring Bills**: Scheduler engine for recurring payments (e.g. rent, internet data, Susu groups) with push notifications.
+- Susu **Group Saving & SUSU Ledger**: Support for Susu saving circles, allowing tracking of contributions across multiple users.
+- 🛡️ **Enterprise Security Hardening**: Implementing SSL pinning in mobile, Termii API SMS request caps, and private database subnets.
+- 💱 **Multi-Currency Support**: Track assets in GHS, USD, NGN, and GBP with real-time exchange rates.
+
+For technical scope and implementation details, see [Full Product & Technical Blueprint](./docs/budget-app-blueprint.md#part-13-future-product-roadmap).
+
+---
+
 ## Running Locally
 
 ### Backend API
