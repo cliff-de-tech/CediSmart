@@ -201,9 +201,19 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
             </View>
 
             <Text className={`font-headline font-extrabold text-3xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight mb-2`}>Security Check</Text>
-            <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed text-center mb-10`}>
+            <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed text-center mb-6`}>
               OTP sent to <Text className={`font-semibold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{phone}</Text>
             </Text>
+
+            {/* Beta Banner */}
+            <View className={`w-full mb-8 p-4 rounded-2xl border ${isDark ? 'bg-dark-surface-container-low border-primary/20' : 'bg-primary/5 border-primary/10'} flex-row items-center space-x-3`}>
+              <Shield size={20} color={isDark ? '#4ade80' : '#0A6E4A'} />
+              <View className="flex-1">
+                <Text className={`font-body text-xs leading-relaxed ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
+                  We are in <Text className="font-bold text-primary">Beta mode</Text>. Please enter the bypass code <Text className="font-bold text-primary">123456</Text> to verify.
+                </Text>
+              </View>
+            </View>
 
             {/* OTP Input Grid */}
             <View className="flex-row justify-between w-full mb-10">

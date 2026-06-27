@@ -66,6 +66,19 @@ const RegisterScreen = ({ navigation }: any) => {
             </Text>
           </View>
 
+          {/* Beta Notice Banner */}
+          <View className={`mb-6 p-4 rounded-2xl border ${isDark ? 'bg-dark-surface-container-low border-primary/20' : 'bg-primary/5 border-primary/10'} flex-row items-start space-x-3`}>
+            <View className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? 'bg-primary/20' : 'bg-primary/10'}`}>
+              <Shield size={16} color={isDark ? '#4ade80' : '#0A6E4A'} />
+            </View>
+            <View className="flex-1">
+              <Text className={`font-headline font-bold text-sm ${isDark ? 'text-primary' : 'text-primary'}`}>Beta Test Mode</Text>
+              <Text className={`font-body text-xs mt-1 leading-relaxed ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
+                To bypass SMS verification during testing, enter your number and use <Text className="font-bold text-primary">123456</Text> as the OTP.
+              </Text>
+            </View>
+          </View>
+
           {/* Registration Form */}
           <View className={`w-full ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} rounded-3xl p-8 shadow-sm`}>
             <View className="space-y-8">
