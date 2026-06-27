@@ -100,7 +100,7 @@ const DashboardScreen = ({ navigation }: any) => {
   const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'week' | 'month' | 'year'>('all');
 
   const { data: categories } = useQuery<any[]>({
-    queryKey: ['categories'],
+    queryKey: ['categories', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/categories/');
       return response.data;
@@ -109,7 +109,7 @@ const DashboardScreen = ({ navigation }: any) => {
   });
 
   const { data: accounts, isLoading: isAccountsLoading, refetch: refetchAccounts } = useQuery<any[]>({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/accounts/');
       return response.data;
@@ -118,31 +118,34 @@ const DashboardScreen = ({ navigation }: any) => {
   });
 
   const { data: summary, isLoading: isSummaryLoading, refetch: refetchSummary } = useQuery({
-    queryKey: ['transactions', 'summary'],
+    queryKey: ['transactions', 'summary', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/transactions/summary');
       return response.data;
-    }
+    },
+    enabled: !!user?.id
   });
 
   const { data: transactionsData, isLoading: isTransactionsLoading, refetch: refetchTransactions } = useQuery({
-    queryKey: ['transactions', 'recent'],
+    queryKey: ['transactions', 'recent', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/transactions/?per_page=5');
       return response.data;
-    }
+    },
+    enabled: !!user?.id
   });
 
   const { data: budgets, refetch: refetchBudgets } = useQuery<Budget[]>({
-    queryKey: ['budgets'],
+    queryKey: ['budgets', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/budgets/');
       return response.data;
-    }
+    },
+    enabled: !!user?.id
   });
 
   const { data: allTransactionsData, isLoading: isAllTransactionsLoading, refetch: refetchAllTransactions } = useQuery({
-    queryKey: ['transactions', 'all'],
+    queryKey: ['transactions', 'all', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/transactions/');
       return response.data;

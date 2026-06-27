@@ -221,6 +221,7 @@ const LoginScreen = ({ navigation }: any) => {
   const loginMutation = useMutation({
     mutationFn: (data: { phone: string, pin: string }) => {
       console.log('[Login API] Logging in for phone:', data.phone);
+      console.log('[Login API] BASE_URL:', process.env.EXPO_PUBLIC_API_URL);
       return apiClient.post('/auth/login', data);
     },
     onSuccess: async (response, variables) => {
@@ -238,7 +239,9 @@ const LoginScreen = ({ navigation }: any) => {
       login(user);
     },
     onError: (err: any) => {
+      console.error('[Login API] Error status:', err?.response?.status);
       console.error('[Login API] Error response:', err?.response?.data || err);
+      console.error('[Login API] Requested URL:', err?.config?.baseURL + err?.config?.url);
       const serverError = err?.response?.data?.error;
       const errorMsg = typeof serverError === 'string' 
         ? serverError 

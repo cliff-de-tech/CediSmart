@@ -62,11 +62,12 @@ const BudgetsScreen = () => {
 
   // 1. Fetch current month's budgets
   const { data: budgets, isLoading, refetch } = useQuery<Budget[]>({
-    queryKey: ['budgets'],
+    queryKey: ['budgets', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/budgets/');
       return response.data;
-    }
+    },
+    enabled: !!user?.id
   });
 
   const [refreshing, setRefreshing] = useState(false);

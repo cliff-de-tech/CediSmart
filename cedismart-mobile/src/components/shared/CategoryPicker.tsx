@@ -19,17 +19,21 @@ interface CategoryPickerProps {
   onSelect: (categoryId: string, categoryName: string) => void;
 }
 
+import { useAuthStore } from '../../stores/authStore';
+
 const CategoryPicker: React.FC<CategoryPickerProps> = ({ bottomSheetRef, type, onSelect }) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const snapPoints = useMemo(() => ['50%', '100%'], []);
+  const user = useAuthStore((state) => state.user);
 
   const { data: categories, isLoading } = useQuery<Category[]>({
-    queryKey: ['categories', type],
+    queryKey: ['categories', type, user?.id],
     queryFn: async () => {
       const response = await apiClient.get(`/categories/?type=${type}`);
       return response.data;
-    }
+    },
+    enabled: !!user?.id
   });
 
   const renderBackdrop = useCallback(

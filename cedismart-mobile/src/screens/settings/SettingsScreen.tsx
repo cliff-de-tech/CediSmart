@@ -117,7 +117,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
 
   // Fetch all categories for mappings
   const { data: categories } = useQuery<any[]>({
-    queryKey: ['categories'],
+    queryKey: ['categories', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/categories/');
       return response.data;
@@ -135,7 +135,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
 
   // Fetch linked accounts to check if bank/momo are active
   const { data: accounts } = useQuery<any[]>({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/accounts/');
       return response.data;

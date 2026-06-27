@@ -67,13 +67,15 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
     }
   }, [route.params?.openAiPaste]);
 
+  const user = useAuthStore((state) => state.user);
+
   const { data: categories } = useQuery<any[]>({
-    queryKey: ['categories', transactionType],
+    queryKey: ['categories', transactionType, user?.id],
     queryFn: async () => {
       const response = await apiClient.get(`/categories/?type=${transactionType}`);
       return response.data;
     },
-    enabled: !!transactionType,
+    enabled: !!transactionType && !!user?.id,
   });
 
   const handleParseSMS = async () => {

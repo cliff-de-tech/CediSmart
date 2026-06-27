@@ -92,11 +92,12 @@ const AccountsScreen = ({ navigation }: any) => {
   }, [navigation, user?.id]);
 
   const { data: accounts, isLoading, refetch } = useQuery<Account[]>({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', user?.id],
     queryFn: async () => {
       const response = await apiClient.get('/accounts/');
       return response.data;
-    }
+    },
+    enabled: !!user?.id
   });
 
   const [refreshing, setRefreshing] = useState(false);

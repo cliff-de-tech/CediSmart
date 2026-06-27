@@ -5,7 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { Shield, Info, CheckCircle } from 'lucide-react-native';
 import PINPad from '../../components/shared/PINPad';
-import apiClient from '../../api/client';
+import apiClient, { setActiveTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
@@ -80,11 +80,17 @@ const SetPINScreen = ({ route, navigation }: any) => {
       console.log('[SetPIN] Posting to /auth/register/verify with:', JSON.stringify(payload));
       return apiClient.post('/auth/register/verify', payload);
     },
-    onSuccess: async (response) => {
+    onSuccess: async (response, variables) => {
       console.log('[SetPIN] Success:', JSON.stringify(response.data));
       const { access_token, refresh_token, user } = response.data;
-      await SecureStore.setItemAsync('access_token', access_token);
-      await SecureStore.setItemAsync('refresh_token', refresh_token);
+      
+      // Store session tokens using the active session helper (crucial for switcher to function)
+      await setActiveTokens(user.phone || phone, access_token, refresh_token);
+      
+      // Save PIN in SecureStore for multi-account switches and biometrics
+      const sanitizedPhone = (user.phone || phone).replace(/[^\w.-]/g, '');
+      await SecureStore.setItemAsync(`user_pin_${sanitizedPhone}`, variables.pin);
+      
       login(user);
     },
     onError: (err: any) => {
