@@ -27,12 +27,21 @@ const RegisterScreen = ({ navigation }: any) => {
 
   const mutation = useMutation({
     mutationFn: (data: { phone: string }) => {
-      return apiClient.post('/auth/register/initiate', {
-        phone: `+233${data.phone}`,
-      });
+      const url = '/auth/register/initiate';
+      const payload = { phone: `+233${data.phone}` };
+      console.log('[Register] BASE_URL:', process.env.EXPO_PUBLIC_API_URL);
+      console.log('[Register] Posting to:', url, 'with payload:', JSON.stringify(payload));
+      return apiClient.post(url, payload);
     },
     onSuccess: (response, variables) => {
+      console.log('[Register] Success:', response.data);
       navigation.navigate('OTPVerify', { phone: `+233${variables.phone}` });
+    },
+    onError: (err: any) => {
+      console.error('[Register] Error status:', err?.response?.status);
+      console.error('[Register] Error data:', JSON.stringify(err?.response?.data));
+      console.error('[Register] Error message:', err?.message);
+      console.error('[Register] Full error:', err);
     },
   });
 

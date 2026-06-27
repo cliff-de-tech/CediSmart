@@ -76,18 +76,22 @@ const SetPINScreen = ({ route, navigation }: any) => {
 
   const verifyMutation = useMutation({
     mutationFn: (data: { phone: string, otp: string, pin: string }) => {
-      return apiClient.post('/auth/register/verify', {
-        ...data,
-        full_name: full_name,
-      });
+      const payload = { ...data, full_name: full_name };
+      console.log('[SetPIN] Posting to /auth/register/verify with:', JSON.stringify(payload));
+      return apiClient.post('/auth/register/verify', payload);
     },
     onSuccess: async (response) => {
+      console.log('[SetPIN] Success:', JSON.stringify(response.data));
       const { access_token, refresh_token, user } = response.data;
       await SecureStore.setItemAsync('access_token', access_token);
       await SecureStore.setItemAsync('refresh_token', refresh_token);
       login(user);
     },
     onError: (err: any) => {
+      console.error('[SetPIN] Error status:', err?.response?.status);
+      console.error('[SetPIN] Error data:', JSON.stringify(err?.response?.data));
+      console.error('[SetPIN] Error message:', err?.message);
+      console.error('[SetPIN] Request URL:', err?.config?.baseURL + err?.config?.url);
       setError(
         typeof err?.response?.data?.error === 'string'
           ? err?.response?.data?.error

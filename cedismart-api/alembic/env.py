@@ -28,8 +28,20 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Override the sqlalchemy.url with the app's DATABASE_URL
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# Override the sqlalchemy.url with the app's DATABASE_URL (strip sslmode
+# for asyncpg compatibility — same logic as database.py).
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+_parsed = urlparse(settings.DATABASE_URL)
+_qs = parse_qs(_parsed.query)
+_ssl_mode = _qs.pop("sslmode", [None])[0]
+_clean_query = urlencode(_qs, doseq=True)
+_clean_url = urlunparse(_parsed._replace(query=_clean_query))
+config.set_main_option("sqlalchemy.url", _clean_url)
+
+_connect_args: dict = {}
+if _ssl_mode in ("require", "verify-ca", "verify-full"):
+    _connect_args["ssl"] = "require"
 
 
 def run_migrations_offline() -> None:
@@ -60,6 +72,7 @@ async def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=NullPool,
+        connect_args=_connect_args,
     )
 
     async with connectable.connect() as connection:
