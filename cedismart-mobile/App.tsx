@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useColorScheme } from 'nativewind';
 import { useThemeStore } from './src/stores/themeStore';
 import RootNavigator from './src/navigation/RootNavigator';
+import { ClerkProviderWrapper } from './src/providers/ClerkProvider';
 
 // Create a query client with optimized default settings for mobile
 const queryClient = new QueryClient({
@@ -28,14 +29,16 @@ export default function App() {
   }, [theme, setColorScheme]);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <QueryClientProvider client={queryClient}>
-        <SafeAreaProvider>
-          <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-          <RootNavigator />
-        </SafeAreaProvider>
-      </QueryClientProvider>
-    </GestureHandlerRootView>
+    <ClerkProviderWrapper>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <QueryClientProvider client={queryClient}>
+          <SafeAreaProvider>
+            <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+            <RootNavigator />
+          </SafeAreaProvider>
+        </QueryClientProvider>
+      </GestureHandlerRootView>
+    </ClerkProviderWrapper>
   );
 }
 

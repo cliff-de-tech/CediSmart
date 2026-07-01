@@ -18,12 +18,9 @@ from app.core.redis import get_redis
 from app.modules.auth import service
 from app.modules.auth.schemas import (
     LoginRequest,
-    LoginVerifyRequest,
     MessageResponse,
     PinResetConfirmRequest,
-    PinResetInitiateRequest,
-    RegisterInitiateRequest,
-    RegisterVerifyRequest,
+    RegisterClerkRequest,
     TokenRefreshRequest,
     TokenRefreshResponse,
     TokenResponse,
@@ -40,109 +37,27 @@ DBSession = Annotated[AsyncSession, Depends(get_db)]
 
 
 # ---------------------------------------------------------------------------
-# POST /register/initiate
+# POST /register/clerk
 # ---------------------------------------------------------------------------
 
 
 @router.post(
-    "/register/initiate",
-    response_model=MessageResponse,
-    status_code=200,
-    summary="Send OTP to phone number",
-)
-@limiter.limit("30/15minutes")
-async def register_initiate(
-    request: Request,
-    body: RegisterInitiateRequest,
-    redis: RedisConn,
-) -> MessageResponse:
-    """Start the registration flow by sending a 6-digit OTP via SMS.
-
-    Rate limited to **3 requests per 15 minutes** per IP to prevent abuse.
-    """
-    expires_in = await service.initiate_registration(
-        phone=body.phone,
-        redis=redis,
-    )
-    return MessageResponse(message="OTP sent", expires_in=expires_in)
-
-
-# ---------------------------------------------------------------------------
-# POST /register/verify
-# ---------------------------------------------------------------------------
-
-
-@router.post(
-    "/register/verify",
+    "/register/clerk",
     response_model=TokenResponse,
     status_code=201,
-    summary="Verify OTP and complete registration",
+    summary="Complete registration after Clerk verification",
 )
-async def register_verify(
-    body: RegisterVerifyRequest,
+async def register_clerk(
+    body: RegisterClerkRequest,
     db: DBSession,
     redis: RedisConn,
 ) -> TokenResponse:
-    """Verify the OTP, create the user account, and return JWT tokens."""
-    tokens = await service.verify_registration(
+    """Verify the Clerk session, create user, and return JWT tokens."""
+    tokens = await service.register_with_clerk(
         phone=body.phone,
-        otp=body.otp,
         pin=body.pin,
         full_name=body.full_name,
-        db=db,
-        redis=redis,
-    )
-    return TokenResponse(**tokens)
-
-
-# ---------------------------------------------------------------------------
-# POST /login/initiate
-# ---------------------------------------------------------------------------
-
-
-@router.post(
-    "/login/initiate",
-    response_model=MessageResponse,
-    status_code=200,
-    summary="Initiate login by verifying PIN and sending OTP",
-)
-@limiter.limit("30/15minutes")
-async def login_initiate(
-    request: Request,
-    body: LoginRequest,
-    db: DBSession,
-    redis: RedisConn,
-) -> MessageResponse:
-    """Verify credentials and send a login OTP to the user's phone."""
-    expires_in = await service.initiate_login(
-        phone=body.phone,
-        pin=body.pin,
-        db=db,
-        redis=redis,
-    )
-    return MessageResponse(message="OTP sent", expires_in=expires_in)
-
-
-# ---------------------------------------------------------------------------
-# POST /login/verify
-# ---------------------------------------------------------------------------
-
-
-@router.post(
-    "/login/verify",
-    response_model=TokenResponse,
-    status_code=200,
-    summary="Verify login OTP and return tokens",
-)
-async def login_verify(
-    body: LoginVerifyRequest,
-    db: DBSession,
-    redis: RedisConn,
-) -> TokenResponse:
-    """Verify the OTP and return full JWT tokens for login."""
-    tokens = await service.verify_login(
-        phone=body.phone,
-        otp=body.otp,
+        clerk_user_id=body.clerk_user_id,
         db=db,
         redis=redis,
     )
@@ -242,42 +157,6 @@ async def logout(
 
 
 # ---------------------------------------------------------------------------
-# POST /pin/reset/initiate
-# ---------------------------------------------------------------------------
-
-
-@router.post(
-    "/pin/reset/initiate",
-    response_model=MessageResponse,
-    status_code=200,
-    summary="Send PIN reset OTP",
-)
-@limiter.limit("30/15minutes")
-async def pin_reset_initiate(
-    request: Request,
-    body: PinResetInitiateRequest,
-    db: DBSession,
-    redis: RedisConn,
-) -> MessageResponse:
-    """Trigger a PIN reset OTP for the given phone number.
-
-    Response is identical whether or not the phone is registered — phone
-    existence is never revealed.
-
-    Rate limited to **3 requests per 15 minutes** per IP.
-    """
-    expires_in = await service.initiate_pin_reset(
-        phone=body.phone,
-        db=db,
-        redis=redis,
-    )
-    return MessageResponse(
-        message="If this number is registered, an OTP has been sent",
-        expires_in=expires_in,
-    )
-
-
-# ---------------------------------------------------------------------------
 # POST /pin/reset/confirm
 # ---------------------------------------------------------------------------
 
@@ -286,25 +165,19 @@ async def pin_reset_initiate(
     "/pin/reset/confirm",
     response_model=MessageResponse,
     status_code=200,
-    summary="Verify OTP and set new PIN",
+    summary="Verify Clerk ID and set new PIN",
 )
 @limiter.limit("30/15minutes")
 async def pin_reset_confirm(
     request: Request,
     body: PinResetConfirmRequest,
     db: DBSession,
-    redis: RedisConn,
 ) -> MessageResponse:
-    """Verify the PIN-reset OTP and replace the user's PIN.
-
-    The OTP is single-use and expires after 5 minutes.
-    Rate limited to **5 attempts per 15 minutes** per IP.
-    """
+    """Verify the Clerk verification session and replace the user's PIN."""
     await service.confirm_pin_reset(
         phone=body.phone,
-        otp=body.otp,
+        clerk_user_id=body.clerk_user_id,
         new_pin=body.new_pin,
         db=db,
-        redis=redis,
     )
     return MessageResponse(message="PIN updated successfully")

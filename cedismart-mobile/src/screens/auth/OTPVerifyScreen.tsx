@@ -3,8 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform
 import { useMutation } from '@tanstack/react-query';
 import { Shield, ArrowRight, Lock, Clock, HelpCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
-import apiClient, { setActiveTokens } from '../../api/client';
+import { useSignUp } from '@clerk/clerk-expo';
+import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
@@ -13,7 +13,7 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
   const { phone, flow = 'register', pin } = route.params;
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
-  const { login } = useAuthStore();
+  const { isLoaded, signUp } = useSignUp();
   const [verifyError, setVerifyError] = useState('');
 
   const [step, setStep] = useState<'otp' | 'details'>('otp');
@@ -21,6 +21,7 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
   const [timer, setTimer] = useState(300);
   const [title, setTitle] = useState<'Mr.' | 'Mrs.' | 'Ms.' | 'None'>('Mr.');
   const [fullName, setFullName] = useState('');
+  const [clerkUserId, setClerkUserId] = useState<string | null>(null);
   
   const inputRefs = useRef<Array<TextInput | null>>([]);
 
@@ -49,11 +50,7 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
 
     if (index === 5 && value !== '' && newOtp.every(digit => digit !== '')) {
       const fullOtp = newOtp.join('');
-      if (flow === 'login') {
-        setTimeout(() => loginOtpMutation.mutate(fullOtp), 200);
-      } else {
-        setTimeout(() => setStep('details'), 400);
-      }
+      setTimeout(() => verifyOtpMutation.mutate(fullOtp), 200);
     }
   };
 
@@ -64,56 +61,114 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
   };
 
   const resendMutation = useMutation({
-    mutationFn: () => {
-      if (flow === 'login') {
-        return apiClient.post('/auth/login/initiate', { phone, pin });
+    mutationFn: async () => {
+      if (!isLoaded) {
+        throw new Error('Verification service not loaded yet. Please try again.');
       }
-      return apiClient.post('/auth/register/initiate', { phone });
+      console.log('[OTPVerify Clerk] Resending verification code');
+      await signUp.preparePhoneNumberVerification({ strategy: 'phone_code' });
     },
     onSuccess: () => {
       setTimer(300);
       setVerifyError('');
     },
     onError: (err: any) => {
-      console.error('[Resend OTP] Failed:', err?.response?.data || err);
-      const serverError = err?.response?.data?.error;
-      const errorMsg = typeof serverError === 'string'
-        ? serverError
-        : serverError?.message || 'Failed to resend code. Please try again.';
+      console.error('[OTPVerify Clerk] Resend failed:', err);
+      const errorMsg = err?.errors?.[0]?.message || err?.message || 'Failed to resend code. Please try again.';
       setVerifyError(errorMsg);
     }
   });
 
-  const loginOtpMutation = useMutation({
-    mutationFn: (otpCode: string) => {
-      return apiClient.post('/auth/login/verify', { phone, otp: otpCode });
-    },
-    onSuccess: async (response) => {
-      const { access_token, refresh_token, user } = response.data;
-      
-      // Store session tokens using the active session helper
-      await setActiveTokens(user.phone || phone, access_token, refresh_token);
-      
-      // Save PIN in SecureStore for biometric convenience
-      if (pin) {
-        const sanitizedPhone = (user.phone || phone).replace(/[^\w.-]/g, '');
-        await SecureStore.setItemAsync(`user_pin_${sanitizedPhone}`, pin);
+  const verifyOtpMutation = useMutation({
+    mutationFn: async (otpCode: string) => {
+      if (!isLoaded) {
+        throw new Error('Verification service not loaded yet. Please try again.');
       }
       
-      // Trigger local login to hydrate state
-      login(user);
+      console.log('[OTPVerify Clerk] Attempting verification code:', otpCode);
+      const result = await signUp.attemptPhoneNumberVerification({
+        code: otpCode,
+      });
+      return result;
+    },
+    onSuccess: (result) => {
+      console.log('[OTPVerify Clerk] Phone verified successfully. Status:', result.status);
+      console.log('[OTPVerify Clerk] Missing fields:', JSON.stringify(result.missingFields));
+      if (result.status === 'complete') {
+        setClerkUserId(result.createdUserId || null);
+      }
+      // If status is 'missing_requirements', we'll finalize after the user enters their name
+      setStep('details');
     },
     onError: (err: any) => {
-      console.error('[Login OTP Verify] Failed:', err?.response?.data || err);
-      const serverError = err?.response?.data?.error;
-      const errorMsg = typeof serverError === 'string' 
-        ? serverError 
-        : serverError?.message || 'Verification failed. Please check the code.';
+      console.warn('[OTPVerify Clerk] Verification failed:', err?.errors?.[0]?.message || err?.message);
+      const errorMsg = err?.errors?.[0]?.message || err?.message || 'Verification failed. Please check the code.';
       setVerifyError(errorMsg);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     }
   });
+
+  const [isFinalizingSignUp, setIsFinalizingSignUp] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
+
+  const handleContinueToPin = async () => {
+    if (!fullName.trim()) return;
+
+    const composedName = title === 'None' ? fullName : `${title} ${fullName}`;
+    
+    // If we already have a clerk user ID (status was 'complete'), navigate directly
+    if (clerkUserId) {
+      navigation.navigate('SetPIN', { 
+        phone, 
+        otp: otp.join(''), 
+        full_name: composedName,
+        clerk_user_id: clerkUserId,
+      });
+      return;
+    }
+
+    // Otherwise, finalize the sign-up by providing missing fields (name)
+    if (!isLoaded || !signUp) {
+      setDetailsError('Verification service not available. Please restart registration.');
+      return;
+    }
+
+    setIsFinalizingSignUp(true);
+    setDetailsError('');
+
+    try {
+      // Split name into first/last for Clerk
+      const nameParts = fullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || fullName;
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
+      console.log('[OTPVerify Clerk] Finalizing sign-up with name:', firstName, lastName);
+      const result = await signUp.update({
+        firstName,
+        lastName: lastName || undefined,
+      });
+
+      console.log('[OTPVerify Clerk] Sign-up finalized. Status:', result.status, 'UserID:', result.createdUserId);
+
+      if (result.status === 'complete' && result.createdUserId) {
+        navigation.navigate('SetPIN', { 
+          phone, 
+          otp: otp.join(''), 
+          full_name: composedName,
+          clerk_user_id: result.createdUserId,
+        });
+      } else {
+        console.warn('[OTPVerify Clerk] Still missing requirements:', JSON.stringify(result.missingFields));
+        setDetailsError('Additional verification required. Please contact support.');
+      }
+    } catch (err: any) {
+      console.warn('[OTPVerify Clerk] Finalize error:', err?.errors?.[0]?.message || err?.message);
+      setDetailsError(err?.errors?.[0]?.message || err?.message || 'Failed to complete registration.');
+    } finally {
+      setIsFinalizingSignUp(false);
+    }
+  };
 
   if (step === 'details') {
     return (
@@ -160,18 +215,18 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
                   />
                 </View>
 
+                {detailsError ? (
+                  <Text className="text-error text-sm font-semibold mb-4 text-center">{detailsError}</Text>
+                ) : null}
+
                 <TouchableOpacity
-                  onPress={() => navigation.navigate('SetPIN', { 
-                    phone, 
-                    otp: otp.join(''), 
-                    full_name: title === 'None' ? fullName : `${title} ${fullName}` 
-                  })}
-                  disabled={!fullName.trim()}
+                  onPress={handleContinueToPin}
+                  disabled={!fullName.trim() || isFinalizingSignUp}
                   className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20"
                 >
-                  <View className={`w-full h-14 items-center justify-center flex-row space-x-3 ${!fullName.trim() ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') : 'bg-primary'}`}>
-                    <Text className="text-white font-headline font-bold text-base">Continue</Text>
-                    <ArrowRight size={20} color="white" />
+                  <View className={`w-full h-14 items-center justify-center flex-row space-x-3 ${!fullName.trim() || isFinalizingSignUp ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') : 'bg-primary'}`}>
+                    <Text className="text-white font-headline font-bold text-base">{isFinalizingSignUp ? 'Setting up...' : 'Continue'}</Text>
+                    {!isFinalizingSignUp && <ArrowRight size={20} color="white" />}
                   </View>
                 </TouchableOpacity>
               </View>
@@ -204,16 +259,6 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
             <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed text-center mb-6`}>
               OTP sent to <Text className={`font-semibold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{phone}</Text>
             </Text>
-
-            {/* Beta Banner */}
-            <View className={`w-full mb-8 p-4 rounded-2xl border ${isDark ? 'bg-dark-surface-container-low border-primary/20' : 'bg-primary/5 border-primary/10'} flex-row items-center space-x-3`}>
-              <Shield size={20} color={isDark ? '#4ade80' : '#0A6E4A'} />
-              <View className="flex-1">
-                <Text className={`font-body text-xs leading-relaxed ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
-                  We are in <Text className="font-bold text-primary">Beta mode</Text>. Please enter the bypass code <Text className="font-bold text-primary">123456</Text> to verify.
-                </Text>
-              </View>
-            </View>
 
             {/* OTP Input Grid */}
             <View className="flex-row justify-between w-full mb-10">
@@ -260,29 +305,25 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
             <TouchableOpacity
               onPress={() => {
                 if (!otp.some(d => d === '')) {
-                  if (flow === 'login') {
-                    loginOtpMutation.mutate(otp.join(''));
-                  } else {
-                    setStep('details');
-                  }
+                  verifyOtpMutation.mutate(otp.join(''));
                 }
               }}
-              disabled={otp.some(d => d === '') || loginOtpMutation.isPending}
+              disabled={otp.some(d => d === '') || verifyOtpMutation.isPending}
               className="w-full h-14 rounded-2xl overflow-hidden shadow-lg shadow-primary/10"
             >
               <View className={`w-full h-full items-center justify-center flex-row space-x-2 ${
-                otp.some(d => d === '') || loginOtpMutation.isPending 
+                otp.some(d => d === '') || verifyOtpMutation.isPending 
                   ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') 
                   : 'bg-primary'
               }`}>
                 <Text className={`font-headline font-bold text-base ${
-                  otp.some(d => d === '') || loginOtpMutation.isPending 
+                  otp.some(d => d === '') || verifyOtpMutation.isPending 
                     ? (isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant') 
                     : 'text-white'
                 }`}>
-                  {loginOtpMutation.isPending ? 'Verifying...' : 'Verify'}
+                  {verifyOtpMutation.isPending ? 'Verifying...' : 'Verify'}
                 </Text>
-                {!loginOtpMutation.isPending && (
+                {!verifyOtpMutation.isPending && (
                   <ArrowRight size={18} color={otp.some(d => d === '') ? (isDark ? '#b2b6b1' : '#40493d') : 'white'} />
                 )}
               </View>

@@ -243,10 +243,9 @@ pytest tests/modules/test_auth.py -v
 
 **Coverage target:** ≥ 80% (enforced in CI).
 
-### 🧪 Beta Testing & Verification Bypass
-To facilitate external beta testing (via APK or TestFlight), a **universal OTP bypass** is built directly into the auth service:
-- **How it works:** Any verification request (`/auth/register/verify` or `/auth/login/verify`) containing the code **`123456`** will bypass the SMS provider check and succeed.
-- **Safety:** This allows reviewers, developers, and QA testers to create and access test profiles instantly across all environments without consuming SMS API credits.
+### 🧪 Testing & Verification
+All client-side verification SMS checks are offloaded to Clerk. The API only receives a verified Clerk User ID at `/auth/register/clerk` and validates it against the Clerk Backend API using the `CLERK_SECRET_KEY` environment variable.
+To bypass SMS check for local tests or Store review submissions, configure **Test Phone Numbers** in the Clerk Dashboard.
 
 ---
 

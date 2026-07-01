@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { Shield, Info, CheckCircle } from 'lucide-react-native';
+import { useSignUp } from '@clerk/clerk-expo';
 import PINPad from '../../components/shared/PINPad';
 import apiClient, { setActiveTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -11,10 +12,11 @@ import { useThemeStore } from '../../stores/themeStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
 
 const SetPINScreen = ({ route, navigation }: any) => {
-  const { phone, otp, full_name } = route.params;
+  const { phone, otp, full_name, clerk_user_id } = route.params;
   const login = useAuthStore((state) => state.login);
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
+  const { isLoaded, signUp } = useSignUp();
   
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [pin, setPin] = useState('');
@@ -53,7 +55,7 @@ const SetPINScreen = ({ route, navigation }: any) => {
         setConfirmPin(newConfirmPin);
         if (newConfirmPin.length === 6) {
           if (newConfirmPin === pin) {
-            verifyMutation.mutate({ phone, otp, pin: newConfirmPin });
+            verifyMutation.mutate({ phone, pin: newConfirmPin });
           } else {
             setError('PINs do not match. Start over.');
             setPin('');
@@ -75,13 +77,22 @@ const SetPINScreen = ({ route, navigation }: any) => {
   };
 
   const verifyMutation = useMutation({
-    mutationFn: (data: { phone: string, otp: string, pin: string }) => {
-      const payload = { ...data, full_name: full_name };
-      console.log('[SetPIN] Posting to /auth/register/verify with:', JSON.stringify(payload));
-      return apiClient.post('/auth/register/verify', payload);
+    mutationFn: (data: { phone: string, pin: string }) => {
+      const resolvedClerkUserId = clerk_user_id || signUp?.createdUserId;
+      if (!resolvedClerkUserId) {
+        throw new Error('Authentication session is missing. Please restart registration.');
+      }
+      const payload = {
+        phone: data.phone,
+        pin: data.pin,
+        full_name: full_name,
+        clerk_user_id: resolvedClerkUserId,
+      };
+      console.log('[SetPIN Clerk] Posting to /auth/register/clerk with:', JSON.stringify(payload));
+      return apiClient.post('/auth/register/clerk', payload);
     },
     onSuccess: async (response, variables) => {
-      console.log('[SetPIN] Success:', JSON.stringify(response.data));
+      console.log('[SetPIN Clerk] Success:', JSON.stringify(response.data));
       const { access_token, refresh_token, user } = response.data;
       
       // Store session tokens using the active session helper (crucial for switcher to function)
@@ -94,14 +105,16 @@ const SetPINScreen = ({ route, navigation }: any) => {
       login(user);
     },
     onError: (err: any) => {
-      console.error('[SetPIN] Error status:', err?.response?.status);
-      console.error('[SetPIN] Error data:', JSON.stringify(err?.response?.data));
-      console.error('[SetPIN] Error message:', err?.message);
-      console.error('[SetPIN] Request URL:', err?.config?.baseURL + err?.config?.url);
+      console.warn('[SetPIN Clerk] Error status:', err?.response?.status);
+      console.warn('[SetPIN Clerk] Error data:', JSON.stringify(err?.response?.data));
+      console.warn('[SetPIN Clerk] Error message:', err?.message);
+      if (err?.config?.baseURL) {
+        console.warn('[SetPIN Clerk] Request URL:', err.config.baseURL + (err.config.url || ''));
+      }
       setError(
         typeof err?.response?.data?.error === 'string'
           ? err?.response?.data?.error
-          : err?.response?.data?.error?.message || 'Verification failed.'
+          : err?.response?.data?.error?.message || err?.message || 'Verification failed.'
       );
       setPin('');
       setConfirmPin('');

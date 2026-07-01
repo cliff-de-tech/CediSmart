@@ -164,14 +164,10 @@ async def client(
 
 
 @pytest.fixture(autouse=True)
-def mock_send_otp() -> AsyncGenerator[AsyncMock, None]:
-    """Prevent real Termii calls in all tests.
-
-    Patch the reference inside auth/service (where it was imported),
-    not the original in app.core.sms — otherwise SMS unit tests that
-    call sms.send_otp directly would hit the mock instead of the real code.
-    """
-    with patch("app.modules.auth.service.send_otp", new_callable=AsyncMock) as m:
+def mock_verify_clerk_user() -> AsyncGenerator[AsyncMock, None]:
+    """Mock Clerk user verification for all backend tests."""
+    with patch("app.core.clerk.verify_clerk_user", new_callable=AsyncMock) as m:
+        m.return_value = {"id": "user_mock123", "phone_numbers": [{"phone_number": "+233200000000"}]}
         yield m
 
 

@@ -14,27 +14,13 @@ _GHANA_PHONE_RE = re.compile(r"^\+233\d{9}$")
 # ---------------------------------------------------------------------------
 
 
-class RegisterInitiateRequest(BaseModel):
-    """Start registration by sending an OTP to the given phone number."""
+class RegisterClerkRequest(BaseModel):
+    """Complete registration by verifying the Clerk session and setting a PIN."""
 
     phone: str
-
-    @field_validator("phone")
-    @classmethod
-    def validate_phone(cls, v: str) -> str:
-        v = v.strip()
-        if not _GHANA_PHONE_RE.match(v):
-            raise ValueError("Phone must be in E.164 format: +233XXXXXXXXX")
-        return v
-
-
-class RegisterVerifyRequest(BaseModel):
-    """Complete registration by verifying OTP and setting a PIN."""
-
-    phone: str
-    otp: str
     pin: str
     full_name: str
+    clerk_user_id: str
 
     @field_validator("phone")
     @classmethod
@@ -42,14 +28,6 @@ class RegisterVerifyRequest(BaseModel):
         v = v.strip()
         if not _GHANA_PHONE_RE.match(v):
             raise ValueError("Phone must be in E.164 format: +233XXXXXXXXX")
-        return v
-
-    @field_validator("otp")
-    @classmethod
-    def validate_otp(cls, v: str) -> str:
-        v = v.strip()
-        if not re.fullmatch(r"\d{6}", v):
-            raise ValueError("OTP must be exactly 6 digits")
         return v
 
     @field_validator("pin")
@@ -72,6 +50,15 @@ class RegisterVerifyRequest(BaseModel):
             raise ValueError("Full name must be at most 100 characters")
         return v
 
+    @field_validator("clerk_user_id")
+    @classmethod
+    def validate_clerk_user_id(cls, v: str) -> str:
+        v = v.strip()
+        if not v.startswith("user_") and not settings.ENVIRONMENT == "testing":
+            # Allow mock IDs in testing
+            pass
+        return v
+
 
 class LoginRequest(BaseModel):
     """Authenticate with phone number and PIN."""
@@ -88,54 +75,17 @@ class LoginRequest(BaseModel):
         return v
 
 
-class LoginVerifyRequest(BaseModel):
-    """Verify login OTP to obtain final tokens."""
-
-    phone: str
-    otp: str
-
-    @field_validator("phone")
-    @classmethod
-    def validate_phone(cls, v: str) -> str:
-        v = v.strip()
-        if not _GHANA_PHONE_RE.match(v):
-            raise ValueError("Phone must be in E.164 format: +233XXXXXXXXX")
-        return v
-
-    @field_validator("otp")
-    @classmethod
-    def validate_otp(cls, v: str) -> str:
-        v = v.strip()
-        if not re.fullmatch(r"\d{6}", v):
-            raise ValueError("OTP must be exactly 6 digits")
-        return v
-
-
 class TokenRefreshRequest(BaseModel):
     """Request a new access token using a valid refresh token."""
 
     refresh_token: str
 
 
-class PinResetInitiateRequest(BaseModel):
-    """Start PIN reset by sending an OTP to the registered phone number."""
-
-    phone: str
-
-    @field_validator("phone")
-    @classmethod
-    def validate_phone(cls, v: str) -> str:
-        v = v.strip()
-        if not _GHANA_PHONE_RE.match(v):
-            raise ValueError("Phone must be in E.164 format: +233XXXXXXXXX")
-        return v
-
-
 class PinResetConfirmRequest(BaseModel):
-    """Complete PIN reset by verifying OTP and setting a new PIN."""
+    """Complete PIN reset by verifying Clerk user ID and setting a new PIN."""
 
     phone: str
-    otp: str
+    clerk_user_id: str
     new_pin: str
 
     @field_validator("phone")
@@ -146,12 +96,10 @@ class PinResetConfirmRequest(BaseModel):
             raise ValueError("Phone must be in E.164 format: +233XXXXXXXXX")
         return v
 
-    @field_validator("otp")
+    @field_validator("clerk_user_id")
     @classmethod
-    def validate_otp(cls, v: str) -> str:
+    def validate_clerk_user_id(cls, v: str) -> str:
         v = v.strip()
-        if not re.fullmatch(r"\d{6}", v):
-            raise ValueError("OTP must be exactly 6 digits")
         return v
 
     @field_validator("new_pin")

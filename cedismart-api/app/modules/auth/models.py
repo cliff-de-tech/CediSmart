@@ -24,6 +24,7 @@ class User(TimestampMixin, Base):
         server_default=text("gen_random_uuid()"),
     )
     phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    clerk_user_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)
     email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     full_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     pin_hash: Mapped[str] = mapped_column(String(60), nullable=False)

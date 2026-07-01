@@ -265,11 +265,11 @@ React Native (Expo SDK 54, Managed Workflow) with TypeScript strict mode.
 
 **Implemented screens:** Registration → OTP → Set PIN → Login → Dashboard → Transactions → Add Transaction → Budgets → Reports → Accounts → Settings.
 
-### 🧪 Beta Testing & OTP Bypass
-To facilitate external beta testing (via APK or TestFlight), SMS verification can be bypassed:
-- **Phone Number:** Enter any valid format phone number
-- **Bypass OTP Code:** Enter `123456`
-This universal bypass functions in all environments and allows immediate account creation or login for test users without needing live SMS credits.
+### 🧪 Beta Testing & Reviewer Verification
+To facilitate store submissions (App Store / Play Store) and external beta testing without sending live SMS messages, configure Clerk's native **Test Phone Numbers**:
+1. Log in to the Clerk Dashboard and navigate to the phone verification settings.
+2. Register your testing/reviewer phone numbers (e.g. `+1 555 000 0000`).
+3. Associate a fixed code (e.g. `123456`) that reviewers can use to verify instantly.
 
 ---
 

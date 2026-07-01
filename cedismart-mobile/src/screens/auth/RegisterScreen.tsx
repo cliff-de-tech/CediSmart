@@ -6,6 +6,7 @@ import * as z from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { ArrowRight, Shield } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSignUp } from '@clerk/clerk-expo';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
@@ -19,6 +20,7 @@ type PhoneForm = z.infer<typeof phoneSchema>;
 const RegisterScreen = ({ navigation }: any) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
+  const { isLoaded, signUp } = useSignUp();
 
   const { control, handleSubmit, formState: { errors } } = useForm<PhoneForm>({
     resolver: zodResolver(phoneSchema),
@@ -26,22 +28,32 @@ const RegisterScreen = ({ navigation }: any) => {
   });
 
   const mutation = useMutation({
-    mutationFn: (data: { phone: string }) => {
-      const url = '/auth/register/initiate';
-      const payload = { phone: `+233${data.phone}` };
-      console.log('[Register] BASE_URL:', process.env.EXPO_PUBLIC_API_URL);
-      console.log('[Register] Posting to:', url, 'with payload:', JSON.stringify(payload));
-      return apiClient.post(url, payload);
+    mutationFn: async (data: { phone: string }) => {
+      if (!isLoaded) {
+        throw new Error('Verification service not loaded yet. Please try again.');
+      }
+      
+      const formattedPhone = `+233${data.phone}`;
+      console.log('[Register Clerk] Starting signUp for:', formattedPhone);
+      
+      // Start registration flow with Clerk
+      await signUp.create({
+        phoneNumber: formattedPhone,
+      });
+      
+      // Send OTP via SMS
+      await signUp.preparePhoneNumberVerification({
+        strategy: 'phone_code',
+      });
+      
+      return formattedPhone;
     },
-    onSuccess: (response, variables) => {
-      console.log('[Register] Success:', response.data);
-      navigation.navigate('OTPVerify', { phone: `+233${variables.phone}` });
+    onSuccess: (formattedPhone) => {
+      console.log('[Register Clerk] Verification initiated');
+      navigation.navigate('OTPVerify', { phone: formattedPhone, flow: 'register' });
     },
     onError: (err: any) => {
-      console.error('[Register] Error status:', err?.response?.status);
-      console.error('[Register] Error data:', JSON.stringify(err?.response?.data));
-      console.error('[Register] Error message:', err?.message);
-      console.error('[Register] Full error:', err);
+      console.error('[Register Clerk] Error:', err);
     },
   });
 
@@ -64,19 +76,6 @@ const RegisterScreen = ({ navigation }: any) => {
             <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-4 text-sm leading-relaxed max-w-[280px]`}>
               Secure your financial future with Ghana's most trusted digital ledger system.
             </Text>
-          </View>
-
-          {/* Beta Notice Banner */}
-          <View className={`mb-6 p-4 rounded-2xl border ${isDark ? 'bg-dark-surface-container-low border-primary/20' : 'bg-primary/5 border-primary/10'} flex-row items-start space-x-3`}>
-            <View className={`w-8 h-8 rounded-full items-center justify-center ${isDark ? 'bg-primary/20' : 'bg-primary/10'}`}>
-              <Shield size={16} color={isDark ? '#4ade80' : '#0A6E4A'} />
-            </View>
-            <View className="flex-1">
-              <Text className={`font-headline font-bold text-sm ${isDark ? 'text-primary' : 'text-primary'}`}>Beta Mode</Text>
-              <Text className={`font-body text-xs mt-1 leading-relaxed ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
-                To bypass SMS verification during testing, enter your number and use <Text className="font-bold text-primary">123456</Text> as the OTP.
-              </Text>
-            </View>
           </View>
 
           {/* Registration Form */}
@@ -122,9 +121,9 @@ const RegisterScreen = ({ navigation }: any) => {
 
               {mutation.error ? (
                 <Text className="text-error text-xs font-semibold text-center mb-4">
-                  {typeof (mutation.error as any)?.response?.data?.error === 'string'
-                    ? (mutation.error as any)?.response?.data?.error
-                    : (mutation.error as any)?.response?.data?.error?.message || 'Failed to send OTP. Please try again.'}
+                  {(mutation.error as any)?.errors?.[0]?.message || 
+                   (mutation.error as any)?.message || 
+                   'Failed to send OTP. Please try again.'}
                 </Text>
               ) : null}
 

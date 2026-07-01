@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # --- Gemini (AI SMS Parsing) ---
     GEMINI_API_KEY: str = ""
 
+    # --- Clerk (Authentication) ---
+    CLERK_SECRET_KEY: str = ""
+    CLERK_PUBLISHABLE_KEY: str = ""
+
     # --- GitHub Bug Reporting ---
     GITHUB_ACCESS_TOKEN: str = ""
     GITHUB_REPO: str = "cliff-de-tech/CediSmart"
