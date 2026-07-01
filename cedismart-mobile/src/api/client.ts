@@ -81,9 +81,20 @@ export const clearActiveSession = async (phone: string): Promise<void> => {
 // --- Request Interceptor ---
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const { access } = await getActiveTokens();
-    if (access && config.headers) {
-      config.headers.Authorization = `Bearer ${access}`;
+    const isPublicEndpoint = config.url && (
+      config.url.includes('/auth/login') ||
+      config.url.includes('/auth/register') ||
+      config.url.includes('/auth/verify-otp') ||
+      config.url.includes('/auth/token/refresh') ||
+      config.url.includes('/support/chat') ||
+      config.url.includes('/support/escalate')
+    );
+
+    if (!isPublicEndpoint) {
+      const { access } = await getActiveTokens();
+      if (access && config.headers) {
+        config.headers.Authorization = `Bearer ${access}`;
+      }
     }
     return config;
   },
@@ -96,8 +107,17 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // If error is 401 and we haven't retried yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const isPublicEndpoint = originalRequest?.url && (
+      originalRequest.url.includes('/auth/login') ||
+      originalRequest.url.includes('/auth/register') ||
+      originalRequest.url.includes('/auth/verify-otp') ||
+      originalRequest.url.includes('/auth/token/refresh') ||
+      originalRequest.url.includes('/support/chat') ||
+      originalRequest.url.includes('/support/escalate')
+    );
+
+    // If error is 401, we haven't retried yet, and it is not a public auth endpoint
+    if (error.response?.status === 401 && !originalRequest._retry && !isPublicEndpoint) {
       if (isRefreshing) {
         // Queue the request while refresh is in flight
         return new Promise((resolve, reject) => {

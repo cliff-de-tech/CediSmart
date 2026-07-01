@@ -776,6 +776,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
               // Suppress auto-biometrics on next mount of Login screen
               await AsyncStorage.setItem('suppress_auto_bio', 'true');
             } catch (err) {}
+            
+            if (user?.phone) {
+              await clearActiveSession(user.phone);
+            }
             await SecureStore.deleteItemAsync('access_token');
             await SecureStore.deleteItemAsync('refresh_token');
             logout(); // Clear Zustand state
