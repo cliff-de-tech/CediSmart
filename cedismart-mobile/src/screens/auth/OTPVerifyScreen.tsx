@@ -353,6 +353,7 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
         visible={supportVisible}
         onClose={() => setSupportVisible(false)}
         phone={phone}
+        supportType="auth"
       />
     </SafeAreaView>
   );

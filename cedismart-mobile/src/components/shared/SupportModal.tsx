@@ -17,6 +17,7 @@ interface SupportModalProps {
   visible: boolean;
   onClose: () => void;
   phone?: string;
+  supportType?: 'auth' | 'general';
 }
 
 const parseInlineStyles = (text: string) => {
@@ -103,7 +104,7 @@ const parseMarkdown = (text: string, isDark: boolean) => {
   });
 };
 
-export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, phone = 'Anonymous' }) => {
+export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, phone = 'Anonymous', supportType = 'general' }) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const insets = useSafeAreaInsets();
@@ -114,11 +115,13 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
   const [showEscalate, setShowEscalate] = useState(false);
   const [escalatedTicket, setEscalatedTicket] = useState<{ number: number; url: string } | null>(null);
 
-  const storageKey = `cedismart_chat_history_${phone.replace(/[^\d+]/g, '') || 'anonymous'}`;
+  const storageKey = `cedismart_chat_history_${phone.replace(/[^\d+]/g, '') || 'anonymous'}_${supportType}`;
 
   const defaultGreeting: Message = {
     role: 'model',
-    content: "Hi! I'm your CediSmart AI Support Assistant. How can I help you today? (e.g., issues with OTP, registering, or PIN setup)."
+    content: supportType === 'auth'
+      ? "Hi! I'm your CediSmart Onboarding Assistant. How can I help you today? (e.g., issues with OTP, registering, or PIN setup)."
+      : "Hi! I'm your CediSmart AI Support Assistant. How can I help you today? (e.g., ledgers, budgeting, transactions, or general settings)."
   };
 
   // Load chat history when modal becomes visible or phone changes
@@ -209,6 +212,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
       };
       const response = await apiClient.post('/support/chat', {
         messages: chatHistory,
+        support_type: supportType,
         device_diagnostics: diagnostics
       });
       return response.data.response;

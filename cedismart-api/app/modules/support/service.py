@@ -9,21 +9,40 @@ from app.modules.support.models import SupportTicket
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = (
-    "You are the CediSmart AI Support Assistant. CediSmart is a digital ledger and budgeting "
-    "mobile application built for the Ghanaian market, supporting Cash, Mobile Money (MTN, Telecel, AT), "
-    "and Bank accounts.\n\n"
-    "Your tone should be polite, helpful, and direct. You can use Ghanaian context/slang (e.g. chop money, "
-    "trotro, airtime, MoMo fees) appropriately to make the user feel at home.\n\n"
-    "Help users troubleshoot issues including:\n"
-    "- Registration & OTP: SMS verification is offloaded to Clerk. If they aren't receiving OTPs, "
+AUTH_SYSTEM_PROMPT = (
+    "You are the CediSmart Onboarding & Authentication Troubleshooter. CediSmart is a digital ledger "
+    "and budgeting mobile application built for the Ghanaian market.\n\n"
+    "Your tone should be polite, helpful, and direct. You can use Ghanaian context/slang appropriately "
+    "to make the user feel at home.\n\n"
+    "Your sole focus is helping users resolve registration, SMS verification OTP, sign-in, and 6-digit Secure PIN reset issues.\n"
+    "- SMS Verification OTP: SMS verification is offloaded to Clerk. If they aren't receiving OTPs, "
     "suggest they check cellular signal, ensure they didn't prefix the number with another 0 "
-    "(Ghana numbers are 9 digits, e.g. 20xxxxxxx), or try again in a few minutes. "
+    "(Ghana numbers are 9 digits, e.g., 24XXXXXXX, excluding the leading 0), or check if they have "
+    "MTN Do Not Disturb (DND) active which blocks transaction SMS. "
     "Also note that reviewers can use pre-configured Test Phone Numbers.\n"
     "- PIN & Login: Security PINs are 6 digits and stored securely. PIN resets require a Clerk "
     "phone re-verification step.\n"
-    "- Budgeting & Ledgers: Help them understand how to set budgets, add transactions (expense vs income), "
-    "and review monthly reports.\n\n"
+    "- Important restriction: Since you are the Onboarding Troubleshooter, if users ask about general ledger usage, "
+    "adding transactions, or setting budgets, politely advise them that you are specialized in login/registration issues, "
+    "but once they are logged in, the General Support assistant in Settings will happily help them with budgeting.\n\n"
+    "IMPORTANT ESCALATION PROTOCOL:\n"
+    "If the user describes a bug, a server crash, asks for a human / developer, or if the issue is complex "
+    "and you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your response. "
+    "This lets the system know it needs to escalate the conversation to the developer."
+)
+
+GENERAL_SYSTEM_PROMPT = (
+    "You are the CediSmart Ledger & Budgeting Co-Pilot. CediSmart is a digital ledger and budgeting "
+    "mobile application built for the Ghanaian market, supporting Cash, Mobile Money (MTN, Telecel, AT), "
+    "and Bank accounts.\n\n"
+    "Your tone should be polite, helpful, and direct. You can use Ghanaian context/slang (e.g., chop money, "
+    "trotro, airtime, MoMo fees) appropriately to make the user feel at home.\n\n"
+    "Your focus is helping logged-in users understand and use CediSmart's ledger and budgeting features:\n"
+    "- Ledgers: Help them understand how to set up ledgers (personal, business, savings), add transactions "
+    "(categorize expense vs income), and review monthly reports.\n"
+    "- Budgeting: Guide them on setting monthly budgets, track savings goals, and manage MoMo transaction fee settings.\n"
+    "- Important restriction: Since you are post-login support, if the user asks about changing phone numbers or "
+    "re-registering, guide them to the profile/auth settings.\n\n"
     "IMPORTANT ESCALATION PROTOCOL:\n"
     "If the user describes a bug, a server crash, asks for a human / developer, or if the issue is complex "
     "and you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your response. "
@@ -32,11 +51,13 @@ SYSTEM_PROMPT = (
 
 class SupportService:
     @staticmethod
-    async def generate_chat_response(messages: list[ChatMessage]) -> str:
+    async def generate_chat_response(messages: list[ChatMessage], support_type: str | None = None) -> str:
         """Call Gemini model to generate a supportive assistant response."""
+        system_prompt = AUTH_SYSTEM_PROMPT if support_type == "auth" else GENERAL_SYSTEM_PROMPT
+
         if not settings.GEMINI_API_KEY:
             logger.warning("GEMINI_API_KEY is not set. Using local rules-based support fallback.")
-            return SupportService._fallback_support_response(messages)
+            return SupportService._fallback_support_response(messages, support_type)
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
 
@@ -50,7 +71,7 @@ class SupportService:
         payload = {
             "contents": contents,
             "systemInstruction": {
-                "parts": [{"text": SYSTEM_PROMPT}]
+                "parts": [{"text": system_prompt}]
             }
         }
 
@@ -76,28 +97,34 @@ class SupportService:
             )
 
     @staticmethod
-    def _fallback_support_response(messages: list[ChatMessage]) -> str:
+    def _fallback_support_response(messages: list[ChatMessage], support_type: str | None = None) -> str:
         """Provide a fallback response when Gemini is not configured."""
         last_msg = messages[-1].content.lower() if messages else ""
 
-        if "otp" in last_msg or "code" in last_msg or "sms" in last_msg:
-            return (
-                "It looks like you're having trouble receiving your verification OTP. Please check:\n"
-                "1. That your phone has active cellular reception.\n"
-                "2. That the number was entered correctly (9 digits, e.g. 24XXXXXXX, excluding the leading 0).\n"
-                "If the issue persists, tap 'Escalate' to report this bug to our developers."
-            )
-        elif "pin" in last_msg or "password" in last_msg or "reset" in last_msg:
-            return (
-                "To reset your PIN, please use the 'Forgot PIN?' link on the Login screen. "
-                "This will verify your identity via SMS before prompting you to choose a new 6-digit PIN."
-            )
+        if support_type == "auth":
+            if "otp" in last_msg or "code" in last_msg or "sms" in last_msg:
+                return (
+                    "It looks like you're having trouble receiving your verification OTP. Please check:\n"
+                    "1. That your phone has active cellular reception.\n"
+                    "2. That the number was entered correctly (9 digits, e.g. 24XXXXXXX, excluding the leading 0).\n"
+                    "If the issue persists, tap 'Escalate' to report this bug to our developers."
+                )
+            else:
+                return (
+                    "Hi there! I am the CediSmart Onboarding Assistant. I can help you with OTP codes, "
+                    "registration, and PIN resets. (If you have a complicated issue, please let me know and I will raise a developer ticket)."
+                )
         else:
-            return (
-                "Hi there! I am the CediSmart Support Assistant. I can help you with OTP codes, "
-                "PIN resets, budgets, and transactions. What's on your mind? "
-                "(If you have a complicated issue, please let me know and I will raise a developer ticket)."
-            )
+            if "pin" in last_msg or "password" in last_msg or "reset" in last_msg:
+                return (
+                    "To reset your PIN, please use the 'Forgot PIN?' link on the Login screen. "
+                    "This will verify your identity via SMS before prompting you to choose a new 6-digit PIN."
+                )
+            else:
+                return (
+                    "Hi there! I am the CediSmart Support Assistant. I can help you set budgets, "
+                    "create ledgers, and log transactions. What can I help you with today?"
+                )
 
     @staticmethod
     async def escalate_ticket(

@@ -496,6 +496,7 @@ const ForgotPINScreen = ({ navigation }: any) => {
         visible={supportVisible}
         onClose={() => setSupportVisible(false)}
         phone={phone ? `+233${phone}` : undefined}
+        supportType="auth"
       />
     </SafeAreaView>
   );

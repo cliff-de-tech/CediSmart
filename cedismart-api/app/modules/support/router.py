@@ -18,7 +18,7 @@ DBSession = Annotated[AsyncSession, Depends(get_db)]
 @limiter.limit("30/15minutes")
 async def chat_with_support(request: Request, body: ChatRequest) -> ChatResponse:
     """Generate a response using Gemini based on the conversation history."""
-    response_text = await SupportService.generate_chat_response(body.messages)
+    response_text = await SupportService.generate_chat_response(body.messages, support_type=body.support_type)
     return ChatResponse(response=response_text)
 
 @router.post(

@@ -6,6 +6,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: list[ChatMessage]
+    support_type: str | None = Field(default="general", description="The support category context: 'auth' or 'general'")
     device_diagnostics: dict | None = Field(default=None, description="Optional metadata about client device")
 
 class ChatResponse(BaseModel):
