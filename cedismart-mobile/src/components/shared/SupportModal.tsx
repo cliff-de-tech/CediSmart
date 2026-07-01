@@ -16,6 +16,90 @@ interface SupportModalProps {
   phone?: string;
 }
 
+const parseInlineStyles = (text: string) => {
+  const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <Text key={index} className="font-bold">
+          {part.slice(2, -2)}
+        </Text>
+      );
+    }
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return (
+        <Text key={index} className="italic">
+          {part.slice(1, -1)}
+        </Text>
+      );
+    }
+    return part;
+  });
+};
+
+const parseMarkdown = (text: string, isDark: boolean) => {
+  const lines = text.split('\n');
+  return lines.map((line, lineIndex) => {
+    if (line.trim() === '') {
+      return <View key={lineIndex} style={{ height: 6 }} />;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const content = headingMatch[2];
+      const fontSize = level === 1 ? 20 : level === 2 ? 17 : 15;
+      return (
+        <Text
+          key={lineIndex}
+          style={{ fontSize, fontWeight: 'bold', marginVertical: 4 }}
+          className={isDark ? 'text-dark-on-surface' : 'text-on-surface'}
+        >
+          {parseInlineStyles(content)}
+        </Text>
+      );
+    }
+
+    const listMatch = line.match(/^(\s*)([*\-•])\s+(.*)$/);
+    if (listMatch) {
+      const indent = listMatch[1].length * 10;
+      const content = listMatch[3];
+      return (
+        <View key={lineIndex} className="flex-row items-start mb-1" style={{ marginLeft: indent + 6 }}>
+          <Text className={`mr-2 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>•</Text>
+          <Text className={`flex-1 font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed`}>
+            {parseInlineStyles(content)}
+          </Text>
+        </View>
+      );
+    }
+
+    const numListMatch = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
+    if (numListMatch) {
+      const indent = numListMatch[1].length * 10;
+      const index = numListMatch[2];
+      const content = numListMatch[3];
+      return (
+        <View key={lineIndex} className="flex-row items-start mb-1" style={{ marginLeft: indent + 6 }}>
+          <Text className={`mr-2 font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{index}.</Text>
+          <Text className={`flex-1 font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed`}>
+            {parseInlineStyles(content)}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <Text
+        key={lineIndex}
+        className={`font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed mb-1`}
+      >
+        {parseInlineStyles(line)}
+      </Text>
+    );
+  });
+};
+
 export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, phone = 'Anonymous' }) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
@@ -171,11 +255,15 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
                       ? 'bg-primary rounded-tr-none'
                       : `${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} rounded-tl-none`
                   }`}>
-                    <Text className={`font-body text-sm ${
-                      isUser ? 'text-white' : isDark ? 'text-dark-on-surface' : 'text-on-surface'
-                    } leading-relaxed`}>
-                      {msg.content}
-                    </Text>
+                    {isUser ? (
+                      <Text className="font-body text-sm text-white leading-relaxed">
+                        {msg.content}
+                      </Text>
+                    ) : (
+                      <View className="space-y-1">
+                        {parseMarkdown(msg.content, isDark)}
+                      </View>
+                    )}
                   </View>
                   {isUser && (
                     <View className="w-8 h-8 rounded-full bg-primary/20 items-center justify-center ml-3 self-end">
