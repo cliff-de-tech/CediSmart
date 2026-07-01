@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, Modal, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
-import { X, Send, Bot, User, Sparkles, Github, AlertCircle, CheckCircle, Trash2 } from 'lucide-react-native';
+import { X, Send, Bot, User, Sparkles, Github, AlertCircle, CheckCircle, Trash2, Plus } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
@@ -162,15 +162,28 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
     saveHistory();
   }, [messages, isHistoryLoaded]);
 
-  const handleClearChat = async () => {
-    try {
-      await AsyncStorage.removeItem(storageKey);
-      setMessages([defaultGreeting]);
-      setShowEscalate(false);
-      setEscalatedTicket(null);
-    } catch (err) {
-      console.warn('[AI Support] Error clearing chat history:', err);
-    }
+  const handleClearChat = () => {
+    Alert.alert(
+      'New Chat',
+      'Are you sure you want to start a new chat? This will clear your current conversation history.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'New Chat',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await AsyncStorage.removeItem(storageKey);
+              setMessages([defaultGreeting]);
+              setShowEscalate(false);
+              setEscalatedTicket(null);
+            } catch (err) {
+              console.warn('[AI Support] Error clearing chat history:', err);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const scrollViewRef = useRef<ScrollView>(null);
@@ -297,9 +310,9 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
                 <TouchableOpacity 
                   onPress={handleClearChat} 
                   className="w-9 h-9 rounded-full bg-white/10 items-center justify-center active:bg-white/20"
-                  accessibilityLabel="Clear Chat"
+                  accessibilityLabel="New Chat"
                 >
-                  <Trash2 size={16} color="white" />
+                  <Plus size={20} color="white" />
                 </TouchableOpacity>
               )}
               <TouchableOpacity 
