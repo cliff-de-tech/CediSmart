@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import { X, Send, Bot, User, Sparkles, Github, AlertCircle, CheckCircle } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
 
@@ -208,52 +210,60 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={true}
+      transparent={false}
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-black/60 justify-end">
+      <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          className={`h-[80%] w-full ${isDark ? 'bg-dark-background' : 'bg-surface'} rounded-t-3xl overflow-hidden`}
+          className="flex-1"
         >
-          {/* Header */}
-          <View className={`px-6 py-4 flex-row items-center justify-between border-b ${isDark ? 'border-dark-outline-variant/35' : 'border-outline-variant/20'}`}>
-            <View className="flex-row items-center space-x-2">
-              <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
-                <Sparkles size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
+          {/* Premium Gradient Header */}
+          <LinearGradient
+            colors={isDark ? ['#143d1a', '#081c0e'] : ['#2e7d32', '#0d631b']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            className="px-6 py-5 flex-row items-center justify-between shadow-md"
+          >
+            <View className="flex-row items-center space-x-3">
+              <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/10">
+                <Sparkles size={20} color="#ffb703" />
               </View>
               <View>
-                <Text className={`font-headline font-bold text-lg ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>CediSmart AI Support</Text>
-                <Text className={`font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>Ghana's Smart Finance Assistant</Text>
+                <Text className="font-headline font-bold text-lg text-white">CediSmart AI Support</Text>
+                <Text className="font-body text-[10px] text-emerald-200/80">Ghana's Premium Finance Assistant</Text>
               </View>
             </View>
-            <TouchableOpacity onPress={onClose} className="p-1 rounded-full active:bg-gray-500/10">
-              <X size={24} color={isDark ? '#e1e3e0' : '#1c1b1f'} />
+            <TouchableOpacity 
+              onPress={onClose} 
+              className="w-9 h-9 rounded-full bg-white/10 items-center justify-center active:bg-white/20"
+            >
+              <X size={20} color="white" />
             </TouchableOpacity>
-          </View>
+          </LinearGradient>
 
           {/* Chat Messages */}
           <ScrollView
             ref={scrollViewRef}
             className="flex-1 p-6"
-            contentContainerStyle={{ paddingBottom: 24 }}
+            contentContainerStyle={{ paddingBottom: 32 }}
           >
             {messages.map((msg, index) => {
               const isUser = msg.role === 'user';
               return (
                 <View
                   key={index}
-                  className={`flex-row mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}
+                  className={`flex-row mb-5 ${isUser ? 'justify-end' : 'justify-start'}`}
                 >
                   {!isUser && (
-                    <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-3 self-end">
+                    <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2 self-end">
                       <Bot size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
                     </View>
                   )}
-                  <View className={`max-w-[75%] rounded-2xl px-4 py-3 ${
+                  <View className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
                     isUser
                       ? 'bg-primary rounded-tr-none'
-                      : `${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} rounded-tl-none`
+                      : `${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-surface-container-low border border-outline-variant/5'} rounded-tl-none`
                   }`}>
                     {isUser ? (
                       <Text className="font-body text-sm text-white leading-relaxed">
@@ -266,7 +276,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
                     )}
                   </View>
                   {isUser && (
-                    <View className="w-8 h-8 rounded-full bg-primary/20 items-center justify-center ml-3 self-end">
+                    <View className="w-8 h-8 rounded-full bg-primary/20 items-center justify-center ml-2 self-end">
                       <User size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
                     </View>
                   )}
@@ -276,11 +286,11 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
 
             {/* AI thinking state */}
             {chatMutation.isPending && (
-              <View className="flex-row mb-4 justify-start items-center">
-                <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-3">
+              <View className="flex-row mb-5 justify-start items-center">
+                <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2">
                   <Bot size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
                 </View>
-                <View className={`rounded-2xl px-4 py-3 ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} rounded-tl-none flex-row items-center space-x-2`}>
+                <View className={`rounded-2xl px-4 py-3 ${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-surface-container-low border border-outline-variant/5'} rounded-tl-none flex-row items-center space-x-2`}>
                   <ActivityIndicator size="small" color={isDark ? '#2e7d32' : '#0d631b'} />
                   <Text className={`font-body text-xs ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>Assistant thinking...</Text>
                 </View>
@@ -313,12 +323,12 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
             )}
           </ScrollView>
 
-          {/* Chat Input Bar */}
-          <View className={`p-4 border-t ${isDark ? 'border-dark-outline-variant/35' : 'border-outline-variant/20'} flex-row items-center space-x-3`}>
+          {/* Styled Chat Input Bar */}
+          <View className={`px-4 py-3 border-t ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-white border-outline-variant/10'} flex-row items-center space-x-3`}>
             <TextInput
               className={`flex-1 h-12 px-4 rounded-xl font-body text-sm ${
                 isDark ? 'bg-dark-surface-container-low text-dark-on-surface' : 'bg-surface-container-low text-on-surface'
-              }`}
+              } border ${isDark ? 'border-dark-outline-variant/10' : 'border-outline-variant/5'}`}
               placeholder="Ask CediSmart AI..."
               placeholderTextColor={isDark ? '#434942' : '#9CA3AF'}
               value={input}
@@ -332,13 +342,13 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
               disabled={!input.trim() || chatMutation.isPending}
               className={`w-12 h-12 rounded-xl items-center justify-center ${
                 !input.trim() || chatMutation.isPending ? 'bg-gray-500/10' : 'bg-primary'
-              }`}
+              } shadow-sm`}
             >
               <Send size={18} color={!input.trim() || chatMutation.isPending ? '#9CA3AF' : 'white'} />
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 };
