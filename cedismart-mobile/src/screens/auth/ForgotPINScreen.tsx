@@ -322,6 +322,23 @@ const ForgotPINScreen = ({ navigation }: any) => {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        {/* Support Action */}
+        <View className="absolute bottom-10 right-8">
+          <TouchableOpacity 
+            onPress={() => setSupportVisible(true)}
+            className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}
+          >
+            <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
+            <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
+          </TouchableOpacity>
+        </View>
+
+        <SupportModal
+          visible={supportVisible}
+          onClose={() => setSupportVisible(false)}
+          phone={phone ? `+233${phone}` : undefined}
+          supportType="auth"
+        />
       </SafeAreaView>
     );
   }
@@ -414,6 +431,23 @@ const ForgotPINScreen = ({ navigation }: any) => {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        {/* Support Action */}
+        <View className="absolute bottom-10 right-8">
+          <TouchableOpacity 
+            onPress={() => setSupportVisible(true)}
+            className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}
+          >
+            <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
+            <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
+          </TouchableOpacity>
+        </View>
+
+        <SupportModal
+          visible={supportVisible}
+          onClose={() => setSupportVisible(false)}
+          phone={phone ? `+233${phone}` : undefined}
+          supportType="auth"
+        />
       </SafeAreaView>
     );
   }
@@ -481,23 +515,6 @@ const ForgotPINScreen = ({ navigation }: any) => {
           />
         </View>
       </View>
-      {/* Support Action */}
-      <View className="absolute bottom-10 right-8">
-        <TouchableOpacity 
-          onPress={() => setSupportVisible(true)}
-          className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}
-        >
-          <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
-          <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
-        </TouchableOpacity>
-      </View>
-
-      <SupportModal
-        visible={supportVisible}
-        onClose={() => setSupportVisible(false)}
-        phone={phone ? `+233${phone}` : undefined}
-        supportType="auth"
-      />
     </SafeAreaView>
   );
 };
