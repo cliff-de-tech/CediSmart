@@ -1,9 +1,11 @@
 import logging
 from typing import Any
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import AppException
 from app.modules.support.schemas import ChatMessage
+from app.modules.support.models import SupportTicket
 
 logger = logging.getLogger(__name__)
 
@@ -98,15 +100,65 @@ class SupportService:
             )
 
     @staticmethod
-    async def escalate_to_github(phone: str, user_query: str, chat_history: list[ChatMessage]) -> dict[str, Any]:
-        """Create a GitHub issue containing the support details and chat transcript."""
-        if not settings.GITHUB_ACCESS_TOKEN:
-            logger.warning("GITHUB_ACCESS_TOKEN is empty. Simulating successful GitHub escalation.")
-            return {
-                "number": 404,
-                "html_url": "https://github.com/cliff-de-tech/CediSmart/issues/mock"
-            }
+    async def escalate_ticket(
+        db: AsyncSession,
+        phone: str,
+        user_query: str,
+        chat_history: list[ChatMessage],
+        device_diagnostics: dict | None = None
+    ) -> dict[str, Any]:
+        """Save ticket to local database, escalate to GitHub, and notify via Discord if configured."""
+        # 1. Create and commit the SupportTicket in the Postgres database
+        ticket = SupportTicket(
+            phone=phone,
+            user_query=user_query,
+            chat_history=[msg.model_dump() for msg in chat_history],
+            device_diagnostics=device_diagnostics,
+            is_resolved=False
+        )
+        db.add(ticket)
+        await db.commit()
+        await db.refresh(ticket)
+        ticket_id = str(ticket.id)
 
+        # 2. Escalate to GitHub if token exists
+        issue_number = 0
+        issue_url = "database_only"
+        
+        if settings.GITHUB_ACCESS_TOKEN:
+            issue_number, issue_url = await SupportService._create_github_issue(
+                phone=phone,
+                user_query=user_query,
+                chat_history=chat_history,
+                device_diagnostics=device_diagnostics,
+                ticket_id=ticket_id
+            )
+
+        # 3. Send private alert to Discord webhook if configured
+        if settings.DISCORD_WEBHOOK_URL:
+            await SupportService._send_discord_alert(
+                phone=phone,
+                user_query=user_query,
+                ticket_id=ticket_id,
+                issue_url=issue_url,
+                device_diagnostics=device_diagnostics
+            )
+
+        return {
+            "ticket_id": ticket_id,
+            "issue_number": issue_number,
+            "issue_url": issue_url
+        }
+
+    @staticmethod
+    async def _create_github_issue(
+        phone: str,
+        user_query: str,
+        chat_history: list[ChatMessage],
+        device_diagnostics: dict | None,
+        ticket_id: str
+    ) -> tuple[int, str]:
+        """Call GitHub API to open a developer issue ticket."""
         url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues"
         headers = {
             "Authorization": f"token {settings.GITHUB_ACCESS_TOKEN}",
@@ -121,10 +173,18 @@ class SupportService:
             transcript_lines.append(f"**{role_label}**: {msg.content}")
         transcript_str = "\n\n".join(transcript_lines)
 
+        # Format diagnostics
+        diagnostics_str = "None provided"
+        if device_diagnostics:
+            diagnostics_str = "\n".join([f"- **{k}**: `{v}`" for k, v in device_diagnostics.items()])
+
         body_content = (
             f"## 📱 CediSmart Support Escalation\n\n"
+            f"**Ticket Database ID:** `{ticket_id}`\n"
             f"**Phone Number:** `{phone}`\n"
             f"**Primary Query:** {user_query}\n\n"
+            f"### ⚙️ Diagnostics\n"
+            f"{diagnostics_str}\n\n"
             f"### 💬 Chat History\n"
             f"{transcript_str}\n\n"
             f"---  \n"
@@ -142,21 +202,56 @@ class SupportService:
                 response = await client.post(url, headers=headers, json=payload)
                 if response.status_code == 201:
                     resp_json = response.json()
-                    return {
-                        "number": resp_json["number"],
-                        "html_url": resp_json["html_url"]
-                    }
+                    return resp_json["number"], resp_json["html_url"]
                 else:
                     logger.error("GitHub API issue creation failed (status %d): %s", response.status_code, response.text)
-                    raise AppException(
-                        status_code=502,
-                        error_code="GITHUB_API_ERROR",
-                        message="Failed to submit support ticket to GitHub. Please try again."
-                    )
+                    return 0, "github_error"
         except httpx.RequestError as exc:
             logger.error("Failed to connect to GitHub API: %s", str(exc))
-            raise AppException(
-                status_code=503,
-                error_code="GITHUB_UNREACHABLE",
-                message="Bug tracker service is currently unreachable. Please try again."
-            )
+            return 0, "github_unreachable"
+
+    @staticmethod
+    async def _send_discord_alert(
+        phone: str,
+        user_query: str,
+        ticket_id: str,
+        issue_url: str,
+        device_diagnostics: dict | None
+    ) -> None:
+        """Trigger Discord Webhook message to notify the team instantly of a ticket creation."""
+        # Format diagnostics block
+        diag_lines = []
+        if device_diagnostics:
+            for k, v in device_diagnostics.items():
+                diag_lines.append(f"{k}: {v}")
+        diag_str = "\n".join(diag_lines) if diag_lines else "No diagnostics provided."
+
+        embed = {
+            "title": "🚨 CediSmart Support Ticket Created",
+            "description": f"A user has escalated a support issue to the developers.",
+            "color": 14034714,  # Red color decimal
+            "fields": [
+                {"name": "📞 User Phone", "value": f"`{phone}`", "inline": True},
+                {"name": "🆔 Ticket ID", "value": f"`{ticket_id}`", "inline": True},
+                {"name": "💬 User Query", "value": user_query, "inline": False},
+                {"name": "⚙️ Diagnostics", "value": f"```\n{diag_str}\n```", "inline": False}
+            ]
+        }
+
+        if issue_url and issue_url != "database_only" and "mock" not in issue_url:
+            embed["fields"].append({"name": "🌐 GitHub Issue Link", "value": f"[Open GitHub Issue]({issue_url})", "inline": False})
+
+        payload = {
+            "username": "CediSmart Support Bot",
+            "embeds": [embed]
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(settings.DISCORD_WEBHOOK_URL, json=payload)
+                if res.status_code < 300:
+                    logger.info("Discord support webhook successfully notified.")
+                else:
+                    logger.error("Discord support webhook failed with status %d: %s", res.status_code, res.text)
+        except Exception as e:
+            logger.error("Error invoking Discord webhook: %s", str(e))

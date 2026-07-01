@@ -23,11 +23,12 @@ async def test_support_chat_mock(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_support_escalate_mock(client: AsyncClient) -> None:
-    # Mock SupportService.escalate_to_github to avoid actual GitHub API calls
-    with patch("app.modules.support.router.SupportService.escalate_to_github", new_callable=AsyncMock) as mock_escalate:
+    # Mock SupportService.escalate_ticket to avoid actual db / GitHub / Discord calls in tests
+    with patch("app.modules.support.router.SupportService.escalate_ticket", new_callable=AsyncMock) as mock_escalate:
         mock_escalate.return_value = {
-            "number": 123,
-            "html_url": "https://github.com/cliff-de-tech/CediSmart/issues/123"
+            "ticket_id": "test-ticket-uuid-123",
+            "issue_number": 123,
+            "issue_url": "https://github.com/cliff-de-tech/CediSmart/issues/123"
         }
 
         resp = await client.post(
@@ -38,11 +39,17 @@ async def test_support_escalate_mock(client: AsyncClient) -> None:
                 "chat_history": [
                     {"role": "user", "content": "The app keeps crashing"},
                     {"role": "model", "content": "I am sorry to hear that. I've noted down the crash."}
-                ]
+                ],
+                "device_diagnostics": {
+                    "os": "ios",
+                    "os_version": "17.2",
+                    "app_version": "1.0.0"
+                }
             }
         )
         assert resp.status_code == 201
         body = resp.json()
+        assert body["ticket_id"] == "test-ticket-uuid-123"
         assert body["issue_number"] == 123
         assert body["issue_url"] == "https://github.com/cliff-de-tech/CediSmart/issues/123"
         assert "successfully created" in body["message"]

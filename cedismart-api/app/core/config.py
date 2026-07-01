@@ -51,9 +51,10 @@ class Settings(BaseSettings):
     CLERK_SECRET_KEY: str = ""
     CLERK_PUBLISHABLE_KEY: str = ""
 
-    # --- GitHub Bug Reporting ---
+    # --- GitHub Bug Reporting & Discord Alert Webhooks ---
     GITHUB_ACCESS_TOKEN: str = ""
     GITHUB_REPO: str = "cliff-de-tech/CediSmart"
+    DISCORD_WEBHOOK_URL: str | None = None
 
     @field_validator("DATABASE_URL")
     @classmethod

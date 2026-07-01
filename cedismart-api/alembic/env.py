@@ -20,6 +20,7 @@ from app.modules.auth.models import User  # noqa: F401
 from app.modules.budgets.models import Budget  # noqa: F401
 from app.modules.categories.models import Category  # noqa: F401
 from app.modules.transactions.models import Transaction  # noqa: F401
+from app.modules.support.models import SupportTicket  # noqa: F401
 
 config = context.config
 

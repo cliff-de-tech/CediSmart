@@ -1,8 +1,13 @@
-from fastapi import APIRouter, Depends, status
+from typing import Annotated
+from fastapi import APIRouter, Depends, status, Request
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
 from app.modules.support.schemas import ChatRequest, ChatResponse, EscalateRequest, EscalateResponse
 from app.modules.support.service import SupportService
+from app.modules.auth.router import limiter
 
 router = APIRouter()
+DBSession = Annotated[AsyncSession, Depends(get_db)]
 
 @router.post(
     "/chat",
@@ -10,7 +15,8 @@ router = APIRouter()
     status_code=status.HTTP_200_OK,
     summary="Get response from CediSmart AI Support Assistant",
 )
-async def chat_with_support(body: ChatRequest) -> ChatResponse:
+@limiter.limit("30/15minutes")
+async def chat_with_support(request: Request, body: ChatRequest) -> ChatResponse:
     """Generate a response using Gemini based on the conversation history."""
     response_text = await SupportService.generate_chat_response(body.messages)
     return ChatResponse(response=response_text)
@@ -19,17 +25,21 @@ async def chat_with_support(body: ChatRequest) -> ChatResponse:
     "/escalate",
     response_model=EscalateResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Escalate issue to developer by opening a GitHub issue",
+    summary="Escalate issue to developer by opening a support ticket",
 )
-async def escalate_support_issue(body: EscalateRequest) -> EscalateResponse:
-    """Escalate a complicated support issue directly to the developer's GitHub repo."""
-    res = await SupportService.escalate_to_github(
+@limiter.limit("10/15minutes")
+async def escalate_support_issue(request: Request, body: EscalateRequest, db: DBSession) -> EscalateResponse:
+    """Save ticket locally, escalate to GitHub, and alert Discord webhook."""
+    res = await SupportService.escalate_ticket(
+        db=db,
         phone=body.phone,
         user_query=body.user_query,
-        chat_history=body.chat_history
+        chat_history=body.chat_history,
+        device_diagnostics=body.device_diagnostics
     )
     return EscalateResponse(
-        issue_number=res["number"],
-        issue_url=res["html_url"],
-        message="Support ticket successfully created and assigned."
+        ticket_id=res["ticket_id"],
+        issue_number=res["issue_number"],
+        issue_url=res["issue_url"],
+        message="Support ticket successfully created and logged."
     )

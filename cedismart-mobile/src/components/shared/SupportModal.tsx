@@ -202,7 +202,15 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
   // Chat Mutation
   const chatMutation = useMutation({
     mutationFn: async (chatHistory: Message[]) => {
-      const response = await apiClient.post('/support/chat', { messages: chatHistory });
+      const diagnostics = {
+        os: Platform.OS,
+        os_version: String(Platform.Version),
+        app_version: '1.0.0',
+      };
+      const response = await apiClient.post('/support/chat', {
+        messages: chatHistory,
+        device_diagnostics: diagnostics
+      });
       return response.data.response;
     },
     onSuccess: (data: string) => {
@@ -235,28 +243,39 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
   // Escalation Mutation
   const escalateMutation = useMutation({
     mutationFn: async () => {
-      // Use the last user message as the primary query
       const userQueries = messages.filter((m) => m.role === 'user');
       const primaryQuery = userQueries.length > 0 ? userQueries[userQueries.length - 1].content : 'General inquiry';
+
+      const diagnostics = {
+        os: Platform.OS,
+        os_version: String(Platform.Version),
+        app_version: '1.0.0',
+      };
 
       const response = await apiClient.post('/support/escalate', {
         phone: phone,
         user_query: primaryQuery,
-        chat_history: messages
+        chat_history: messages,
+        device_diagnostics: diagnostics
       });
       return response.data;
     },
     onSuccess: (data) => {
       setEscalatedTicket({
-        number: data.issue_number,
-        url: data.issue_url
+          number: data.issue_number,
+          url: data.issue_url
       });
       setShowEscalate(false);
+
+      const successMsg = data.issue_number > 0
+        ? `I've opened a support ticket (#${data.issue_number}) on GitHub directly for our developer and logged it in our secure database. They've been notified!`
+        : `I've logged a support ticket (ID: ${data.ticket_id.substring(0, 8)}...) directly in our secure database. Our developer has been notified!`;
+
       setMessages((prev) => [
         ...prev,
         {
           role: 'model',
-          content: `I've opened a support ticket (#${data.issue_number}) on GitHub directly for our developer. They've been notified and will look into this immediately!`
+          content: successMsg
         }
       ]);
     },
