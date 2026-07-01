@@ -8,6 +8,7 @@ import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
+import { SupportModal } from '../../components/shared/SupportModal';
 
 const OTPVerifyScreen = ({ route, navigation }: any) => {
   const { phone, flow = 'register', pin } = route.params;
@@ -17,6 +18,7 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
   const [verifyError, setVerifyError] = useState('');
 
   const [step, setStep] = useState<'otp' | 'details'>('otp');
+  const [supportVisible, setSupportVisible] = useState(false);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(300);
   const [title, setTitle] = useState<'Mr.' | 'Mrs.' | 'Ms.' | 'None'>('Mr.');
@@ -338,11 +340,20 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
 
       {/* Support Action */}
       <View className="absolute bottom-10 right-8">
-        <TouchableOpacity className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
+        <TouchableOpacity 
+          onPress={() => setSupportVisible(true)}
+          className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}
+        >
           <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
           <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
         </TouchableOpacity>
       </View>
+
+      <SupportModal
+        visible={supportVisible}
+        onClose={() => setSupportVisible(false)}
+        phone={phone}
+      />
     </SafeAreaView>
   );
 };

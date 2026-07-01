@@ -153,6 +153,10 @@ def _include_routers(app: FastAPI) -> None:
 
     app.include_router(reports_router, prefix="/api/v1/reports", tags=["Reports"])
 
+    from app.modules.support.router import router as support_router
+
+    app.include_router(support_router, prefix="/api/v1/support", tags=["Support"])
+
 
 # ---------------------------------------------------------------------------
 # Module-level app instance (used by uvicorn)
