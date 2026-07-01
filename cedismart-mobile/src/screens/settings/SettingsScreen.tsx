@@ -8,7 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug, HelpCircle } from 'lucide-react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -18,6 +18,7 @@ import PINPad from '../../components/shared/PINPad';
 import { formatGHS } from '../../utils/currency';
 import apiClient, { setActiveTokens, clearActiveSession } from '../../api/client';
 import { requestNotificationPermissions, triggerLocalNotification } from '../../utils/notifications';
+import { SupportModal } from '../../components/shared/SupportModal';
 import { CoinBackground } from '../../components/shared/CoinBackground';
 let setAppIcon: any = null;
 try {
@@ -102,6 +103,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [bugDescription, setBugDescription] = useState('');
   const [isSubmittingBug, setIsSubmittingBug] = useState(false);
   const [isBugModalVisible, setIsBugModalVisible] = useState(false);
+  const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
 
 
   const queryClient = useQueryClient();
@@ -1367,6 +1369,12 @@ const SettingsScreen = ({ navigation, route }: any) => {
               value="Submit issues to developers" 
               onPress={() => setIsBugModalVisible(true)}
             />
+            <SettingItem 
+              icon={HelpCircle} 
+              title="AI Support Assistant" 
+              value="Chat with CediSmart AI helper" 
+              onPress={() => setIsSupportModalVisible(true)}
+            />
           </View>
 
           {/* Danger Zone */}
@@ -2115,6 +2123,11 @@ const SettingsScreen = ({ navigation, route }: any) => {
         </BottomSheetScrollView>
       </BottomSheet>
 
+      <SupportModal
+        visible={isSupportModalVisible}
+        onClose={() => setIsSupportModalVisible(false)}
+        phone={user?.phone}
+      />
     </SafeAreaView>
   );
 
