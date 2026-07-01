@@ -429,6 +429,19 @@ const LoginScreen = ({ navigation }: any) => {
                       />
                     ))}
                   </View>
+
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setPin('');
+                      setError('');
+                      navigation.navigate('ForgotPIN');
+                    }}
+                    className="mt-2"
+                  >
+                    <Text className="font-body text-xs font-bold text-primary underline">
+                      Forgot PIN?
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
