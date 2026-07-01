@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
-import { X, Send, Bot, User, Sparkles, Github, AlertCircle, CheckCircle } from 'lucide-react-native';
+import { X, Send, Bot, User, Sparkles, Github, AlertCircle, CheckCircle, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Message {
   role: 'user' | 'model';
@@ -108,14 +109,69 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
   const insets = useSafeAreaInsets();
 
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'model',
-      content: "Hi! I'm your CediSmart AI Support Assistant. How can I help you today? (e.g., issues with OTP, registering, or PIN setup)."
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const [showEscalate, setShowEscalate] = useState(false);
   const [escalatedTicket, setEscalatedTicket] = useState<{ number: number; url: string } | null>(null);
+
+  const storageKey = `cedismart_chat_history_${phone.replace(/[^\d+]/g, '') || 'anonymous'}`;
+
+  const defaultGreeting: Message = {
+    role: 'model',
+    content: "Hi! I'm your CediSmart AI Support Assistant. How can I help you today? (e.g., issues with OTP, registering, or PIN setup)."
+  };
+
+  // Load chat history when modal becomes visible or phone changes
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(storageKey);
+        if (stored) {
+          const parsed = JSON.parse(stored) as Message[];
+          if (parsed && parsed.length > 0) {
+            setMessages(parsed);
+            setIsHistoryLoaded(true);
+            return;
+          }
+        }
+        setMessages([defaultGreeting]);
+        setIsHistoryLoaded(true);
+      } catch (err) {
+        console.warn('[AI Support] Error loading chat history:', err);
+        setMessages([defaultGreeting]);
+        setIsHistoryLoaded(true);
+      }
+    };
+
+    if (visible) {
+      setIsHistoryLoaded(false);
+      loadHistory();
+    }
+  }, [visible, phone]);
+
+  // Save chat history when messages state changes
+  useEffect(() => {
+    const saveHistory = async () => {
+      if (!isHistoryLoaded || messages.length === 0) return;
+      try {
+        await AsyncStorage.setItem(storageKey, JSON.stringify(messages));
+      } catch (err) {
+        console.warn('[AI Support] Error saving chat history:', err);
+      }
+    };
+    saveHistory();
+  }, [messages, isHistoryLoaded]);
+
+  const handleClearChat = async () => {
+    try {
+      await AsyncStorage.removeItem(storageKey);
+      setMessages([defaultGreeting]);
+      setShowEscalate(false);
+      setEscalatedTicket(null);
+    } catch (err) {
+      console.warn('[AI Support] Error clearing chat history:', err);
+    }
+  };
 
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -236,12 +292,23 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
                 <Text className="font-body text-[10px] text-emerald-200/80">Ghana's Premium Finance Assistant</Text>
               </View>
             </View>
-            <TouchableOpacity 
-              onPress={onClose} 
-              className="w-9 h-9 rounded-full bg-white/10 items-center justify-center active:bg-white/20"
-            >
-              <X size={20} color="white" />
-            </TouchableOpacity>
+            <View className="flex-row items-center space-x-2">
+              {messages.length > 1 && (
+                <TouchableOpacity 
+                  onPress={handleClearChat} 
+                  className="w-9 h-9 rounded-full bg-white/10 items-center justify-center active:bg-white/20"
+                  accessibilityLabel="Clear Chat"
+                >
+                  <Trash2 size={16} color="white" />
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity 
+                onPress={onClose} 
+                className="w-9 h-9 rounded-full bg-white/10 items-center justify-center active:bg-white/20"
+              >
+                <X size={20} color="white" />
+              </TouchableOpacity>
+            </View>
           </LinearGradient>
 
           {/* Chat Messages */}
