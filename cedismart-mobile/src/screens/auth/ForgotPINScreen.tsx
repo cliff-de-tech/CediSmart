@@ -2,13 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Animated, Alert } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { useSignIn, useAuth } from '@clerk/clerk-expo';
-import { Shield, ArrowRight, Lock, Clock, ArrowLeft, KeyRound, HelpCircle } from 'lucide-react-native';
+import { Shield, ArrowRight, Lock, Clock, ArrowLeft, KeyRound } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PINPad from '../../components/shared/PINPad';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
-import { SupportModal } from '../../components/shared/SupportModal';
 
 // Helper to normalize phone
 const normalizePhoneNumber = (phone: string): string => {
@@ -27,7 +26,6 @@ const ForgotPINScreen = ({ navigation }: any) => {
   const { userId, signOut } = useAuth();
 
   const [step, setStep] = useState<'phone' | 'otp' | 'pin'>('phone');
-  const [supportVisible, setSupportVisible] = useState(false);
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(300);
@@ -70,6 +68,12 @@ const ForgotPINScreen = ({ navigation }: any) => {
       if (!isLoaded || !signIn) {
         throw new Error('SignIn service not loaded yet. Please try again.');
       }
+
+      if (userId) {
+        console.log('[ForgotPIN Clerk] Active session detected. Signing out first...');
+        await signOut();
+      }
+
       const formattedPhone = normalizePhoneNumber(phone);
       console.log('[ForgotPIN Clerk] Starting signIn/reset for:', formattedPhone);
 
@@ -475,22 +479,6 @@ const ForgotPINScreen = ({ navigation }: any) => {
           />
         </View>
       </View>
-      {/* Support Action */}
-      <View className="absolute bottom-10 right-8">
-        <TouchableOpacity 
-          onPress={() => setSupportVisible(true)}
-          className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}
-        >
-          <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
-          <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
-        </TouchableOpacity>
-      </View>
-
-      <SupportModal
-        visible={supportVisible}
-        onClose={() => setSupportVisible(false)}
-        phone={phone ? `+233${phone}` : undefined}
-      />
     </SafeAreaView>
   );
 };
