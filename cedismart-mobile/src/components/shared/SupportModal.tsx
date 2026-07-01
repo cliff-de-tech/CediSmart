@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, Modal, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import { X, Send, Bot, User, Sparkles, Github, AlertCircle, CheckCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -105,6 +105,7 @@ const parseMarkdown = (text: string, isDark: boolean) => {
 export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, phone = 'Anonymous' }) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
+  const insets = useSafeAreaInsets();
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
@@ -213,7 +214,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
       transparent={false}
       onRequestClose={onClose}
     >
-      <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
+      <View className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           className="flex-1"
@@ -223,7 +224,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
             colors={isDark ? ['#143d1a', '#081c0e'] : ['#2e7d32', '#0d631b']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            className="px-6 py-5 flex-row items-center justify-between shadow-md"
+            style={{ paddingTop: Math.max(insets.top, 16) }}
+            className="px-6 pb-5 flex-row items-center justify-between shadow-md"
           >
             <View className="flex-row items-center space-x-3">
               <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/10">
@@ -324,7 +326,10 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
           </ScrollView>
 
           {/* Styled Chat Input Bar */}
-          <View className={`px-4 py-3 border-t ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-white border-outline-variant/10'} flex-row items-center space-x-3`}>
+          <View 
+            style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+            className={`px-4 pt-3 border-t ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-white border-outline-variant/10'} flex-row items-center space-x-3`}
+          >
             <TextInput
               className={`flex-1 h-12 px-4 rounded-xl font-body text-sm ${
                 isDark ? 'bg-dark-surface-container-low text-dark-on-surface' : 'bg-surface-container-low text-on-surface'
@@ -348,7 +353,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };
