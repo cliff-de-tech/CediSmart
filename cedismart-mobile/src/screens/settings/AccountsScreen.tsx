@@ -98,6 +98,13 @@ const renderProviderLogo = (providerName: string | null, isDark: boolean) => {
   );
 };
 
+const maskPhone = (phone?: string) => {
+  if (!phone) return 'your phone number';
+  const val = phone.trim();
+  if (val.length <= 8) return val;
+  return `${val.slice(0, 6)}****${val.slice(-3)}`;
+};
+
 const AccountsScreen = ({ navigation }: any) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
@@ -1286,7 +1293,7 @@ const AccountsScreen = ({ navigation }: any) => {
                         Change the Request Body to <Text className="font-bold">JSON</Text> and add these fields:
                         {"\n"}• <Text className="font-mono font-bold">sender</Text> ➔ Select <Text className="font-bold">Sender</Text> (from message variable)
                         {"\n"}• <Text className="font-mono font-bold">message_body</Text> ➔ Select <Text className="font-bold">Message</Text> or <Text className="font-bold">Shortcut Input</Text>
-                        {"\n"}• <Text className="font-mono font-bold">phone</Text> ➔ Type your registered number: <Text className="font-mono font-bold">{user?.phone || 'your phone number'}</Text>
+                        {"\n"}• <Text className="font-mono font-bold">phone</Text> ➔ Type your registered number: <Text className="font-mono font-bold">{maskPhone(user?.phone)}</Text>
                       </Text>
                     </View>
                   </View>
