@@ -331,43 +331,11 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
   const handleSend = () => {
     if (!input.trim() || chatMutation.isPending) return;
 
-    const text = input.trim();
-    const userMessage: Message = { role: 'user', content: text };
+    const userMessage: Message = { role: 'user', content: input.trim() };
     const updatedMessages = [...messages, userMessage];
 
     setMessages(updatedMessages);
     setInput('');
-
-    const lowerText = text.toLowerCase();
-    if (
-      lowerText.includes('sync') ||
-      lowerText.includes('shortcut') ||
-      lowerText.includes('sms') ||
-      lowerText.includes('automation')
-    ) {
-      // Simulate typing delay for premium feel
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      setTimeout(() => {
-        const localGuide = 
-          "Here is how you can set up Mobile Money Live Sync on CediSmart:\n\n"
-          "🤖 **For Google Android**:\n"
-          "Android supports direct background intercepting. Go to **Settings ➔ Accounts**, tap **Configure Auto-Sync**, select **Android**, and tap **Grant SMS Permissions** to allow CediSmart to read and automatically log incoming MoMo alerts.\n\n"
-          "🍎 **For Apple iOS (Apple Shortcuts)**:\n"
-          "iOS sandboxing blocks apps from reading SMS alerts directly. You can easily configure Apple's native **Shortcuts** app to securely forward MoMo alerts in the background:\n"
-          "1. Open the Apple **Shortcuts** app, go to the **Automation** tab, and tap **+** (New Automation).\n"
-          "2. Select **Message** as the trigger, set the Sender to your MoMo sender (e.g. `MobileMoney` or `TelecelCash`), and select **Run Immediately** (so it syncs silently in the background).\n"
-          "3. Add a **Get Contents of URL** action, change the method to **POST**, and paste your CediSmart Webhook URL (copy it from Settings ➔ Accounts ➔ Configure Auto-Sync).\n"
-          "4. Add an `Authorization` header with the value `Bearer <your key>` (copied from the Accounts tab).\n"
-          "5. Set the Request Body to **JSON** and add these three fields:\n"
-          "   • `sender` ➔ Select the **Sender** variable.\n"
-          "   • `message_body` ➔ Select the **Message** content/Shortcut Input variable.\n"
-          "   • `phone` ➔ Type your registered CediSmart phone number.";
-          
-        setMessages((prev) => [...prev, { role: 'model', content: localGuide }]);
-      }, 600);
-      return;
-    }
-
     chatMutation.mutate(updatedMessages);
   };
 
