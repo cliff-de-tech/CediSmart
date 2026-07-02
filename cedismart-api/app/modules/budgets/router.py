@@ -113,7 +113,7 @@ async def upsert_budget(
     budget = await service.upsert_budget(
         user_id=user_id,
         payload=body,
-        is_premium=user.is_premium,
+        is_premium=user.has_premium_access,
         db=db,
         redis=redis,
     )

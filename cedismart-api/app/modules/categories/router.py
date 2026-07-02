@@ -98,7 +98,7 @@ async def create_category(
     category = await service.create_category(
         user_id=user_id,
         payload=body,
-        is_premium=user.is_premium,
+        is_premium=user.has_premium_access,
         db=db,
     )
     return CategoryResponse.model_validate(category)

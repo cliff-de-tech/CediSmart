@@ -3,7 +3,8 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Any
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 SUPPORTED_CURRENCIES = {"GHS", "USD", "EUR", "GBP"}
 
@@ -51,6 +52,24 @@ class UserResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_premium_access(cls, data: Any) -> Any:
+        if hasattr(data, "has_premium_access"):
+            return {
+                "id": data.id,
+                "phone": data.phone,
+                "email": data.email,
+                "full_name": data.full_name,
+                "currency": data.currency,
+                "is_premium": data.has_premium_access,
+                "premium_expires_at": data.premium_expires_at,
+                "kyc_verified": data.kyc_verified,
+                "ghana_card": data.ghana_card,
+                "created_at": data.created_at,
+            }
+        return data
 
 
 class BugReportRequest(BaseModel):

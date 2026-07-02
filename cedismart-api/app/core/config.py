@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     CLERK_SECRET_KEY: str = ""
     CLERK_PUBLISHABLE_KEY: str = ""
 
+    # --- Paystack (Localized Mobile Money Billing) ---
+    PAYSTACK_SECRET_KEY: str = ""
+
     # --- GitHub Bug Reporting & Discord Alert Webhooks ---
     GITHUB_ACCESS_TOKEN: str = ""
     GITHUB_REPO: str = "cliff-de-tech/CediSmart"

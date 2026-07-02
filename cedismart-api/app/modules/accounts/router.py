@@ -90,7 +90,7 @@ async def create_account(
     account = await service.create_account(
         user_id=user_id,
         payload=body,
-        is_premium=user.is_premium,
+        is_premium=user.has_premium_access,
         db=db,
     )
     return AccountResponse(**account)

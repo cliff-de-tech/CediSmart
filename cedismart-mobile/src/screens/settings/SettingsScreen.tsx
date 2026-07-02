@@ -5,6 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
@@ -104,6 +105,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [isSubmittingBug, setIsSubmittingBug] = useState(false);
   const [isBugModalVisible, setIsBugModalVisible] = useState(false);
   const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
 
 
   const queryClient = useQueryClient();
@@ -935,12 +937,52 @@ const SettingsScreen = ({ navigation, route }: any) => {
   };
 
   const handleUpgrade = async () => {
+    if (isUpgrading) return;
+    setIsUpgrading(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
-      await apiClient.patch('/users/me', { is_premium: true });
-      updateUser({ is_premium: true });
-      Alert.alert('Success', 'Welcome to CediSmart Pro! Enjoy unlimited accounts, budgets, and exports.');
+      const response = await apiClient.post('/billing/initialize', { plan: 'pro' });
+      const { authorization_url } = response.data;
+      
+      // Open in-app browser for payment checkout
+      await WebBrowser.openBrowserAsync(authorization_url);
+      
+      // Prompt user to verify once they complete checkout
+      Alert.alert(
+        'Verify Subscription',
+        'Have you completed your payment on the checkout page?',
+        [
+          {
+            text: 'Not Yet',
+            style: 'cancel',
+            onPress: () => setIsUpgrading(false)
+          },
+          {
+            text: 'Yes, Verify',
+            onPress: async () => {
+              try {
+                // Fetch latest user profile to verify premium status
+                const profileResp = await apiClient.get('/users/me');
+                updateUser(profileResp.data);
+                if (profileResp.data.is_premium) {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                  Alert.alert('Success', 'Welcome to CediSmart Pro! Your premium status is now active.');
+                } else {
+                  Alert.alert('Pending', 'We did not receive a payment success confirmation yet. If you paid, please wait a moment and try refreshing your profile in settings.');
+                }
+              } catch (verifyErr) {
+                Alert.alert('Error', 'Failed to verify payment status. Please try refreshing settings.');
+              } finally {
+                setIsUpgrading(false);
+              }
+            }
+          }
+        ]
+      );
     } catch (error) {
-      Alert.alert('Error', 'Failed to upgrade to Pro. Please try again.');
+      console.warn('[Upgrade] Initialize payment failed:', error);
+      Alert.alert('Error', 'Failed to initialize payment gateway. Please try again.');
+      setIsUpgrading(false);
     }
   };
 

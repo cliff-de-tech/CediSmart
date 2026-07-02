@@ -51,6 +51,17 @@ class User(TimestampMixin, Base):
         "Budget", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
     )
 
+    @property
+    def has_premium_access(self) -> bool:
+        """Check if user has premium access (either paid or within 7-day free trial)."""
+        if self.is_premium:
+            return True
+        if self.created_at:
+            from datetime import timezone, timedelta
+            now = datetime.now(self.created_at.tzinfo or timezone.utc)
+            return now - self.created_at < timedelta(days=7)
+        return False
+
     def __repr__(self) -> str:
         return f"<User id={self.id} phone={self.phone}>"
 
