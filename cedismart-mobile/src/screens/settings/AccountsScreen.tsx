@@ -1187,7 +1187,7 @@ const AccountsScreen = ({ navigation }: any) => {
                     <View className="flex-1">
                       <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure Automation Trigger</Text>
                       <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
-                        Open the native Apple <Text className="font-bold">Shortcuts</Text> app ➔ Go to the <Text className="font-bold">Automation</Text> tab ➔ Tap <Text className="font-bold">+</Text> ➔ Select <Text className="font-bold">Message</Text> as trigger. Set the Sender to your MoMo sender (e.g., <Text className="font-mono">MobileMoney</Text> or <Text className="font-mono">TelecelCash</Text>). Choose <Text className="font-bold">Run Immediately</Text> to sync in the background.
+                        Open the native Apple <Text className="font-bold">Shortcuts</Text> app ➔ Go to the <Text className="font-bold">Automation</Text> tab ➔ Tap <Text className="font-bold">+</Text> ➔ Select <Text className="font-bold">Message</Text> as trigger. Set the Sender to your MoMo sender (e.g., <Text className="font-mono">MobileMoney</Text> or <Text className="font-mono">T-CASH</Text>). Choose <Text className="font-bold">Run Immediately</Text> to sync in the background.
                       </Text>
                       <TouchableOpacity
                         onPress={async () => {

@@ -18,6 +18,7 @@ interface SupportModalProps {
   visible: boolean;
   onClose: () => void;
   phone?: string;
+  userName?: string;
   supportType?: 'auth' | 'general';
 }
 
@@ -107,7 +108,7 @@ const parseMarkdown = (text: string, isDark: boolean) => {
   });
 };
 
-export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, phone = 'Anonymous', supportType = 'general' }) => {
+export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, phone = 'Anonymous', userName, supportType = 'general' }) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const insets = useSafeAreaInsets();
@@ -253,7 +254,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
       const response = await apiClient.post('/support/chat', {
         messages: chatHistory,
         support_type: supportType,
-        device_diagnostics: diagnostics
+        device_diagnostics: diagnostics,
+        user_name: userName
       });
       return response.data.response;
     },

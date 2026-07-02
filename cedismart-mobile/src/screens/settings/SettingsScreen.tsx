@@ -2153,6 +2153,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
         visible={isSupportModalVisible}
         onClose={() => setIsSupportModalVisible(false)}
         phone={user?.phone}
+        userName={user?.full_name}
       />
     </SafeAreaView>
   );

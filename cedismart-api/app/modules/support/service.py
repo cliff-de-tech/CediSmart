@@ -44,7 +44,7 @@ GENERAL_SYSTEM_PROMPT = (
     "- Mobile Money Live Sync (Background SMS Sync): Guide them on how to configure automated transaction tracking:\n"
     "  1. 🤖 Google Android: Android supports direct background intercepting. Guide the user to click 'Configure Auto-Sync' in their Accounts tab, select Android, and tap 'Grant SMS Permissions' to allow background SMS reading.\n"
     "  2. 🍎 Apple iOS: iOS sandboxing blocks direct SMS reading. Explain that they can configure Apple's native Shortcuts app to securely forward messages via webhook:\n"
-    "     * Step 1: Open Shortcuts app ➔ Go to 'Automation' tab ➔ Tap '+' ➔ Select 'Message' as trigger (Sender: 'MobileMoney' or 'TelecelCash'). Set 'Run Immediately'.\n"
+    "     * Step 1: Open Shortcuts app ➔ Go to 'Automation' tab ➔ Tap '+' ➔ Select 'Message' as trigger (Sender: 'MobileMoney' or 'T-CASH'). Set 'Run Immediately'.\n"
     "     * Step 2: Under actions, add 'Get Contents of URL' action, change method to 'POST', and paste the Webhook URL copied from Settings ➔ Accounts.\n"
     "     * Step 3: Add an Authorization header: Key: 'Authorization', Value: 'Bearer <your key>' (using the copied Auth Key from Accounts tab).\n"
     "     * Step 4: Change request body to JSON and add fields: 'sender' ➔ select Sender (from message), 'message_body' ➔ select Message/Shortcut Input, 'phone' ➔ type their registered CediSmart phone number.\n"
@@ -58,13 +58,30 @@ GENERAL_SYSTEM_PROMPT = (
 
 class SupportService:
     @staticmethod
-    async def generate_chat_response(messages: list[ChatMessage], support_type: str | None = None) -> str:
-        """Call Gemini model to generate a supportive assistant response."""
-        system_prompt = AUTH_SYSTEM_PROMPT if support_type == "auth" else GENERAL_SYSTEM_PROMPT
+    async def generate_chat_response(
+        messages: list[ChatMessage], 
+        support_type: str | None = None,
+        user_name: str | None = None
+    ) -> str:
+        """Call Gemini model to generate a supportive assistant response with personalized Ghanaian pidgin vibe."""
+        first_name = "Chale"
+        if user_name:
+            parts = user_name.strip().split()
+            if parts:
+                first_name = parts[0]
+
+        personalization = (
+            f"The user's first name is {first_name}. You MUST warmly welcome and address them by their first name (e.g. 'Hey {first_name}', 'Yo {first_name}', 'Chale {first_name}', etc.).\n"
+            "Adopt a friendly, warm, and insightful Ghanaian pidgin assistant vibe (using terms like 'chale', 'wahala', 'no wahala', 'dey active', 'make we look', 'chaw', 'dey bleed', 'dey check', 'boss', 'don', etc.) throughout your conversation, "
+            "but make sure your technical/financial advice (Shortcuts webhook URL setup, Android permissions, budget setting) remains 100% clear, accurate, and structured."
+        )
+
+        base_prompt = AUTH_SYSTEM_PROMPT if support_type == "auth" else GENERAL_SYSTEM_PROMPT
+        system_prompt = f"{base_prompt}\n\n=== TONE & PERSONALIZATION RULES ===\n{personalization}"
 
         if not settings.GEMINI_API_KEY:
             logger.warning("GEMINI_API_KEY is not set. Using local rules-based support fallback.")
-            return SupportService._fallback_support_response(messages, support_type)
+            return SupportService._fallback_support_response(messages, support_type, first_name)
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
 
@@ -104,32 +121,32 @@ class SupportService:
             )
 
     @staticmethod
-    def _fallback_support_response(messages: list[ChatMessage], support_type: str | None = None) -> str:
-        """Provide a fallback response when Gemini is not configured."""
+    def _fallback_support_response(messages: list[ChatMessage], support_type: str | None = None, first_name: str = "Chale") -> str:
+        """Provide a personalized fallback response when Gemini is not configured."""
         last_msg = messages[-1].content.lower() if messages else ""
 
         if support_type == "auth":
             if "otp" in last_msg or "code" in last_msg or "sms" in last_msg:
                 return (
-                    "It looks like you're having trouble receiving your verification OTP. Please check:\n"
+                    f"Chale {first_name}, it looks like you're having trouble receiving your verification OTP. Please check:\n"
                     "1. That your phone has active cellular reception.\n"
                     "2. That the number was entered correctly (9 digits, e.g. 24XXXXXXX, excluding the leading 0).\n"
                     "If the issue persists, tap 'Escalate' to report this bug to our developers."
                 )
             else:
                 return (
-                    "Hi there! I am the CediSmart Onboarding Assistant. I can help you with OTP codes, "
+                    f"Hi {first_name}! I am the CediSmart Onboarding Assistant. I can help you with OTP codes, "
                     "registration, and PIN resets. (If you have a complicated issue, please let me know and I will raise a developer ticket)."
                 )
         else:
             if "pin" in last_msg or "password" in last_msg or "reset" in last_msg:
                 return (
-                    "To reset your PIN, please use the 'Forgot PIN?' link on the Login screen. "
+                    f"Chale {first_name}, to reset your PIN, please use the 'Forgot PIN?' link on the Login screen. "
                     "This will verify your identity via SMS before prompting you to choose a new 6-digit PIN."
                 )
             elif "sync" in last_msg or "shortcut" in last_msg or "sms" in last_msg or "automation" in last_msg:
                 return (
-                    "To configure Mobile Money Live Sync:\n"
+                    f"Chale {first_name}, here is how to configure Mobile Money Live Sync:\n"
                     "1. Go to Settings ➔ Accounts and look for the 'Mobile Money Live Sync' panel under your linked accounts.\n"
                     "2. Tap 'Configure Auto-Sync (iOS / Android)'.\n"
                     "3. For Google Android: Tap 'Grant SMS Permissions' to enable automated background listening.\n"
@@ -137,7 +154,7 @@ class SupportService:
                 )
             else:
                 return (
-                    "Hi there! I am the CediSmart Support Assistant. I can help you set budgets, "
+                    f"Hi {first_name}! I am the CediSmart Support Assistant. I can help you set budgets, "
                     "create ledgers, log transactions, and configure background MoMo message sync. What can I help you with today?"
                 )
 

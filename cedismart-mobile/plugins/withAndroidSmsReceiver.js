@@ -97,6 +97,8 @@ class SmsReceiver : BroadcastReceiver() {
                     senderLower.contains("mtnmomo") || 
                     senderLower.contains("telecel") || 
                     senderLower.contains("vodacash") ||
+                    senderLower.contains("t-cash") ||
+                    senderLower.contains("tcash") ||
                     senderLower.contains("atmoney")) {
                     
                     forwardSmsToApi(context, sender, body)

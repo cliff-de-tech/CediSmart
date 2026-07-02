@@ -74,7 +74,7 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
     # -------------------------------------------------------------------------
     # Telecel / Vodafone Cash Senders
     # -------------------------------------------------------------------------
-    elif "telecel" in sender_lower or "voda" in sender_lower:
+    elif "telecel" in sender_lower or "voda" in sender_lower or "t-cash" in sender_lower or "tcash" in sender_lower:
         # Case A: Cash In / Received
         # E.g. "You have received GHS 100.00 from 0201234567. Current balance: GHS 150.00. Transaction ID: 123456"
         rx_received = re.search(

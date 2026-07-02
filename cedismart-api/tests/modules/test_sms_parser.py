@@ -73,6 +73,20 @@ def test_parse_telecel_sent() -> None:
     assert res["reference_id"] == "123457"
     assert res["new_balance"] == 120.0
 
+def test_parse_tcash_received() -> None:
+    body = (
+        "You have received GHS 100.00 from 0201234567. "
+        "Current balance: GHS 150.00. Transaction ID: 123456"
+    )
+    res = parse_sms("T-CASH", body)
+    assert res is not None
+    assert res["amount"] == 100.0
+    assert res["fee"] == 0.0
+    assert res["transaction_type"] == "income"
+    assert "0201234567" in res["description"]
+    assert res["reference_id"] == "123456"
+    assert res["new_balance"] == 150.0
+
 def test_parse_invalid_format() -> None:
     res = parse_sms("MobileMoney", "Hello World. This is a random text message.")
     assert res is None

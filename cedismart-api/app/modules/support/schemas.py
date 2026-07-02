@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage]
     support_type: str | None = Field(default="general", description="The support category context: 'auth' or 'general'")
     device_diagnostics: dict | None = Field(default=None, description="Optional metadata about client device")
+    user_name: str | None = Field(default=None, description="Optional user name for personalization")
 
 class ChatResponse(BaseModel):
     response: str
