@@ -107,18 +107,12 @@ class SupportService:
                     return resp_json["candidates"][0]["content"]["parts"][0]["text"]
                 else:
                     logger.error("Gemini Support API error (status %d): %s", response.status_code, response.text)
-                    raise AppException(
-                        status_code=502,
-                        error_code="AI_PROVIDER_ERROR",
-                        message="Failed to get response from AI assistant. Please try again."
-                    )
+                    logger.warning("Falling back to local support assistant engine due to API error (e.g. rate limit/429).")
+                    return SupportService._fallback_support_response(messages, support_type, first_name)
         except httpx.RequestError as exc:
             logger.error("Failed to connect to Gemini API: %s", str(exc))
-            raise AppException(
-                status_code=503,
-                error_code="AI_PROVIDER_UNREACHABLE",
-                message="Support assistant is currently offline. Please try again."
-            )
+            logger.warning("Falling back to local support assistant engine due to connection exception.")
+            return SupportService._fallback_support_response(messages, support_type, first_name)
 
     @staticmethod
     def _fallback_support_response(messages: list[ChatMessage], support_type: str | None = None, first_name: str = "Chale") -> str:
