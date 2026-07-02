@@ -1081,7 +1081,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
   };
 
   const handleExportHistory = async () => {
-    if (!user?.is_premium) {
+    if (!user?.has_premium_access) {
       Alert.alert(
         'CediSmart Pro Feature',
         'Exporting transaction history is only available for Pro members. Upgrade now to get access!',
@@ -1164,7 +1164,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
   };
 
   const handleSelectAppIcon = async (iconName: string) => {
-    if (!user?.is_premium) {
+    if (!user?.has_premium_access) {
       Alert.alert(
         'CediSmart Pro Feature',
         'Custom App Icons are only available for Pro members. Upgrade now to get access!',
@@ -1501,7 +1501,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
               title="Premium App Icon" 
               value={currentAppIcon}
               onPress={() => {
-                if (user?.is_premium) {
+                if (user?.has_premium_access) {
                   appIconSheetRef.current?.snapToIndex(0);
                 } else {
                   Alert.alert(
@@ -1514,7 +1514,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   );
                 }
               }}
-              color={user?.is_premium ? "#4c56af" : undefined}
+              color={user?.has_premium_access ? "#4c56af" : undefined}
             />
           </View>
 

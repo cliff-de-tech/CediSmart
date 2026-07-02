@@ -246,7 +246,7 @@ const DashboardScreen = ({ navigation }: any) => {
           setIsKycVerified(val === 'true');
         });
         
-        if (user?.is_premium) {
+        if (user?.has_premium_access) {
           AsyncStorage.getItem('pending_confetti').then((val) => {
             if (val === 'true') {
               setShowConfetti(true);
@@ -269,17 +269,17 @@ const DashboardScreen = ({ navigation }: any) => {
           })
         ).then(() => setAccountAvatars(avatarMap));
       });
-    }, [user?.id, user?.is_premium, loadSavedAccounts])
+    }, [user?.id, user?.has_premium_access, loadSavedAccounts])
   );
 
   // Trigger confetti and premium haptics when offline transactions are successfully synced in the background!
   useEffect(() => {
-    if (user?.is_premium && prevPendingCount.current > 0 && pendingCount === 0) {
+    if (user?.has_premium_access && prevPendingCount.current > 0 && pendingCount === 0) {
       setShowConfetti(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     }
     prevPendingCount.current = pendingCount;
-  }, [pendingCount, user?.is_premium]);
+  }, [pendingCount, user?.has_premium_access]);
 
   // --- Account Switcher Logic ---
   const checkBiometricsForSwitch = async (targetPhone: string) => {
@@ -592,7 +592,7 @@ const DashboardScreen = ({ navigation }: any) => {
           >
             <Menu size={24} color={theme === 'dark' ? '#e1e3e0' : '#0d631b'} />
           </TouchableOpacity>
-          {user?.is_premium ? (
+          {user?.has_premium_access ? (
             <Text className={`font-headline font-black ${isDark ? 'text-[#e5a93b]' : 'text-[#a05915]'} text-xl tracking-tight`}>CediSmart Pro</Text>
           ) : (
             <Text className={`font-headline font-black ${isDark ? 'text-[#2e7d32]' : 'text-[#0d631b]'} text-xl tracking-tight`}>CediSmart</Text>
@@ -983,7 +983,7 @@ const DashboardScreen = ({ navigation }: any) => {
                   </Text>
                 </TouchableOpacity>
 
-                {user?.is_premium ? (
+                {user?.has_premium_access ? (
                   <View className={`flex-1 items-center justify-center p-4 rounded-2xl border ${isDark ? 'bg-secondary/20 border-secondary/30' : 'bg-secondary/10 border-secondary/20'} shadow-sm`}>
                     <Award size={24} color={isDark ? '#818cf8' : '#4c56af'} />
                     <Text className={`font-label font-bold text-[9px] uppercase tracking-wider text-center mt-2.5 ${isDark ? 'text-[#818cf8]' : 'text-secondary'}`}>Pro Member</Text>
@@ -1008,7 +1008,7 @@ const DashboardScreen = ({ navigation }: any) => {
             <View className={`w-full ${isDark ? 'bg-dark-surface-container-low border-dark-outline-variant/20' : 'bg-surface-container-low border-outline-variant/10'} p-5 rounded-2xl mb-6 border`}>
               <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-2`}>Member Privileges</Text>
               <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} font-body text-xs leading-relaxed`}>
-                {user?.is_premium ? (
+                {user?.has_premium_access ? (
                   <>
                     ✓ Unlimited Budgets & Vaults enabled.{"\n"}
                     ✓ PDF / CSV Statement Exports unlocked.{"\n"}

@@ -103,7 +103,7 @@ export const CoinBackground = () => {
   const theme = useThemeStore((state) => state.theme);
   const user = useAuthStore((state) => state.user);
   const isDark = theme === 'dark';
-  const isPremium = user?.is_premium === true;
+  const isPremium = user?.has_premium_access === true;
 
   // Opacity increased to make the cedi coins more visible and vibrant for Pro members
   const containerOpacity = isDark 
