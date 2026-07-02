@@ -9,7 +9,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug, HelpCircle } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug, HelpCircle, MessageSquare } from 'lucide-react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -111,6 +111,12 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [isBugModalVisible, setIsBugModalVisible] = useState(false);
   const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
+
+  // Feedback states
+  const [feedbackType, setFeedbackType] = useState('feature_request'); // 'feature_request', 'suggestion', 'other'
+  const [feedbackDescription, setFeedbackDescription] = useState('');
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [isFeedbackModalVisible, setIsFeedbackModalVisible] = useState(false);
 
 
   const queryClient = useQueryClient();
@@ -914,6 +920,51 @@ const SettingsScreen = ({ navigation, route }: any) => {
     }
   };
 
+  const handleSendFeedback = async () => {
+    if (!feedbackDescription.trim()) {
+      Alert.alert('Required Field', 'Please describe your feedback.');
+      return;
+    }
+    if (feedbackDescription.trim().length < 5) {
+      Alert.alert('Validation Error', 'Feedback must be at least 5 characters.');
+      return;
+    }
+
+    setIsSubmittingFeedback(true);
+    try {
+      const { width, height } = Dimensions.get('window');
+      await apiClient.post('/support/feedback', {
+        feedback_type: feedbackType,
+        description: feedbackDescription.trim(),
+        device_info: {
+          os: Platform.OS,
+          os_version: String(Platform.Version),
+          screen_dimensions: `${Math.round(width)}x${Math.round(height)}`,
+          theme_mode: theme,
+        }
+      });
+
+      setIsSubmittingFeedback(false);
+      setIsFeedbackModalVisible(false);
+      setFeedbackDescription('');
+      setFeedbackType('feature_request');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      
+      Alert.alert(
+        'Feedback Submitted',
+        'Chale, thank you! Your feedback has been sent directly to the development team.'
+      );
+    } catch (error: any) {
+      setIsSubmittingFeedback(false);
+      const serverError = error.response?.data?.error;
+      const errMsg = typeof serverError === 'string'
+        ? serverError
+        : serverError?.message || 'Failed to submit feedback. Please check your internet connection and try again.';
+      Alert.alert('Error', errMsg);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    }
+  };
+
   const saveName = async () => {
     const cleanName = newName.trim();
     if (!cleanName) {
@@ -1533,6 +1584,12 @@ const SettingsScreen = ({ navigation, route }: any) => {
               value="Chat with CediSmart AI helper" 
               onPress={() => setIsSupportModalVisible(true)}
             />
+            <SettingItem 
+              icon={MessageSquare} 
+              title="Share Feedback" 
+              value="Suggest features or send reviews" 
+              onPress={() => setIsFeedbackModalVisible(true)}
+            />
           </View>
 
           {/* Danger Zone */}
@@ -1629,6 +1686,98 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   ) : (
                     <>
                       <Text className="text-white font-bold text-base mr-2">Submit Bug Report</Text>
+                      <Check size={18} color="white" />
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Share Feedback Modal */}
+      <Modal
+        visible={isFeedbackModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsFeedbackModalVisible(false)}
+      >
+        <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-surface/95' : 'bg-white/95'}`}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            className="flex-1 justify-center"
+          >
+            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
+              <View className={`w-full p-6 rounded-3xl ${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-white shadow-xl border border-gray-100'}`}>
+                {/* Header */}
+                <View className="flex-row justify-between items-center mb-6">
+                  <View className="flex-row items-center">
+                    <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-emerald-950/30' : 'bg-emerald-50'} items-center justify-center mr-3`}>
+                      <MessageSquare size={20} color="#0D631B" />
+                    </View>
+                    <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Share Feedback</Text>
+                  </View>
+                  <TouchableOpacity 
+                    onPress={() => setIsFeedbackModalVisible(false)}
+                    className={`w-8 h-8 rounded-full ${isDark ? 'bg-dark-surface-container-high' : 'bg-gray-100'} items-center justify-center`}
+                  >
+                    <X size={18} color={isDark ? '#e1e3e0' : '#4B5563'} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Subtitle */}
+                <Text className={`text-sm mb-6 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Chale, help us shape CediSmart! Got a feature request, a suggestion, or a review? Send it directly to our Discord server.
+                </Text>
+
+                {/* Category Picker */}
+                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Feedback Category</Text>
+                <View className="flex-row mb-6 justify-between">
+                  <TouchableOpacity
+                    onPress={() => setFeedbackType('feature_request')}
+                    className={`flex-1 py-3 px-2 rounded-xl mr-2 items-center border ${feedbackType === 'feature_request' ? 'bg-primary border-primary' : (isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-gray-50 border-gray-200')}`}
+                  >
+                    <Text className={`text-xs font-bold ${feedbackType === 'feature_request' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-charcoal')}`}>🚀 Feature</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setFeedbackType('suggestion')}
+                    className={`flex-1 py-3 px-2 rounded-xl mr-2 items-center border ${feedbackType === 'suggestion' ? 'bg-primary border-primary' : (isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-gray-50 border-gray-200')}`}
+                  >
+                    <Text className={`text-xs font-bold ${feedbackType === 'suggestion' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-charcoal')}`}>💡 Suggestion</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setFeedbackType('other')}
+                    className={`flex-1 py-3 px-2 rounded-xl items-center border ${feedbackType === 'other' ? 'bg-primary border-primary' : (isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-gray-50 border-gray-200')}`}
+                  >
+                    <Text className={`text-xs font-bold ${feedbackType === 'other' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-charcoal')}`}>❓ Other</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Feedback Description */}
+                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Description</Text>
+                <TextInput
+                  value={feedbackDescription}
+                  onChangeText={setFeedbackDescription}
+                  placeholder="Describe your request, suggestion, or thoughts in detail here..."
+                  placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
+                  multiline
+                  numberOfLines={6}
+                  textAlignVertical="top"
+                  className={`w-full p-4 mb-6 rounded-xl border h-36 ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20 text-white' : 'bg-gray-50 border-gray-200 text-charcoal'} font-medium`}
+                />
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  onPress={handleSendFeedback}
+                  disabled={isSubmittingFeedback}
+                  className={`w-full py-4 rounded-xl flex-row justify-center items-center ${isSubmittingFeedback ? 'bg-gray-400' : 'bg-primary'}`}
+                >
+                  {isSubmittingFeedback ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <>
+                      <Text className="text-white font-bold text-base mr-2">Submit Feedback</Text>
                       <Check size={18} color="white" />
                     </>
                   )}
