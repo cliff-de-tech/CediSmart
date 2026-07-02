@@ -35,6 +35,8 @@ if not os.environ.get("RSA_PRIVATE_KEY"):
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("TERMII_API_KEY", "")  # Disable real SMS in tests
+os.environ["PAYSTACK_SECRET_KEY"] = "dummy"
+os.environ["ENVIRONMENT"] = "testing"
 
 # ---------------------------------------------------------------------------
 # App imports — after env setup

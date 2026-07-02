@@ -80,6 +80,8 @@ class BillingService:
                         error_code="PAYMENT_GATEWAY_ERROR",
                         message="Failed to connect with payment provider. Try again later."
                     )
+        except AppException:
+            raise
         except Exception as e:
             logger.error("Paystack connection error: %s", str(e))
             raise AppException(
