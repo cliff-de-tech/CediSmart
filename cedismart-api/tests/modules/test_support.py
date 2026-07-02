@@ -54,3 +54,36 @@ async def test_support_escalate_mock(client: AsyncClient) -> None:
         assert body["issue_url"] == "https://github.com/cliff-de-tech/CediSmart/issues/123"
         assert "successfully created" in body["message"]
         mock_escalate.assert_called_once()
+
+
+from tests.conftest import make_auth_headers
+
+@pytest.mark.asyncio
+async def test_support_feedback(client: AsyncClient, make_user) -> None:
+    user = await make_user(phone="+233241234567")
+    headers = make_auth_headers(user.id)
+    
+    with patch("app.modules.support.router.SupportService.submit_user_feedback", new_callable=AsyncMock) as mock_feedback:
+        resp = await client.post(
+            "/api/v1/support/feedback",
+            json={
+                "feedback_type": "feature_request",
+                "description": "Please add dark mode support to the main ledger screen.",
+                "device_info": {
+                    "os": "android",
+                    "app_version": "1.0.0"
+                }
+            },
+            headers=headers
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "submitted"
+        assert "thank you" in body["message"].lower()
+        mock_feedback.assert_called_once_with(
+            user_phone="+233241234567",
+            user_name="Test User",
+            feedback_type="feature_request",
+            description="Please add dark mode support to the main ledger screen.",
+            device_info={"os": "android", "app_version": "1.0.0"}
+        )

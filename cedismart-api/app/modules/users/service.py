@@ -201,17 +201,67 @@ async def verify_user_kyc(
     return user
 
 
+async def _send_discord_bug_alert(
+    user_phone: str,
+    user_name: str,
+    title: str,
+    description: str,
+    device_info: dict | None,
+    issue_url: str | None
+) -> None:
+    """Post bug report details to the designated Discord bugs channel or general channel."""
+    from app.core.config import settings
+    import httpx
+    
+    webhook_url = settings.DISCORD_BUGS_WEBHOOK_URL or settings.DISCORD_WEBHOOK_URL
+    if not webhook_url:
+        return
+
+    diag_lines = []
+    if device_info:
+        for k, v in device_info.items():
+            diag_lines.append(f"{k}: {v}")
+    diag_str = "\n".join(diag_lines) if diag_lines else "None provided."
+
+    embed = {
+        "title": f"🐛 CediSmart Bug Report: {title}",
+        "description": "A user has manually reported a bug from Settings.",
+        "color": 15548997,  # Orange/Red color decimal
+        "fields": [
+            {"name": "📞 User Phone", "value": f"`{user_phone}`", "inline": True},
+            {"name": "👤 User Name", "value": user_name, "inline": True},
+            {"name": "📝 Bug Description", "value": description, "inline": False},
+            {"name": "⚙️ Device Info", "value": f"```\n{diag_str}\n```", "inline": False}
+        ]
+    }
+
+    if issue_url:
+        embed["fields"].append({"name": "🌐 GitHub Issue", "value": f"[View GitHub Issue]({issue_url})", "inline": False})
+
+    payload = {
+        "username": "CediSmart Bug Reporter",
+        "embeds": [embed]
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(webhook_url, json=payload)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("Failed to notify Discord of user bug: %s", str(e))
+
+
 async def report_user_bug(
     user_id: uuid.UUID,
     payload: BugReportRequest,
     db: AsyncSession,
 ) -> dict:
-    """Submit a user bug report to GitHub or log it locally."""
+    """Submit a user bug report to GitHub and log alerts on Discord."""
     from app.core.config import settings
     import logging
+    import httpx
 
     logger = logging.getLogger(__name__)
-
     user = await get_current_user(user_id, db)
 
     # Format the issue body nicely in Markdown
@@ -240,6 +290,10 @@ async def report_user_bug(
     token = settings.GITHUB_ACCESS_TOKEN
     repo = settings.GITHUB_REPO
 
+    issue_number = None
+    issue_url = None
+    status = "logged_locally"
+
     if not token:
         logger.warning(
             "GITHUB_ACCESS_TOKEN is not configured. Logging bug report locally.\n"
@@ -247,50 +301,37 @@ async def report_user_bug(
             payload.title,
             body,
         )
-        return {
-            "issue_number": None,
-            "issue_url": None,
-            "status": "logged_locally",
+    else:
+        # GitHub issues API endpoint
+        url = f"https://api.github.com/repos/{repo}/issues"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "CediSmart-API",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        json_data = {
+            "title": payload.title,
+            "body": body,
         }
 
-    # GitHub issues API endpoint
-    # repo format: "owner/repo"
-    url = f"https://api.github.com/repos/{repo}/issues"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "CediSmart-API",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    json_data = {
-        "title": payload.title,
-        "body": body,
-    }
-
-    async with httpx.AsyncClient() as client:
         try:
-            response = await client.post(url, headers=headers, json=json_data, timeout=10.0)
-            if response.status_code == 201:
-                data = response.json()
-                return {
-                    "issue_number": data.get("number"),
-                    "issue_url": data.get("html_url"),
-                    "status": "submitted",
-                }
-            else:
-                logger.error(
-                    "GitHub API returned error status %d: %s. Logging report locally.\n"
-                    "Title: %s\nBody:\n%s",
-                    response.status_code,
-                    response.text,
-                    payload.title,
-                    body,
-                )
-                return {
-                    "issue_number": None,
-                    "issue_url": None,
-                    "status": "logged_locally",
-                }
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=headers, json=json_data, timeout=10.0)
+                if response.status_code == 201:
+                    data = response.json()
+                    issue_number = data.get("number")
+                    issue_url = data.get("html_url")
+                    status = "submitted"
+                else:
+                    logger.error(
+                        "GitHub API returned error status %d: %s. Logging report locally.\n"
+                        "Title: %s\nBody:\n%s",
+                        response.status_code,
+                        response.text,
+                        payload.title,
+                        body,
+                    )
         except Exception as e:
             logger.error(
                 "Failed to connect to GitHub API: %s. Logging report locally.\n"
@@ -299,8 +340,19 @@ async def report_user_bug(
                 payload.title,
                 body,
             )
-            return {
-                "issue_number": None,
-                "issue_url": None,
-                "status": "logged_locally",
-            }
+
+    # Post notification to Discord (e.g. #bugs channel)
+    await _send_discord_bug_alert(
+        user_phone=user.phone,
+        user_name=user.full_name or 'N/A',
+        title=payload.title,
+        description=payload.description,
+        device_info=payload.device_info,
+        issue_url=issue_url
+    )
+
+    return {
+        "issue_number": issue_number,
+        "issue_url": issue_url,
+        "status": status,
+    }

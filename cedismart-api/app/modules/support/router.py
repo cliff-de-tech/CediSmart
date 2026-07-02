@@ -2,7 +2,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.modules.support.schemas import ChatRequest, ChatResponse, EscalateRequest, EscalateResponse
+from app.core.dependencies import CurrentUser
+from app.modules.support.schemas import ChatRequest, ChatResponse, EscalateRequest, EscalateResponse, FeedbackRequest, FeedbackResponse
 from app.modules.support.service import SupportService
 from app.modules.auth.router import limiter
 
@@ -46,4 +47,38 @@ async def escalate_support_issue(request: Request, body: EscalateRequest, db: DB
         issue_number=res["issue_number"],
         issue_url=res["issue_url"],
         message="Support ticket successfully created and logged."
+    )
+
+@router.post(
+    "/feedback",
+    response_model=FeedbackResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Submit user feedback and feature requests to Discord",
+)
+async def submit_feedback(
+    body: FeedbackRequest,
+    user_id: CurrentUser,
+    db: DBSession
+) -> FeedbackResponse:
+    """Resolve current user, format and forward feedback to Discord channel."""
+    # Find user
+    from app.modules.auth.models import User
+    from sqlalchemy import select
+    
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        return FeedbackResponse(status="error", message="User not found")
+
+    await SupportService.submit_user_feedback(
+        user_phone=user.phone,
+        user_name=user.full_name or "N/A",
+        feedback_type=body.feedback_type,
+        description=body.description,
+        device_info=body.device_info
+    )
+    
+    return FeedbackResponse(
+        status="submitted",
+        message="Chale, thank you! Your feedback has been sent directly to the development team."
     )

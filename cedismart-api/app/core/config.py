@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     GITHUB_ACCESS_TOKEN: str = ""
     GITHUB_REPO: str = "cliff-de-tech/CediSmart"
     DISCORD_WEBHOOK_URL: str | None = None
+    DISCORD_BUGS_WEBHOOK_URL: str | None = None
+    DISCORD_FEEDBACK_WEBHOOK_URL: str | None = None
 
     @field_validator("DATABASE_URL")
     @classmethod

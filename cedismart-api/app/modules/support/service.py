@@ -4,7 +4,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.exceptions import AppException
-from app.modules.support.schemas import ChatMessage
+from app.modules.support.schemas import ChatMessage, FeedbackRequest
 from app.modules.support.models import SupportTicket
 
 logger = logging.getLogger(__name__)
@@ -308,3 +308,58 @@ class SupportService:
                     logger.error("Discord support webhook failed with status %d: %s", res.status_code, res.text)
         except Exception as e:
             logger.error("Error invoking Discord webhook: %s", str(e))
+
+    @staticmethod
+    async def submit_user_feedback(
+        user_phone: str,
+        user_name: str,
+        feedback_type: str,
+        description: str,
+        device_info: dict | None
+    ) -> None:
+        """Post a beautiful formatted embed for feature requests/suggestions to Discord webhook."""
+        webhook_url = settings.DISCORD_FEEDBACK_WEBHOOK_URL or settings.DISCORD_WEBHOOK_URL
+        if not webhook_url:
+            logger.warning("No Discord Webhook configured for feedback alerts.")
+            return
+
+        diag_lines = []
+        if device_info:
+            for k, v in device_info.items():
+                diag_lines.append(f"{k}: {v}")
+        diag_str = "\n".join(diag_lines) if diag_lines else "None provided."
+
+        # Define title icon based on type
+        icon = "💡"
+        if "feature" in feedback_type.lower():
+            icon = "🚀"
+        elif "bug" in feedback_type.lower():
+            icon = "🐛"
+
+        embed = {
+            "title": f"{icon} New CediSmart Feedback & Suggestions",
+            "description": "A user has submitted product feedback from Settings.",
+            "color": 3066993,  # Emerald green color decimal
+            "fields": [
+                {"name": "📞 User Phone", "value": f"`{user_phone}`", "inline": True},
+                {"name": "👤 User Name", "value": user_name, "inline": True},
+                {"name": "🏷️ Feedback Category", "value": feedback_type.upper(), "inline": True},
+                {"name": "💬 Description", "value": description, "inline": False},
+                {"name": "⚙️ Device Diagnostics", "value": f"```\n{diag_str}\n```", "inline": False}
+            ]
+        }
+
+        payload = {
+            "username": "CediSmart Feedback Bot",
+            "embeds": [embed]
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(webhook_url, json=payload)
+                if res.status_code < 300:
+                    logger.info("Discord feedback webhook successfully notified.")
+                else:
+                    logger.error("Discord feedback webhook failed with status %d: %s", res.status_code, res.text)
+        except Exception as e:
+            logger.error("Error invoking Discord feedback webhook: %s", str(e))

@@ -24,3 +24,15 @@ class EscalateResponse(BaseModel):
     issue_number: int
     issue_url: str
     message: str
+
+
+class FeedbackRequest(BaseModel):
+    feedback_type: str = Field(..., min_length=2, max_length=50)  # e.g., "feature_request", "suggestion", "other"
+    description: str = Field(..., min_length=5, max_length=2000)
+    device_info: dict[str, str] | None = None
+
+
+class FeedbackResponse(BaseModel):
+    status: str
+    message: str
+
