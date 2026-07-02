@@ -698,20 +698,42 @@ const SettingsScreen = ({ navigation, route }: any) => {
         }
       }
       
-      await setActiveTokens(targetPhone, access, refresh);
-      
-      const response = await apiClient.get('/users/me');
-      const userProfile = response.data;
-      
-      login(userProfile);
-      
-      setIsSwitchingModalVisible(false);
-      setSwitchingTarget(null);
-      switchSheetRef.current?.close();
-      
-      await AsyncStorage.setItem('last_logged_in_phone', targetPhone);
-      
-      Alert.alert('Account Switched', `Welcome back, ${userProfile.full_name || 'user'}!`);
+      try {
+        await setActiveTokens(targetPhone, access, refresh);
+        const response = await apiClient.get('/users/me');
+        const userProfile = response.data;
+        
+        login(userProfile);
+        
+        setIsSwitchingModalVisible(false);
+        setSwitchingTarget(null);
+        switchSheetRef.current?.close();
+        
+        await AsyncStorage.setItem('last_logged_in_phone', targetPhone);
+        
+        Alert.alert('Account Switched', `Welcome back, ${userProfile.full_name || 'user'}!`);
+      } catch (meErr: any) {
+        console.warn('Session verification failed, attempting PIN login fallback:', meErr?.response?.data || meErr);
+        // Fall back to clean login since we have the PIN
+        try {
+          const loginResp = await apiClient.post('/auth/login', { phone: targetPhone, pin });
+          const { access_token, refresh_token, user: userProfile } = loginResp.data;
+          await setActiveTokens(targetPhone, access_token, refresh_token);
+          
+          login(userProfile);
+          
+          setIsSwitchingModalVisible(false);
+          setSwitchingTarget(null);
+          switchSheetRef.current?.close();
+          
+          await AsyncStorage.setItem('last_logged_in_phone', targetPhone);
+          
+          Alert.alert('Account Switched', `Welcome back, ${userProfile.full_name || 'user'}!`);
+        } catch (loginErr: any) {
+          console.error('Switch fallback login failed:', loginErr?.response?.data || loginErr);
+          setSwitchError('Session expired. Please log in again.');
+        }
+      }
     } catch (err: any) {
       console.error('Account switch verification failed:', err?.response?.data || err);
       setSwitchError('Failed to verify session. Try logging in again.');

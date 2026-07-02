@@ -1,8 +1,9 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Modal, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Modal, RefreshControl, Platform, PermissionsAndroid, Clipboard, Linking, NativeModules, Image } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff } from 'lucide-react-native';
+import { Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff, Zap, CheckCircle2, Info, ExternalLink, Copy } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '../../stores/themeStore';
@@ -17,9 +18,85 @@ interface Account {
   name: string;
   account_type: 'bank' | 'mobile_money' | 'cash';
   provider: string | null;
+  account_number?: string | null;
   balance: string;
   is_active: boolean;
 }
+
+const PROVIDER_LOGOS: Record<string, any> = {
+  'mtn momo': require('../../../assets/mtn_logo.png'),
+  'mtn': require('../../../assets/mtn_logo.png'),
+  'telecel cash': require('../../../assets/telecel_logo.png'),
+  'telecel': require('../../../assets/telecel_logo.png'),
+  'vodafone cash': require('../../../assets/telecel_logo.png'),
+  'vodafone': require('../../../assets/telecel_logo.png'),
+  'airteltigo money': require('../../../assets/airteltigo_logo.png'),
+  'airteltigo': require('../../../assets/airteltigo_logo.png'),
+  'at money': require('../../../assets/airteltigo_logo.png'),
+  'absa bank': require('../../../assets/absa_logo.png'),
+  'absa': require('../../../assets/absa_logo.png'),
+  'gcb bank': require('../../../assets/gcb_logo.png'),
+  'gcb': require('../../../assets/gcb_logo.png'),
+  'ecobank': require('../../../assets/ecobank_logo.png'),
+  'stanbic bank': require('../../../assets/stanbic_logo.png'),
+  'stanbic': require('../../../assets/stanbic_logo.png'),
+};
+
+const renderProviderLogo = (providerName: string | null, isDark: boolean) => {
+  const rawKey = (providerName || '').toLowerCase().trim();
+  
+  if (PROVIDER_LOGOS[rawKey]) {
+    return (
+      <View 
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          backgroundColor: '#FFFFFF',
+          padding: 2,
+          marginRight: 10,
+          borderWidth: 1,
+          borderColor: 'rgba(156, 163, 175, 0.15)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          overflow: 'hidden'
+        }}
+      >
+        <Image 
+          source={PROVIDER_LOGOS[rawKey]} 
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain" 
+        />
+      </View>
+    );
+  }
+  
+  const initials = rawKey.slice(0, 2).toUpperCase();
+  return (
+    <View 
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(10, 110, 74, 0.1)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10
+      }}
+    >
+      <Text 
+        style={{
+          fontFamily: 'Outfit-Bold',
+          fontWeight: '900',
+          fontSize: 12,
+          color: isDark ? '#FFFFFF' : '#0A6E4A'
+        }}
+      >
+        {initials || 'FI'}
+      </Text>
+    </View>
+  );
+};
 
 const AccountsScreen = ({ navigation }: any) => {
   const theme = useThemeStore((state) => state.theme);
@@ -73,6 +150,8 @@ const AccountsScreen = ({ navigation }: any) => {
   // KYC Verification state
   const [isKycVerified, setIsKycVerified] = useState(false);
   const [showKycExplanation, setShowKycExplanation] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [activeSyncTab, setActiveSyncTab] = useState<'ios' | 'android'>(Platform.OS === 'ios' ? 'ios' : 'android');
 
   useEffect(() => {
     const checkKycStatus = async () => {
@@ -99,6 +178,38 @@ const AccountsScreen = ({ navigation }: any) => {
     },
     enabled: !!user?.id
   });
+
+  // Sync MoMo details to Android SharedPreferences if available
+  useEffect(() => {
+    const updateAndroidSyncConfig = async () => {
+      if (Platform.OS !== 'android') return;
+      if (!NativeModules.MomoSyncModule) return;
+
+      if (accounts && accounts.length > 0) {
+        // Find the first mobile money account
+        const momoAccount = accounts.find((acc) => acc.account_type === 'mobile_money');
+        if (momoAccount && momoAccount.account_number) {
+          try {
+            const token = await SecureStore.getItemAsync('access_token');
+            if (token) {
+              const apiUrl = apiClient.defaults.baseURL || 'https://api.cedismart.com/api/v1';
+              NativeModules.MomoSyncModule.saveConfig(token, momoAccount.account_number, apiUrl);
+              console.log('Android SMS background sync config saved/updated successfully.');
+            }
+          } catch (e) {
+            console.error('Failed to save auto-sync config to Android Preferences', e);
+          }
+          return;
+        }
+      }
+      
+      try {
+        NativeModules.MomoSyncModule.clearConfig();
+      } catch (err) {}
+    };
+
+    updateAndroidSyncConfig();
+  }, [accounts]);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -283,6 +394,7 @@ const AccountsScreen = ({ navigation }: any) => {
                 name: linkingType === 'momo' ? `${selectedProvider} Wallet` : `${selectedProvider} Account`,
                 account_type: linkingType === 'momo' ? 'mobile_money' : 'bank',
                 provider: selectedProvider,
+                account_number: cleanId,
                 opening_balance: parsedBalance
               });
             }
@@ -308,7 +420,7 @@ const AccountsScreen = ({ navigation }: any) => {
   };
 
   const openLinkSheet = (type: 'momo' | 'bank') => {
-    if (!isKycVerified) {
+    if (type === 'bank' && !isKycVerified) {
       setShowKycExplanation(true);
       return;
     }
@@ -556,7 +668,11 @@ const AccountsScreen = ({ navigation }: any) => {
                   })();
 
                   // Mask phone/account number visually
-                  const maskedDigits = `•••• •••• •••• ${item.id.slice(-4)}`;
+                  const maskedDigits = item.account_number 
+                    ? (item.account_type === 'mobile_money'
+                      ? `${item.account_number.slice(0, 3)} ••• ••• ${item.account_number.slice(-2)}`
+                      : `•••• •••• •••• ${item.account_number.slice(-4)}`)
+                    : `•••• •••• •••• ${item.id.slice(-4)}`;
 
                   return (
                     <View 
@@ -568,14 +684,17 @@ const AccountsScreen = ({ navigation }: any) => {
                       <View className="absolute bottom-0 right-0 w-24 h-24 bg-white/5 rounded-full translate-x-4 translate-y-4" />
 
                       {/* Upper Card Row */}
-                      <View className="flex-row justify-between items-start z-10">
-                        <View>
-                          <Text className={`font-headline font-black tracking-widest text-lg uppercase ${card.text}`}>
-                            {card.logo}
-                          </Text>
-                          <Text className={`font-body text-[10px] uppercase font-bold tracking-widest ${card.sub}`}>
-                            {item.account_type === 'mobile_money' ? 'MOMO PORTAL' : 'SECURE VAULT'}
-                          </Text>
+                      <View className="flex-row justify-between items-center z-10 w-full">
+                        <View className="flex-row items-center">
+                          {renderProviderLogo(item.provider, isDark)}
+                          <View>
+                            <Text className={`font-headline font-black text-sm tracking-wide uppercase ${card.text}`}>
+                              {card.logo}
+                            </Text>
+                            <Text className={`font-body text-[8px] uppercase font-bold tracking-widest ${card.sub}`}>
+                              {item.account_type === 'mobile_money' ? 'MOMO PORTAL' : 'SECURE VAULT'}
+                            </Text>
+                          </View>
                         </View>
                         
                         <TouchableOpacity 
@@ -626,6 +745,36 @@ const AccountsScreen = ({ navigation }: any) => {
                     </View>
                   );
                 })}
+                
+                {accounts?.some((acc: any) => acc.account_type === 'mobile_money') && (
+                  <View className={`mt-2 p-5 rounded-3xl border ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-emerald-50/50 border-emerald-100'} mb-6`}>
+                    <View className="flex-row items-center mb-3">
+                      <View className={`p-2 rounded-xl ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'} mr-3`}>
+                        <Zap size={20} color="#10B981" />
+                      </View>
+                      <View>
+                        <Text className={`font-headline font-black text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                          ⚡ Mobile Money Live Sync
+                        </Text>
+                        <Text className={`font-body text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Auto-log transactions & keep balance updated
+                        </Text>
+                      </View>
+                    </View>
+                    <Text className={`font-body text-xs leading-5 mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Keep your wallet records perfectly reconciled in the background using automated SMS parsing.
+                    </Text>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                        setShowSyncModal(true);
+                      }}
+                      className="bg-primary py-3.5 px-6 rounded-2xl items-center active:scale-[0.98]"
+                    >
+                      <Text className="text-white font-bold text-xs">Configure Auto-Sync (iOS / Android)</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             )}
           </View>
@@ -663,13 +812,36 @@ const AccountsScreen = ({ navigation }: any) => {
                   <TouchableOpacity
                     key={providerName}
                     onPress={() => setSelectedProvider(providerName)}
-                    className={`w-[48%] items-center py-4 px-2 rounded-2xl border mb-3 ${
+                    className={`w-[48%] items-center py-5 px-3 rounded-2xl border mb-3 ${
                       selectedProvider === providerName 
                         ? 'bg-primary border-primary shadow-sm shadow-primary/20' 
                         : isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'
                     }`}
                   >
-                    <Text className={`text-sm font-bold text-center ${selectedProvider === providerName ? 'text-white' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                    {PROVIDER_LOGOS[providerName.toLowerCase().trim()] && (
+                      <View 
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 12,
+                          backgroundColor: '#FFFFFF',
+                          padding: 4,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: selectedProvider === providerName ? 'rgba(255,255,255,0.2)' : 'rgba(156, 163, 175, 0.15)',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <Image 
+                          source={PROVIDER_LOGOS[providerName.toLowerCase().trim()]} 
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="contain" 
+                        />
+                      </View>
+                    )}
+                    <Text className={`text-xs font-bold text-center ${selectedProvider === providerName ? 'text-white' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
                       {providerName}
                     </Text>
                   </TouchableOpacity>
@@ -679,13 +851,36 @@ const AccountsScreen = ({ navigation }: any) => {
                   <TouchableOpacity
                     key={bankName}
                     onPress={() => setSelectedProvider(bankName)}
-                    className={`w-[48%] items-center py-4 px-2 rounded-2xl border mb-3 ${
+                    className={`w-[48%] items-center py-5 px-3 rounded-2xl border mb-3 ${
                       selectedProvider === bankName 
                         ? 'bg-primary border-primary shadow-sm shadow-primary/20' 
                         : isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'
                     }`}
                   >
-                    <Text className={`text-sm font-bold text-center ${selectedProvider === bankName ? 'text-white' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                    {PROVIDER_LOGOS[bankName.toLowerCase().trim()] && (
+                      <View 
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 12,
+                          backgroundColor: '#FFFFFF',
+                          padding: 4,
+                          marginBottom: 8,
+                          borderWidth: 1,
+                          borderColor: selectedProvider === bankName ? 'rgba(255,255,255,0.2)' : 'rgba(156, 163, 175, 0.15)',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          overflow: 'hidden'
+                        }}
+                      >
+                        <Image 
+                          source={PROVIDER_LOGOS[bankName.toLowerCase().trim()]} 
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="contain" 
+                        />
+                      </View>
+                    )}
+                    <Text className={`text-xs font-bold text-center ${selectedProvider === bankName ? 'text-white' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
                       {bankName}
                     </Text>
                   </TouchableOpacity>
@@ -915,6 +1110,235 @@ const AccountsScreen = ({ navigation }: any) => {
                 <Text className={`font-bold text-base ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Maybe Later</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Mobile Money Auto-Sync Configuration Modal */}
+      <Modal
+        visible={showSyncModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSyncModal(false)}
+      >
+        <View className="flex-1 justify-end bg-black/60">
+          <View className={`w-full max-h-[85%] rounded-t-[32px] p-6 pb-10 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-white'}`}>
+            {/* Header */}
+            <View className="flex-row justify-between items-center mb-6">
+              <View>
+                <Text className={`font-headline font-black text-xl ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                  ⚡ Mobile Money Auto-Sync
+                </Text>
+                <Text className={`font-body text-[11px] mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Real-time transaction tracking setup
+                </Text>
+              </View>
+              <TouchableOpacity 
+                onPress={() => setShowSyncModal(false)}
+                className="bg-primary/10 px-4 py-2 rounded-full active:scale-95"
+              >
+                <Text className="text-primary font-bold text-xs">Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Segmented OS Selector Control */}
+            <View className={`flex-row p-1 rounded-2xl mb-6 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-gray-100'}`}>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setActiveSyncTab('ios');
+                }}
+                className={`flex-1 py-3 items-center rounded-xl flex-row justify-center ${activeSyncTab === 'ios' ? 'bg-primary' : ''}`}
+              >
+                <Text className={`font-bold text-xs ${activeSyncTab === 'ios' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  🍎 Apple iOS
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setActiveSyncTab('android');
+                }}
+                className={`flex-1 py-3 items-center rounded-xl flex-row justify-center ${activeSyncTab === 'android' ? 'bg-primary' : ''}`}
+              >
+                <Text className={`font-bold text-xs ${activeSyncTab === 'android' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  🤖 Google Android
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+              {activeSyncTab === 'ios' ? (
+                // --- iOS Shortcut Webhook Guide ---
+                <View className="space-y-5">
+                  <View className={`p-4 rounded-2xl flex-row ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'}`}>
+                    <Info size={18} color="#3B82F6" className="mr-3 mt-0.5" />
+                    <Text className={`flex-1 font-body text-xs leading-5 ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>
+                      iOS sandboxing blocks apps from reading SMS alerts directly. Follow the steps below to configure Apple's native Shortcuts app to securely forward MoMo messages to CediSmart in the background.
+                    </Text>
+                  </View>
+
+                  {/* Step 1 */}
+                  <View className="flex-row items-start">
+                    <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                      <Text className="text-primary font-bold text-xs">1</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure Automation Trigger</Text>
+                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                        Open the native Apple <Text className="font-bold">Shortcuts</Text> app ➔ Go to the <Text className="font-bold">Automation</Text> tab ➔ Tap <Text className="font-bold">+</Text> ➔ Select <Text className="font-bold">Message</Text> as trigger. Set the Sender to your MoMo sender (e.g., <Text className="font-mono">MobileMoney</Text> or <Text className="font-mono">TelecelCash</Text>). Choose <Text className="font-bold">Run Immediately</Text> to sync in the background.
+                      </Text>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                          Linking.openURL('shortcuts://').catch(() => {
+                            Alert.alert('Error', 'Could not open Apple Shortcuts app. Please ensure it is installed.');
+                          });
+                        }}
+                        className="bg-primary/10 mt-3 py-3 px-4 rounded-xl flex-row items-center justify-center self-start"
+                      >
+                        <Text className="text-primary font-bold text-xs mr-2">Open Shortcuts App</Text>
+                        <ExternalLink size={14} color="#0A6E4A" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Step 2 */}
+                  <View className="flex-row items-start mt-6">
+                    <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                      <Text className="text-primary font-bold text-xs">2</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Copy Webhook Destination URL</Text>
+                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                        Under automation actions, add a <Text className="font-bold">Get Contents of URL</Text> action. Expand details, change method to <Text className="font-bold">POST</Text>, and paste the webhook URL:
+                      </Text>
+                      
+                      <TouchableOpacity
+                        onPress={async () => {
+                          try {
+                            const apiUrl = apiClient.defaults.baseURL || 'https://api.cedismart.com/api/v1';
+                            const webhookUrl = `${apiUrl}/transactions/sms-webhook`;
+                            Clipboard.setString(webhookUrl);
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                            Alert.alert('URL Copied', 'The webhook URL has been copied to your clipboard!');
+                          } catch (e) {
+                            Alert.alert('Error', 'Failed to copy URL.');
+                          }
+                        }}
+                        className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-gray-50 border-gray-100'}`}
+                      >
+                        <Text className={`font-mono text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} flex-1`} numberOfLines={1}>
+                          {`${apiClient.defaults.baseURL || 'https://api.cedismart.com/api/v1'}/transactions/sms-webhook`}
+                        </Text>
+                        <Copy size={16} color="#0A6E4A" className="ml-2" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Step 3 */}
+                  <View className="flex-row items-start mt-6">
+                    <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                      <Text className="text-primary font-bold text-xs">3</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Copy Authentication Key</Text>
+                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                        In the headers section of the action, add a header:
+                        {"\n"}• Key: <Text className="font-mono font-bold">Authorization</Text>
+                        {"\n"}• Value: <Text className="font-mono font-bold">Bearer &lt;your key&gt;</Text>
+                      </Text>
+                      
+                      <TouchableOpacity
+                        onPress={async () => {
+                          try {
+                            const token = await SecureStore.getItemAsync('access_token');
+                            if (token) {
+                              Clipboard.setString(token);
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                              Alert.alert('Key Copied', 'Your secure authentication key has been copied to your clipboard!');
+                            } else {
+                              Alert.alert('Session Expired', 'Please re-login to retrieve your auth key.');
+                            }
+                          } catch (e) {
+                            Alert.alert('Error', 'Failed to retrieve auth token.');
+                          }
+                        }}
+                        className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-gray-50 border-gray-100'}`}
+                      >
+                        <Text className={`font-mono text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} flex-1`} numberOfLines={1}>
+                          ••••••••••••••••••••••••••••••••
+                        </Text>
+                        <Copy size={16} color="#0A6E4A" className="ml-2" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Step 4 */}
+                  <View className="flex-row items-start mt-6">
+                    <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                      <Text className="text-primary font-bold text-xs">4</Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure JSON Payload</Text>
+                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                        Change the Request Body to <Text className="font-bold">JSON</Text> and add these fields:
+                        {"\n"}• <Text className="font-mono font-bold">sender</Text> ➔ Select <Text className="font-bold">Sender</Text> (from message variable)
+                        {"\n"}• <Text className="font-mono font-bold">message_body</Text> ➔ Select <Text className="font-bold">Message</Text> or <Text className="font-bold">Shortcut Input</Text>
+                        {"\n"}• <Text className="font-mono font-bold">phone</Text> ➔ Type your registered number: <Text className="font-mono font-bold">{user?.phone || 'your phone number'}</Text>
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                // --- Android Native Receiver ---
+                <View className="space-y-6">
+                  <View className={`p-4 rounded-2xl flex-row ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'}`}>
+                    <Info size={18} color="#10B981" className="mr-3 mt-0.5" />
+                    <Text className={`flex-1 font-body text-xs leading-5 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>
+                      Android supports background message interception. Granting SMS permissions allows CediSmart to read and automatically log incoming MTN MoMo or Telecel Cash messages instantly.
+                    </Text>
+                  </View>
+
+                  <View className="items-center py-6">
+                    <Smartphone size={60} color="#10B981" />
+                    <Text className={`font-headline font-black text-base mt-4 ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                      Automated Background Listening
+                    </Text>
+                    <Text className={`text-xs text-center mt-1 px-4 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Once enabled, transaction notifications will appear instantly when you receive a Mobile Money alert SMS.
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={async () => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                      try {
+                        const granted = await PermissionsAndroid.requestMultiple([
+                          PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
+                          PermissionsAndroid.PERMISSIONS.READ_SMS,
+                        ]);
+                        if (
+                          granted['android.permission.RECEIVE_SMS'] === PermissionsAndroid.RESULTS.GRANTED &&
+                          granted['android.permission.READ_SMS'] === PermissionsAndroid.RESULTS.GRANTED
+                        ) {
+                          Alert.alert('Permission Granted', 'CediSmart is now configured to auto-log your MoMo messages in the background!');
+                          setShowSyncModal(false);
+                        } else {
+                          Alert.alert('Permission Denied', 'Please grant SMS permissions in settings to enable automated background sync.');
+                        }
+                      } catch (err) {
+                        Alert.alert('Error', 'Failed to request permissions.');
+                      }
+                    }}
+                    className="w-full py-4 bg-primary rounded-xl items-center justify-center shadow-lg shadow-primary/30 active:scale-[0.98]"
+                  >
+                    <Text className="text-white font-bold text-base">Grant SMS Permissions</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>

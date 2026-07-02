@@ -36,6 +36,7 @@ class FinancialAccount(TimestampMixin, Base):
         String(20), nullable=False
     )  # 'bank' | 'mobile_money' | 'cash'
     provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    account_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     opening_balance: Mapped[float] = mapped_column(
         Numeric(14, 2), nullable=False, server_default=text("0")
     )

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Platform } from 'react-native';
 import { Delete, Fingerprint, ScanFace } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useThemeStore } from '../../stores/themeStore';
@@ -12,7 +12,7 @@ interface PINPadProps {
   disabled?: boolean;
 }
 
-const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, onBiometricPress, biometricType = 'fingerprint', disabled = false }) => {
+const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, onBiometricPress, biometricType, disabled = false }) => {
   const isDark = useThemeStore((state) => state.theme) === 'dark';
 
   const keys = [
@@ -47,7 +47,7 @@ const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, onBiometricPress,
                   className={`w-[30%] aspect-square m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
                   accessibilityLabel="Biometric Authentication"
                 >
-                  {biometricType === 'face' ? (
+                  {Platform.OS === 'ios' ? (
                     <ScanFace color={isDark ? '#e1e3e0' : '#1c1b1f'} size={28} />
                   ) : (
                     <Fingerprint color={isDark ? '#e1e3e0' : '#1c1b1f'} size={28} />

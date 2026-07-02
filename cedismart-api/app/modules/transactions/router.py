@@ -30,6 +30,7 @@ from app.modules.transactions.schemas import (
     TransactionUpdateRequest,
     SMSParseRequest,
     SMSParseResponse,
+    SMSWebhookRequest,
 )
 
 router = APIRouter()
@@ -286,3 +287,30 @@ async def parse_sms(
         user_id=user_id,
     )
     return SMSParseResponse(**res)
+
+
+@router.post(
+    "/sms-webhook",
+    response_model=TransactionResponse,
+    status_code=201,
+    summary="Webhook endpoint to parse and log SMS transaction alerts in the background",
+)
+async def sms_webhook(
+    payload: SMSWebhookRequest,
+    user_id: CurrentUser,
+    db: DBSession,
+    redis: RedisConn,
+) -> TransactionResponse:
+    """Parse incoming SMS payload from Android or iOS Shortcuts automation,
+    log the transaction under the corresponding wallet, and adjust
+    ledger balance automatically.
+    """
+    tx = await service.parse_and_log_sms(
+        user_id=user_id,
+        phone=payload.phone,
+        sender=payload.sender,
+        sms_text=payload.message_body,
+        db=db,
+        redis=redis,
+    )
+    return tx

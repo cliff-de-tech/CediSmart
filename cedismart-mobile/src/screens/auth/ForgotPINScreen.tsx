@@ -191,15 +191,36 @@ const ForgotPINScreen = ({ navigation }: any) => {
 
   const handleOtpChange = (value: string, index: number) => {
     setError('');
+    const cleaned = value.trim();
+
+    // Check if user auto-filled or pasted a full code (length > 1)
+    if (cleaned.length > 1) {
+      const codeDigits = cleaned.slice(0, 6).split('');
+      const newOtp = [...otp];
+      for (let i = 0; i < 6; i++) {
+        newOtp[i] = codeDigits[i] || '';
+      }
+      setOtp(newOtp);
+
+      const lastIndex = Math.min(codeDigits.length - 1, 5);
+      inputRefs.current[lastIndex]?.focus();
+
+      if (codeDigits.length === 6) {
+        const fullOtp = codeDigits.join('');
+        setTimeout(() => verifyOtpMutation.mutate(fullOtp), 200);
+      }
+      return;
+    }
+
     const newOtp = [...otp];
-    newOtp[index] = value;
+    newOtp[index] = cleaned;
     setOtp(newOtp);
 
-    if (value !== '' && index < 5) {
+    if (cleaned !== '' && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    if (index === 5 && value !== '' && newOtp.every(digit => digit !== '')) {
+    if (index === 5 && cleaned !== '' && newOtp.every(digit => digit !== '')) {
       const fullOtp = newOtp.join('');
       setTimeout(() => verifyOtpMutation.mutate(fullOtp), 200);
     }
@@ -376,13 +397,15 @@ const ForgotPINScreen = ({ navigation }: any) => {
                     ref={(el) => { inputRefs.current[index] = el; }}
                     className={`w-[14%] aspect-square ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} border ${isDark ? 'border-dark-outline-variant/30' : 'border-outline-variant/20'} rounded-xl text-center font-headline font-bold text-2xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} shadow-sm`}
                     keyboardType="number-pad"
-                    maxLength={1}
+                    maxLength={6}
                     value={digit}
                     placeholder={digit === '' ? '•' : ''}
                     placeholderTextColor={isDark ? '#434942' : '#D1D5DB'}
                     onChangeText={(value) => handleOtpChange(value, index)}
                     onKeyPress={(e) => handleKeyPress(e, index)}
                     autoFocus={index === 0}
+                    textContentType="oneTimeCode"
+                    autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
                   />
                 ))}
               </View>

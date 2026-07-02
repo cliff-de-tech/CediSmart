@@ -62,7 +62,8 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withAndroidSmsReceiver"
     ],
     "extra": {
       "eas": {

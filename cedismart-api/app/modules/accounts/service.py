@@ -242,6 +242,7 @@ async def create_account(
         name=payload.name,
         account_type=payload.account_type,
         provider=payload.provider,
+        account_number=payload.account_number,
         opening_balance=payload.opening_balance,
     )
     db.add(account)
@@ -252,6 +253,7 @@ async def create_account(
         "name": account.name,
         "account_type": account.account_type,
         "provider": account.provider,
+        "account_number": account.account_number,
         "opening_balance": payload.opening_balance,
         "balance": payload.opening_balance,  # No transactions yet
         "is_active": account.is_active,

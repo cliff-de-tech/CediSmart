@@ -22,6 +22,7 @@ class AccountCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     account_type: str = Field(..., description="bank | mobile_money | cash")
     provider: str | None = Field(None, max_length=50)
+    account_number: str | None = Field(None, max_length=50)
     opening_balance: Decimal = Field(Decimal("0.00"), ge=Decimal("0"))
 
     @field_validator("account_type")
@@ -62,6 +63,7 @@ class AccountResponse(BaseModel):
     name: str
     account_type: str
     provider: str | None
+    account_number: str | None = None
     opening_balance: Decimal
     balance: Decimal
     is_active: bool

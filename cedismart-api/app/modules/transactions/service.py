@@ -27,6 +27,7 @@ from sqlalchemy.orm import joinedload
 
 from app.core.exceptions import AppException
 from app.modules.accounts.models import FinancialAccount
+from app.modules.accounts.service import _compute_balances
 from app.modules.budgets.service import invalidate_budget_cache
 from app.modules.categories.models import Category
 from app.modules.reports.service import invalidate_report_cache
@@ -37,6 +38,7 @@ from app.modules.transactions.schemas import (
     TransactionCreateRequest,
     TransactionUpdateRequest,
 )
+from app.modules.transactions.sms_parser import parse_sms as fast_parse_sms
 
 logger = logging.getLogger(__name__)
 
@@ -745,3 +747,211 @@ def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
         "category_suggestion": category_suggestion,
         "notes": notes,
     }
+
+
+async def parse_and_log_sms(
+    user_id: uuid.UUID,
+    phone: str,
+    sender: str,
+    sms_text: str,
+    db: AsyncSession,
+    redis: aioredis.Redis,
+) -> Transaction:
+    """Parse a transaction SMS and automatically record it in the ledger."""
+    # 1. Clean and normalize phone number
+    clean_phone = phone.strip().replace(" ", "").replace("-", "")
+    if clean_phone.startswith("+233"):
+        clean_phone = "0" + clean_phone[4:]  # convert +233240123456 to 0240123456
+        
+    # 2. Find the corresponding FinancialAccount
+    stmt = select(FinancialAccount).where(
+        FinancialAccount.user_id == user_id,
+        FinancialAccount.is_active == True,
+        FinancialAccount.account_number == clean_phone
+    )
+    result = await db.execute(stmt)
+    account = result.scalar_one_or_none()
+    
+    if not account:
+        # Fallback: match by provider/carrier name if phone is not matched
+        provider_hint = None
+        if "mobilemoney" in sender.lower() or "mtnmomo" in sender.lower() or "mtn" in sender.lower():
+            provider_hint = "MTN MoMo"
+        elif "telecel" in sender.lower() or "voda" in sender.lower():
+            provider_hint = "Telecel Cash"
+            
+        if provider_hint:
+            stmt = select(FinancialAccount).where(
+                FinancialAccount.user_id == user_id,
+                FinancialAccount.is_active == True,
+                FinancialAccount.account_type == "mobile_money",
+                FinancialAccount.provider == provider_hint
+            )
+            result = await db.execute(stmt)
+            account = result.scalar_one_or_none()
+            
+    if not account:
+        raise AppException(
+            status_code=404,
+            error_code="ACCOUNT_NOT_FOUND",
+            message=f"No linked Mobile Money account found for provider matching '{sender}' and phone number '{phone}'."
+        )
+
+    # 3. Parse SMS (using regex first, falling back to Gemini)
+    parsed = fast_parse_sms(sender, sms_text)
+    if not parsed:
+        res_gemini = await parse_sms_with_gemini(sms_content=sms_text, db=db, user_id=user_id)
+        parsed = {
+            "amount": float(res_gemini["amount"]),
+            "fee": 0.0,
+            "transaction_type": res_gemini["transaction_type"],
+            "description": res_gemini["description"],
+            "reference_id": f"sms_{int(datetime.now(UTC).timestamp())}",
+            "new_balance": 0.0
+        }
+        category_id = res_gemini["category_id"]
+    else:
+        # Resolve category
+        category_name = "Mobile Money Received" if parsed["transaction_type"] == "income" else "Other Expense"
+        
+        # Check system or user category
+        stmt = select(Category).where(
+            or_(
+                Category.user_id == user_id,
+                Category.is_system == True
+            ),
+            Category.category_type == parsed["transaction_type"],
+            func.lower(Category.name) == category_name.lower()
+        )
+        cat_res = await db.execute(stmt)
+        cat_obj = cat_res.scalar_one_or_none()
+        
+        if not cat_obj:
+            # Fallback to any category for this type
+            stmt = select(Category).where(
+                or_(
+                    Category.user_id == user_id,
+                    Category.is_system == True
+                ),
+                Category.category_type == parsed["transaction_type"]
+            )
+            cat_res = await db.execute(stmt)
+            cat_obj = cat_res.scalar_one_or_none()
+            
+        if not cat_obj:
+            # Create on the fly
+            cat_obj = Category(
+                user_id=user_id,
+                name=category_name,
+                icon="wallet-outline" if parsed["transaction_type"] == "income" else "card-outline",
+                color="#9C27B0" if parsed["transaction_type"] == "income" else "#9E9E9E",
+                category_type=parsed["transaction_type"],
+                is_system=False
+            )
+            db.add(cat_obj)
+            await db.flush()
+            
+        category_id = cat_obj.id
+
+    # 4. Check for duplicate transaction Ref ID to ensure idempotency
+    ref_id = parsed["reference_id"]
+    stmt = select(Transaction).where(
+        Transaction.user_id == user_id,
+        Transaction.account_id == account.id,
+        or_(
+            Transaction.notes.like(f"%{ref_id}%"),
+            Transaction.description.like(f"%{ref_id}%")
+        )
+    )
+    dup_res = await db.execute(stmt)
+    if dup_res.scalar_one_or_none():
+        raise AppException(
+            status_code=409,
+            error_code="TRANSACTION_ALREADY_LOGGED",
+            message=f"Transaction with Reference ID {ref_id} has already been logged."
+        )
+
+    # 5. Create transaction
+    notes = f"Parsed from SMS: {sms_text} | Ref: {ref_id}"
+    tx = Transaction(
+        user_id=user_id,
+        account_id=account.id,
+        category_id=category_id,
+        amount=parsed["amount"],
+        transaction_type=parsed["transaction_type"],
+        description=parsed["description"],
+        transaction_date=date.today(),
+        notes=notes
+    )
+    db.add(tx)
+    
+    # Save Fee Transaction (if fee > 0 and transaction is an expense)
+    if parsed["fee"] > 0 and parsed["transaction_type"] == "expense":
+        stmt_fee = select(Category).where(
+            or_(
+                Category.user_id == user_id,
+                Category.is_system == True
+            ),
+            Category.category_type == "expense",
+            func.lower(Category.name) == "mobile money fees"
+        )
+        fee_cat_res = await db.execute(stmt_fee)
+        fee_cat = fee_cat_res.scalar_one_or_none()
+        
+        if not fee_cat:
+            # Create on the fly
+            fee_cat = Category(
+                user_id=user_id,
+                name="Mobile Money Fees",
+                icon="card-outline",
+                color="#FF9800",
+                category_type="expense",
+                is_system=False
+            )
+            db.add(fee_cat)
+            await db.flush()
+            
+        fee_category_id = fee_cat.id
+        
+        fee_tx = Transaction(
+            user_id=user_id,
+            account_id=account.id,
+            category_id=fee_category_id,
+            amount=parsed["fee"],
+            transaction_type="expense",
+            description="Mobile Money Fee",
+            transaction_date=date.today(),
+            notes=f"Fee for transaction Ref: {ref_id}"
+        )
+        db.add(fee_tx)
+
+    await db.flush()
+
+    # 6. Reconcile Balance
+    if parsed["new_balance"] > 0:
+        current_balances = await _compute_balances(user_id, db, [account.id])
+        curr_bal = current_balances.get(account.id, Decimal("0.00"))
+        
+        target_bal = Decimal(str(parsed["new_balance"]))
+        if curr_bal != target_bal:
+            diff = target_bal - curr_bal
+            account.opening_balance = account.opening_balance + diff
+            await db.flush()
+
+    # Invalidate cache
+    await redis.delete(f"{SUMMARY_CACHE_PREFIX}{user_id}")
+    await invalidate_budget_cache(user_id, date.today().year, date.today().month, redis)
+    await invalidate_report_cache(user_id, date.today().year, date.today().month, redis)
+
+    # Reload transaction
+    stmt_reload = (
+        select(Transaction)
+        .options(
+            joinedload(Transaction.account),
+            joinedload(Transaction.category),
+        )
+        .where(Transaction.id == tx.id)
+    )
+    tx_reload = (await db.execute(stmt_reload)).scalar_one()
+    return tx_reload
+

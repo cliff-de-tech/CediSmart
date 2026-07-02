@@ -33,7 +33,6 @@ const LoginScreen = ({ navigation }: any) => {
   const shakeAnimation = useState(new Animated.Value(0))[0];
 
   const [isBiometricAvailable, setIsBiometricAvailable] = useState(false);
-  const [biometricType, setBiometricType] = useState<'fingerprint' | 'face' | null>(null);
   const [savedPhone, setSavedPhone] = useState('');
   const [savedPin, setSavedPin] = useState('');
   const [accountAvatars, setAccountAvatars] = useState<Record<string, string>>({});
@@ -103,13 +102,6 @@ const LoginScreen = ({ navigation }: any) => {
           setStep('pin');
           
           if (hasHardware && isEnrolled) {
-            const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-            if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-              setBiometricType('face');
-            } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-              setBiometricType('fingerprint');
-            }
-
             const phoneVal = await SecureStore.getItemAsync('biometric_phone');
             if (phoneVal && normalizePhoneNumber(phoneVal) === normalizedSingle) {
               const sanitizedPhone = normalizedSingle.replace(/[^\w.-]/g, '');
@@ -130,13 +122,6 @@ const LoginScreen = ({ navigation }: any) => {
         } else if (lastPhone && hasHardware && isEnrolled) {
           // If there are multiple accounts, check biometric settings for the last logged-in account
           const normalizedLast = normalizePhoneNumber(lastPhone);
-          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-            setBiometricType('face');
-          } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-            setBiometricType('fingerprint');
-          }
-
           const phoneVal = await SecureStore.getItemAsync('biometric_phone');
           if (phoneVal && normalizePhoneNumber(phoneVal) === normalizedLast) {
             const sanitizedPhone = normalizedLast.replace(/[^\w.-]/g, '');
@@ -155,13 +140,6 @@ const LoginScreen = ({ navigation }: any) => {
         setStep('pin');
         
         if (hasHardware && isEnrolled) {
-          const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-          if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-            setBiometricType('face');
-          } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
-            setBiometricType('fingerprint');
-          }
-
           const phoneVal = await SecureStore.getItemAsync('biometric_phone');
           if (phoneVal && normalizePhoneNumber(phoneVal) === normalizedLast) {
             const sanitizedPhone = normalizedLast.replace(/[^\w.-]/g, '');
@@ -455,7 +433,6 @@ const LoginScreen = ({ navigation }: any) => {
                 onPress={handlePress} 
                 onBackspace={handleBackspace} 
                 onBiometricPress={isBiometricAvailable && step === 'pin' ? () => handleBiometricAuth(savedPhone, savedPin) : undefined}
-                biometricType={biometricType}
                 disabled={loginMutation.isPending}
               />
             )}

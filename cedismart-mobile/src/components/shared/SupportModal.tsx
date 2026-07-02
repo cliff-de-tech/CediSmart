@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, Modal, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Clipboard } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import { X, Send, Bot, User, Sparkles, Github, AlertCircle, CheckCircle, Trash2, Plus } from 'lucide-react-native';
@@ -56,6 +57,7 @@ const parseMarkdown = (text: string, isDark: boolean) => {
       return (
         <Text
           key={lineIndex}
+          selectable={true}
           style={{ fontSize, fontWeight: 'bold', marginVertical: 4 }}
           className={isDark ? 'text-dark-on-surface' : 'text-on-surface'}
         >
@@ -70,8 +72,8 @@ const parseMarkdown = (text: string, isDark: boolean) => {
       const content = listMatch[3];
       return (
         <View key={lineIndex} className="flex-row items-start mb-1" style={{ marginLeft: indent + 6 }}>
-          <Text className={`mr-2 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>•</Text>
-          <Text className={`flex-1 font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed`}>
+          <Text selectable={true} className={`mr-2 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>•</Text>
+          <Text selectable={true} className={`flex-1 font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed`}>
             {parseInlineStyles(content)}
           </Text>
         </View>
@@ -85,8 +87,8 @@ const parseMarkdown = (text: string, isDark: boolean) => {
       const content = numListMatch[3];
       return (
         <View key={lineIndex} className="flex-row items-start mb-1" style={{ marginLeft: indent + 6 }}>
-          <Text className={`mr-2 font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{index}.</Text>
-          <Text className={`flex-1 font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed`}>
+          <Text selectable={true} className={`mr-2 font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{index}.</Text>
+          <Text selectable={true} className={`flex-1 font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed`}>
             {parseInlineStyles(content)}
           </Text>
         </View>
@@ -96,6 +98,7 @@ const parseMarkdown = (text: string, isDark: boolean) => {
     return (
       <Text
         key={lineIndex}
+        selectable={true}
         className={`font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed mb-1`}
       >
         {parseInlineStyles(line)}
@@ -114,6 +117,43 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const [showEscalate, setShowEscalate] = useState(false);
   const [escalatedTicket, setEscalatedTicket] = useState<{ number: number; url: string } | null>(null);
+
+  const textInputRef = useRef<TextInput>(null);
+
+  const handleMessagePress = (msg: Message, index: number) => {
+    const isUser = msg.role === 'user';
+    const actions: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [
+      {
+        text: '📋 Copy Text',
+        onPress: () => {
+          Clipboard.setString(msg.content);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        }
+      }
+    ];
+
+    if (isUser) {
+      actions.push({
+        text: '✏️ Edit Message',
+        onPress: () => {
+          setInput(msg.content);
+          textInputRef.current?.focus();
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        }
+      });
+    }
+
+    actions.push({
+      text: 'Cancel',
+      style: 'cancel' as const
+    });
+
+    Alert.alert(
+      isUser ? 'Message Options' : 'AI Assistant Options',
+      'Choose an action for this message:',
+      actions
+    );
+  };
 
   const storageKey = `cedismart_chat_history_${phone.replace(/[^\d+]/g, '') || 'anonymous'}_${supportType}`;
 
@@ -291,11 +331,43 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
   const handleSend = () => {
     if (!input.trim() || chatMutation.isPending) return;
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
+    const text = input.trim();
+    const userMessage: Message = { role: 'user', content: text };
     const updatedMessages = [...messages, userMessage];
 
     setMessages(updatedMessages);
     setInput('');
+
+    const lowerText = text.toLowerCase();
+    if (
+      lowerText.includes('sync') ||
+      lowerText.includes('shortcut') ||
+      lowerText.includes('sms') ||
+      lowerText.includes('automation')
+    ) {
+      // Simulate typing delay for premium feel
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setTimeout(() => {
+        const localGuide = 
+          "Here is how you can set up Mobile Money Live Sync on CediSmart:\n\n"
+          "🤖 **For Google Android**:\n"
+          "Android supports direct background intercepting. Go to **Settings ➔ Accounts**, tap **Configure Auto-Sync**, select **Android**, and tap **Grant SMS Permissions** to allow CediSmart to read and automatically log incoming MoMo alerts.\n\n"
+          "🍎 **For Apple iOS (Apple Shortcuts)**:\n"
+          "iOS sandboxing blocks apps from reading SMS alerts directly. You can easily configure Apple's native **Shortcuts** app to securely forward MoMo alerts in the background:\n"
+          "1. Open the Apple **Shortcuts** app, go to the **Automation** tab, and tap **+** (New Automation).\n"
+          "2. Select **Message** as the trigger, set the Sender to your MoMo sender (e.g. `MobileMoney` or `TelecelCash`), and select **Run Immediately** (so it syncs silently in the background).\n"
+          "3. Add a **Get Contents of URL** action, change the method to **POST**, and paste your CediSmart Webhook URL (copy it from Settings ➔ Accounts ➔ Configure Auto-Sync).\n"
+          "4. Add an `Authorization` header with the value `Bearer <your key>` (copied from the Accounts tab).\n"
+          "5. Set the Request Body to **JSON** and add these three fields:\n"
+          "   • `sender` ➔ Select the **Sender** variable.\n"
+          "   • `message_body` ➔ Select the **Message** content/Shortcut Input variable.\n"
+          "   • `phone` ➔ Type your registered CediSmart phone number.";
+          
+        setMessages((prev) => [...prev, { role: 'model', content: localGuide }]);
+      }, 600);
+      return;
+    }
+
     chatMutation.mutate(updatedMessages);
   };
 
@@ -365,13 +437,18 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
                       <Bot size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
                     </View>
                   )}
-                  <View className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
-                    isUser
-                      ? 'bg-primary rounded-tr-none'
-                      : `${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-surface-container-low border border-outline-variant/5'} rounded-tl-none`
-                  }`}>
+                  <TouchableOpacity
+                    onLongPress={() => handleMessagePress(msg, index)}
+                    delayLongPress={300}
+                    activeOpacity={0.85}
+                    className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
+                      isUser
+                        ? 'bg-primary rounded-tr-none'
+                        : `${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-surface-container-low border border-outline-variant/5'} rounded-tl-none`
+                    }`}
+                  >
                     {isUser ? (
-                      <Text className="font-body text-sm text-white leading-relaxed">
+                      <Text selectable={true} className="font-body text-sm text-white leading-relaxed">
                         {msg.content}
                       </Text>
                     ) : (
@@ -379,7 +456,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
                         {parseMarkdown(msg.content, isDark)}
                       </View>
                     )}
-                  </View>
+                  </TouchableOpacity>
                   {isUser && (
                     <View className="w-8 h-8 rounded-full bg-primary/20 items-center justify-center ml-2 self-end">
                       <User size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
@@ -434,6 +511,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
             className={`px-4 pt-3 border-t ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-white border-outline-variant/10'} flex-row items-center space-x-3`}
           >
             <TextInput
+              ref={textInputRef}
               className={`flex-1 h-12 px-4 rounded-xl font-body text-sm ${
                 isDark ? 'bg-dark-surface-container-low text-dark-on-surface' : 'bg-surface-container-low text-on-surface'
               } border ${isDark ? 'border-dark-outline-variant/10' : 'border-outline-variant/5'}`}

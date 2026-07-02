@@ -37,10 +37,17 @@ GENERAL_SYSTEM_PROMPT = (
     "and Bank accounts.\n\n"
     "Your tone should be polite, helpful, and direct. You can use Ghanaian context/slang (e.g., chop money, "
     "trotro, airtime, MoMo fees) appropriately to make the user feel at home.\n\n"
-    "Your focus is helping logged-in users understand and use CediSmart's ledger and budgeting features:\n"
+    "Your focus is helping logged-in users understand and use CediSmart's ledger, budgeting, and transaction syncing features:\n"
     "- Ledgers: Help them understand how to set up ledgers (personal, business, savings), add transactions "
     "(categorize expense vs income), and review monthly reports.\n"
     "- Budgeting: Guide them on setting monthly budgets, track savings goals, and manage MoMo transaction fee settings.\n"
+    "- Mobile Money Live Sync (Background SMS Sync): Guide them on how to configure automated transaction tracking:\n"
+    "  1. 🤖 Google Android: Android supports direct background intercepting. Guide the user to click 'Configure Auto-Sync' in their Accounts tab, select Android, and tap 'Grant SMS Permissions' to allow background SMS reading.\n"
+    "  2. 🍎 Apple iOS: iOS sandboxing blocks direct SMS reading. Explain that they can configure Apple's native Shortcuts app to securely forward messages via webhook:\n"
+    "     * Step 1: Open Shortcuts app ➔ Go to 'Automation' tab ➔ Tap '+' ➔ Select 'Message' as trigger (Sender: 'MobileMoney' or 'TelecelCash'). Set 'Run Immediately'.\n"
+    "     * Step 2: Under actions, add 'Get Contents of URL' action, change method to 'POST', and paste the Webhook URL copied from Settings ➔ Accounts.\n"
+    "     * Step 3: Add an Authorization header: Key: 'Authorization', Value: 'Bearer <your key>' (using the copied Auth Key from Accounts tab).\n"
+    "     * Step 4: Change request body to JSON and add fields: 'sender' ➔ select Sender (from message), 'message_body' ➔ select Message/Shortcut Input, 'phone' ➔ type their registered CediSmart phone number.\n"
     "- Important restriction: Since you are post-login support, if the user asks about changing phone numbers or "
     "re-registering, guide them to the profile/auth settings.\n\n"
     "IMPORTANT ESCALATION PROTOCOL:\n"
@@ -120,10 +127,18 @@ class SupportService:
                     "To reset your PIN, please use the 'Forgot PIN?' link on the Login screen. "
                     "This will verify your identity via SMS before prompting you to choose a new 6-digit PIN."
                 )
+            elif "sync" in last_msg or "shortcut" in last_msg or "sms" in last_msg or "automation" in last_msg:
+                return (
+                    "To configure Mobile Money Live Sync:\n"
+                    "1. Go to Settings ➔ Accounts and look for the 'Mobile Money Live Sync' panel under your linked accounts.\n"
+                    "2. Tap 'Configure Auto-Sync (iOS / Android)'.\n"
+                    "3. For Google Android: Tap 'Grant SMS Permissions' to enable automated background listening.\n"
+                    "4. For Apple iOS: Copy your Webhook URL and Auth Key, then open the native Apple Shortcuts app and configure a new 'Message' Personal Automation (set request to POST, add Authorization header, and send the message details as JSON)."
+                )
             else:
                 return (
                     "Hi there! I am the CediSmart Support Assistant. I can help you set budgets, "
-                    "create ledgers, and log transactions. What can I help you with today?"
+                    "create ledgers, log transactions, and configure background MoMo message sync. What can I help you with today?"
                 )
 
     @staticmethod
