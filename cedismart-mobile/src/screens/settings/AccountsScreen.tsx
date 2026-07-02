@@ -1293,7 +1293,7 @@ const AccountsScreen = ({ navigation }: any) => {
                         Change the Request Body to <Text className="font-bold">JSON</Text> and add these fields:
                         {"\n"}• <Text className="font-mono font-bold">sender</Text> ➔ Select <Text className="font-bold">Sender</Text> (from message variable)
                         {"\n"}• <Text className="font-mono font-bold">message_body</Text> ➔ Select <Text className="font-bold">Message</Text> or <Text className="font-bold">Shortcut Input</Text>
-                        {"\n"}• <Text className="font-mono font-bold">phone</Text> ➔ Type your registered number: <Text className="font-mono font-bold">{maskPhone(user?.phone)}</Text>
+                        {"\n"}• <Text className="font-mono font-bold">phone</Text> ➔ Type your registered number (e.g., <Text className="font-mono font-bold">+23324****567</Text>)
                       </Text>
                     </View>
                   </View>
