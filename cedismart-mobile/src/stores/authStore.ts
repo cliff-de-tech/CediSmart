@@ -17,6 +17,10 @@ export interface User {
   email?: string;
   currency: string;
   is_premium: boolean;
+  trial_started_at?: string;
+  is_trial_active?: boolean;
+  trial_days_remaining?: number;
+  has_premium_access?: boolean;
 }
 
 export interface SavedAccount {

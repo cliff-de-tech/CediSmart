@@ -34,6 +34,9 @@ class User(TimestampMixin, Base):
     premium_expires_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
+    trial_started_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
     kyc_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     ghana_card: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
@@ -53,14 +56,44 @@ class User(TimestampMixin, Base):
 
     @property
     def has_premium_access(self) -> bool:
-        """Check if user has premium access (either paid or within 7-day free trial)."""
+        """Check if user has premium access (either paid or within active 7-day free trial)."""
         if self.is_premium:
             return True
-        if self.created_at:
+        if self.trial_started_at:
             from datetime import timezone, timedelta
-            now = datetime.now(self.created_at.tzinfo or timezone.utc)
-            return now - self.created_at < timedelta(days=7)
+            start = self.trial_started_at
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            return now - start < timedelta(days=7)
         return False
+
+    @property
+    def is_trial_active(self) -> bool:
+        """Check if user has a trial currently running and active."""
+        if self.is_premium:
+            return False
+        if self.trial_started_at:
+            from datetime import timezone, timedelta
+            start = self.trial_started_at
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            return now - start < timedelta(days=7)
+        return False
+
+    @property
+    def trial_days_remaining(self) -> int:
+        """Get remaining days of trial."""
+        if self.trial_started_at:
+            from datetime import timezone
+            start = self.trial_started_at
+            if start.tzinfo is None:
+                start = start.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            diff = now - start
+            return max(0, 7 - diff.days)
+        return 0
 
     def __repr__(self) -> str:
         return f"<User id={self.id} phone={self.phone}>"

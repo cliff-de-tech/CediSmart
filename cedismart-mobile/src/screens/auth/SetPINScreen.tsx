@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { Shield, Info, CheckCircle } from 'lucide-react-native';
 import { useSignUp } from '@clerk/clerk-expo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import PINPad from '../../components/shared/PINPad';
 import apiClient, { setActiveTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -101,6 +102,21 @@ const SetPINScreen = ({ route, navigation }: any) => {
       // Save PIN in SecureStore for multi-account switches and biometrics
       const sanitizedPhone = (user.phone || phone).replace(/[^\w.-]/g, '');
       await SecureStore.setItemAsync(`user_pin_${sanitizedPhone}`, variables.pin);
+      
+      // Check for pending trial activation
+      try {
+        const startTrialOptIn = await AsyncStorage.getItem('pending_trial_opt_in');
+        if (startTrialOptIn === 'true') {
+          await AsyncStorage.removeItem('pending_trial_opt_in');
+          console.log('[SetPIN Clerk] Activating pending free trial...');
+          const trialResponse = await apiClient.post('/billing/start-trial');
+          console.log('[SetPIN Clerk] Trial active:', JSON.stringify(trialResponse.data));
+          login(trialResponse.data);
+          return;
+        }
+      } catch (trialErr) {
+        console.warn('[SetPIN Clerk] Failed to activate pending trial:', trialErr);
+      }
       
       login(user);
     },

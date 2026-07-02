@@ -1148,204 +1148,234 @@ const AccountsScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* Segmented OS Selector Control */}
-            <View className={`flex-row p-1 rounded-2xl mb-6 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-gray-100'}`}>
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setActiveSyncTab('ios');
-                }}
-                className={`flex-1 py-3 items-center rounded-xl flex-row justify-center ${activeSyncTab === 'ios' ? 'bg-primary' : ''}`}
-              >
-                <Text className={`font-bold text-xs ${activeSyncTab === 'ios' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  🍎 Apple iOS
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.selectionAsync().catch(() => {});
-                  setActiveSyncTab('android');
-                }}
-                className={`flex-1 py-3 items-center rounded-xl flex-row justify-center ${activeSyncTab === 'android' ? 'bg-primary' : ''}`}
-              >
-                <Text className={`font-bold text-xs ${activeSyncTab === 'android' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  🤖 Google Android
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-              {activeSyncTab === 'ios' ? (
-                // --- iOS Shortcut Webhook Guide ---
-                <View className="space-y-5">
-                  <View className={`p-4 rounded-2xl flex-row ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'}`}>
-                    <Info size={18} color="#3B82F6" className="mr-3 mt-0.5" />
-                    <Text className={`flex-1 font-body text-xs leading-5 ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>
-                      iOS sandboxing blocks apps from reading SMS alerts directly. Follow the steps below to configure Apple's native Shortcuts app to securely forward MoMo messages to CediSmart in the background.
-                    </Text>
-                  </View>
-
-                  {/* Step 1 */}
-                  <View className="flex-row items-start">
-                    <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                      <Text className="text-primary font-bold text-xs">1</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure Automation Trigger</Text>
-                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
-                        Open the native Apple <Text className="font-bold">Shortcuts</Text> app ➔ Go to the <Text className="font-bold">Automation</Text> tab ➔ Tap <Text className="font-bold">+</Text> ➔ Select <Text className="font-bold">Message</Text> as trigger. Set the Sender to your MoMo sender (e.g., <Text className="font-mono">MobileMoney</Text> or <Text className="font-mono">T-CASH</Text>). Choose <Text className="font-bold">Run Immediately</Text> to sync in the background.
-                      </Text>
-                      <TouchableOpacity
-                        onPress={async () => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                          Linking.openURL('shortcuts://').catch(() => {
-                            Alert.alert('Error', 'Could not open Apple Shortcuts app. Please ensure it is installed.');
-                          });
-                        }}
-                        className="bg-primary/10 mt-3 py-3 px-4 rounded-xl flex-row items-center justify-center self-start"
-                      >
-                        <Text className="text-primary font-bold text-xs mr-2">Open Shortcuts App</Text>
-                        <ExternalLink size={14} color="#0A6E4A" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Step 2 */}
-                  <View className="flex-row items-start mt-6">
-                    <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                      <Text className="text-primary font-bold text-xs">2</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Copy Webhook Destination URL</Text>
-                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
-                        Under automation actions, add a <Text className="font-bold">Get Contents of URL</Text> action. Expand details, change method to <Text className="font-bold">POST</Text>, and paste the webhook URL:
-                      </Text>
-                      
-                      <TouchableOpacity
-                        onPress={async () => {
-                          try {
-                            const apiUrl = apiClient.defaults.baseURL || 'https://api.cedismart.com/api/v1';
-                            const webhookUrl = `${apiUrl}/transactions/sms-webhook`;
-                            Clipboard.setString(webhookUrl);
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-                            Alert.alert('URL Copied', 'The webhook URL has been copied to your clipboard!');
-                          } catch (e) {
-                            Alert.alert('Error', 'Failed to copy URL.');
-                          }
-                        }}
-                        className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-gray-50 border-gray-100'}`}
-                      >
-                        <Text className={`font-mono text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} flex-1`} numberOfLines={1}>
-                          {`${apiClient.defaults.baseURL || 'https://api.cedismart.com/api/v1'}/transactions/sms-webhook`}
-                        </Text>
-                        <Copy size={16} color="#0A6E4A" className="ml-2" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Step 3 */}
-                  <View className="flex-row items-start mt-6">
-                    <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                      <Text className="text-primary font-bold text-xs">3</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Copy Authentication Key</Text>
-                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
-                        In the headers section of the action, add a header:
-                        {"\n"}• Key: <Text className="font-mono font-bold">Authorization</Text>
-                        {"\n"}• Value: <Text className="font-mono font-bold">Bearer &lt;your key&gt;</Text>
-                      </Text>
-                      
-                      <TouchableOpacity
-                        onPress={async () => {
-                          try {
-                            const token = await SecureStore.getItemAsync('access_token');
-                            if (token) {
-                              Clipboard.setString(token);
-                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-                              Alert.alert('Key Copied', 'Your secure authentication key has been copied to your clipboard!');
-                            } else {
-                              Alert.alert('Session Expired', 'Please re-login to retrieve your auth key.');
-                            }
-                          } catch (e) {
-                            Alert.alert('Error', 'Failed to retrieve auth token.');
-                          }
-                        }}
-                        className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-gray-50 border-gray-100'}`}
-                      >
-                        <Text className={`font-mono text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} flex-1`} numberOfLines={1}>
-                          ••••••••••••••••••••••••••••••••
-                        </Text>
-                        <Copy size={16} color="#0A6E4A" className="ml-2" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {/* Step 4 */}
-                  <View className="flex-row items-start mt-6">
-                    <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                      <Text className="text-primary font-bold text-xs">4</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure JSON Payload</Text>
-                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
-                        Change the Request Body to <Text className="font-bold">JSON</Text> and add these fields:
-                        {"\n"}• <Text className="font-mono font-bold">sender</Text> ➔ Select <Text className="font-bold">Sender</Text> (from message variable)
-                        {"\n"}• <Text className="font-mono font-bold">message_body</Text> ➔ Select <Text className="font-bold">Message</Text> or <Text className="font-bold">Shortcut Input</Text>
-                        {"\n"}• <Text className="font-mono font-bold">phone</Text> ➔ Type your registered number (e.g., <Text className="font-mono font-bold">+23324****567</Text>)
-                      </Text>
-                    </View>
-                  </View>
+            {!(user?.is_premium || user?.is_trial_active) ? (
+              <View className="items-center py-10 px-4">
+                <View className={`w-16 h-16 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center mb-4`}>
+                  <Smartphone size={32} color={isDark ? '#4ade80' : '#16a34a'} />
                 </View>
-              ) : (
-                // --- Android Native Receiver ---
-                <View className="space-y-6">
-                  <View className={`p-4 rounded-2xl flex-row ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'}`}>
-                    <Info size={18} color="#10B981" className="mr-3 mt-0.5" />
-                    <Text className={`flex-1 font-body text-xs leading-5 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>
-                      Android supports background message interception. Granting SMS permissions allows CediSmart to read and automatically log incoming MTN MoMo or Telecel Cash messages instantly.
+                <Text className={`font-headline font-bold text-lg text-center ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                  Auto-Sync is a Pro Feature
+                </Text>
+                <Text className={`text-xs text-center mt-2 leading-relaxed max-w-[280px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  SMS background listening and automated webhooks require an active subscription or free trial.
+                </Text>
+                
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowSyncModal(false);
+                    Alert.alert(
+                      'Unlock Pro Features',
+                      'Please visit the Settings menu to redeem your 7-day Free Trial or subscribe to a plan!',
+                      [{ text: 'OK' }]
+                    );
+                  }}
+                  className="mt-6 w-full bg-primary h-12 rounded-xl items-center justify-center shadow-lg shadow-primary/20"
+                >
+                  <Text className="text-white font-headline font-bold text-sm">
+                    Unlock Premium Features
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {/* Segmented OS Selector Control */}
+                <View className={`flex-row p-1 rounded-2xl mb-6 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-gray-100'}`}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setActiveSyncTab('ios');
+                    }}
+                    className={`flex-1 py-3 items-center rounded-xl flex-row justify-center ${activeSyncTab === 'ios' ? 'bg-primary' : ''}`}
+                  >
+                    <Text className={`font-bold text-xs ${activeSyncTab === 'ios' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      🍎 Apple iOS
                     </Text>
-                  </View>
-
-                  <View className="items-center py-6">
-                    <Smartphone size={60} color="#10B981" />
-                    <Text className={`font-headline font-black text-base mt-4 ${isDark ? 'text-white' : 'text-charcoal'}`}>
-                      Automated Background Listening
-                    </Text>
-                    <Text className={`text-xs text-center mt-1 px-4 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      Once enabled, transaction notifications will appear instantly when you receive a Mobile Money alert SMS.
-                    </Text>
-                  </View>
+                  </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={async () => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-                      try {
-                        const granted = await PermissionsAndroid.requestMultiple([
-                          PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
-                          PermissionsAndroid.PERMISSIONS.READ_SMS,
-                        ]);
-                        if (
-                          granted['android.permission.RECEIVE_SMS'] === PermissionsAndroid.RESULTS.GRANTED &&
-                          granted['android.permission.READ_SMS'] === PermissionsAndroid.RESULTS.GRANTED
-                        ) {
-                          Alert.alert('Permission Granted', 'CediSmart is now configured to auto-log your MoMo messages in the background!');
-                          setShowSyncModal(false);
-                        } else {
-                          Alert.alert('Permission Denied', 'Please grant SMS permissions in settings to enable automated background sync.');
-                        }
-                      } catch (err) {
-                        Alert.alert('Error', 'Failed to request permissions.');
-                      }
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => {});
+                      setActiveSyncTab('android');
                     }}
-                    className="w-full py-4 bg-primary rounded-xl items-center justify-center shadow-lg shadow-primary/30 active:scale-[0.98]"
+                    className={`flex-1 py-3 items-center rounded-xl flex-row justify-center ${activeSyncTab === 'android' ? 'bg-primary' : ''}`}
                   >
-                    <Text className="text-white font-bold text-base">Grant SMS Permissions</Text>
+                    <Text className={`font-bold text-xs ${activeSyncTab === 'android' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      🤖 Google Android
+                    </Text>
                   </TouchableOpacity>
                 </View>
-              )}
-            </ScrollView>
+
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                  {activeSyncTab === 'ios' ? (
+                    // --- iOS Shortcut Webhook Guide ---
+                    <View className="space-y-5">
+                      <View className={`p-4 rounded-2xl flex-row ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'}`}>
+                        <Info size={18} color="#3B82F6" className="mr-3 mt-0.5" />
+                        <Text className={`flex-1 font-body text-xs leading-5 ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>
+                          iOS sandboxing blocks apps from reading SMS alerts directly. Follow the steps below to configure Apple's native Shortcuts app to securely forward MoMo messages to CediSmart in the background.
+                        </Text>
+                      </View>
+
+                      {/* Step 1 */}
+                      <View className="flex-row items-start">
+                        <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                          <Text className="text-primary font-bold text-xs">1</Text>
+                        </View>
+                        <View className="flex-1">
+                          <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure Automation Trigger</Text>
+                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                            Open the native Apple <Text className="font-bold">Shortcuts</Text> app ➔ Go to the <Text className="font-bold">Automation</Text> tab ➔ Tap <Text className="font-bold">+</Text> ➔ Select <Text className="font-bold">Message</Text> as trigger. Set the Sender to your MoMo sender (e.g., <Text className="font-mono">MobileMoney</Text> or <Text className="font-mono">T-CASH</Text>). Choose <Text className="font-bold">Run Immediately</Text> to sync in the background.
+                          </Text>
+                          <TouchableOpacity
+                            onPress={async () => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                              Linking.openURL('shortcuts://').catch(() => {
+                                Alert.alert('Error', 'Could not open Apple Shortcuts app. Please ensure it is installed.');
+                              });
+                            }}
+                            className="bg-primary/10 mt-3 py-3 px-4 rounded-xl flex-row items-center justify-center self-start"
+                          >
+                            <Text className="text-primary font-bold text-xs mr-2">Open Shortcuts App</Text>
+                            <ExternalLink size={14} color="#0A6E4A" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Step 2 */}
+                      <View className="flex-row items-start mt-6">
+                        <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                          <Text className="text-primary font-bold text-xs">2</Text>
+                        </View>
+                        <View className="flex-1">
+                          <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Add Contents URL Action</Text>
+                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                            Add the <Text className="font-bold">Get Contents of URL</Text> action. Set the URL to:
+                          </Text>
+                          <View className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-gray-50 border-gray-100'}`}>
+                            <Text className={`font-mono text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'} flex-1`} numberOfLines={1}>
+                              https://api.cedismart.com/api/v1/transactions/sms-webhook
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                Clipboard.setString('https://api.cedismart.com/api/v1/transactions/sms-webhook');
+                                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                                Alert.alert('Copied', 'Webhook URL copied to clipboard!');
+                              }}
+                              className="ml-2"
+                            >
+                              <Copy size={16} color="#0A6E4A" />
+                            </TouchableOpacity>
+                          </View>
+                          <Text className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-[10px] mt-1`}>
+                            Tap the URL in Shortcuts to change the method from GET to <Text className="font-bold">POST</Text>.
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Step 3 */}
+                      <View className="flex-row items-start mt-6">
+                        <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                          <Text className="text-primary font-bold text-xs">3</Text>
+                        </View>
+                        <View className="flex-1">
+                          <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Copy Authentication Key</Text>
+                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                            In the headers section of the action, add a header:
+                            {"\n"}• Key: <Text className="font-mono font-bold">Authorization</Text>
+                            {"\n"}• Value: <Text className="font-mono font-bold">Bearer &lt;your key&gt;</Text>
+                          </Text>
+                          
+                          <TouchableOpacity
+                            onPress={async () => {
+                              try {
+                                const token = await SecureStore.getItemAsync('access_token');
+                                if (token) {
+                                  Clipboard.setString(token);
+                                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                                  Alert.alert('Key Copied', 'Your secure authentication key has been copied to your clipboard!');
+                                } else {
+                                  Alert.alert('Session Expired', 'Please re-login to retrieve your auth key.');
+                                }
+                              } catch (e) {
+                                Alert.alert('Error', 'Failed to retrieve auth token.');
+                              }
+                            }}
+                            className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-gray-50 border-gray-100'}`}
+                          >
+                            <Text className={`font-mono text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} flex-1`} numberOfLines={1}>
+                              ••••••••••••••••••••••••••••••••
+                            </Text>
+                            <Copy size={16} color="#0A6E4A" className="ml-2" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* Step 4 */}
+                      <View className="flex-row items-start mt-6">
+                        <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                          <Text className="text-primary font-bold text-xs">4</Text>
+                        </View>
+                        <View className="flex-1">
+                          <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure JSON Payload</Text>
+                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                            Change the Request Body to <Text className="font-bold">JSON</Text> and add these fields:
+                            {"\n"}• <Text className="font-mono font-bold">sender</Text> ➔ Select <Text className="font-bold">Sender</Text> (from message variable)
+                            {"\n"}• <Text className="font-mono font-bold">message_body</Text> ➔ Select <Text className="font-bold">Message</Text> or <Text className="font-bold">Shortcut Input</Text>
+                            {"\n"}• <Text className="font-mono font-bold">phone</Text> ➔ Type your registered number (e.g., <Text className="font-mono font-bold">+23324****567</Text>)
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    // --- Android Native Receiver ---
+                    <View className="space-y-6">
+                      <View className={`p-4 rounded-2xl flex-row ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-100'}`}>
+                        <Info size={18} color="#10B981" className="mr-3 mt-0.5" />
+                        <Text className={`flex-1 font-body text-xs leading-5 ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>
+                          Android supports background message interception. Granting SMS permissions allows CediSmart to read and automatically log incoming MTN MoMo or Telecel Cash messages instantly.
+                        </Text>
+                      </View>
+
+                      <View className="items-center py-6">
+                        <Smartphone size={60} color="#10B981" />
+                        <Text className={`font-headline font-black text-base mt-4 ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                          Automated Background Listening
+                        </Text>
+                        <Text className={`text-xs text-center mt-1 px-4 leading-relaxed ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          Once enabled, transaction notifications will appear instantly when you receive a Mobile Money alert SMS.
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={async () => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                          try {
+                            const granted = await PermissionsAndroid.requestMultiple([
+                              PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
+                              PermissionsAndroid.PERMISSIONS.READ_SMS,
+                            ]);
+                            if (
+                              granted['android.permission.RECEIVE_SMS'] === PermissionsAndroid.RESULTS.GRANTED &&
+                              granted['android.permission.READ_SMS'] === PermissionsAndroid.RESULTS.GRANTED
+                            ) {
+                              Alert.alert('Permission Granted', 'CediSmart is now configured to auto-log your MoMo messages in the background!');
+                              setShowSyncModal(false);
+                            } else {
+                              Alert.alert('Permission Denied', 'Please grant SMS permissions in settings to enable automated background sync.');
+                            }
+                          } catch (err) {
+                            Alert.alert('Error', 'Failed to request permissions.');
+                          }
+                        }}
+                        className="w-full py-4 bg-primary rounded-xl items-center justify-center shadow-lg shadow-primary/30 active:scale-[0.98]"
+                      >
+                        <Text className="text-white font-bold text-base">Grant SMS Permissions</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </ScrollView>
+              </>
+            )}
           </View>
         </View>
       </Modal>

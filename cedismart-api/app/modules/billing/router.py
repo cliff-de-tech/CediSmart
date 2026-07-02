@@ -9,6 +9,8 @@ from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.core.exceptions import AppException
 from app.modules.auth.models import User
+from datetime import datetime, timezone
+from app.modules.users.schemas import UserResponse
 from app.modules.billing.schemas import PaymentInitializeRequest, PaymentInitializeResponse
 from app.modules.billing.service import BillingService
 
@@ -25,6 +27,52 @@ async def _get_user(user_id: uuid.UUID, db: AsyncSession) -> User:
             message="User session not found."
         )
     return user
+
+@router.post(
+    "/start-trial",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Start user's 7-day free trial of CediSmart Pro"
+)
+async def start_trial(
+    user_id: CurrentUser,
+    db: DBSession
+) -> UserResponse:
+    user = await _get_user(user_id, db)
+    if user.trial_started_at is not None:
+        raise AppException(
+            status_code=400,
+            error_code="TRIAL_ALREADY_USED",
+            message="You have already redeemed or started your free trial."
+        )
+    user.trial_started_at = datetime.now(timezone.utc)
+    await db.commit()
+    return UserResponse.model_validate(user)
+
+@router.post(
+    "/cancel",
+    response_model=UserResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Cancel active subscription or opt-out of the free trial"
+)
+async def cancel_subscription(
+    user_id: CurrentUser,
+    db: DBSession
+) -> UserResponse:
+    user = await _get_user(user_id, db)
+    
+    # 1. If in active trial, opt-out by setting start date to past
+    if user.is_trial_active:
+        from datetime import timedelta
+        user.trial_started_at = datetime.now(timezone.utc) - timedelta(days=10)
+        
+    # 2. If paid premium member, clear premium fields
+    if user.is_premium:
+        user.is_premium = False
+        user.premium_expires_at = None
+        
+    await db.commit()
+    return UserResponse.model_validate(user)
 
 @router.post(
     "/initialize",

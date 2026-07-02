@@ -206,7 +206,7 @@ async def test_verify_kyc_duplicate_card(client: AsyncClient, make_user, db_sess
     # Manually update their ghana_card and save to DB
     user_a.ghana_card = "GHA-123456789-0"
     user_a.kyc_verified = True
-    await db_session.commit()
+    await db_session.flush()
 
     # 2. Create another user trying to link the same card
     user_b = await make_user(phone="+233202222222")

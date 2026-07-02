@@ -156,8 +156,13 @@ async def test_delete_account_no_transactions(client: AsyncClient, make_user) ->
 # ---------------------------------------------------------------------------
 
 
-async def test_free_tier_account_limit(client: AsyncClient, make_user) -> None:
+async def test_free_tier_account_limit(client: AsyncClient, make_user, db_session) -> None:
+    from datetime import datetime, timezone, timedelta
     user = await make_user(is_premium=False)
+    user.trial_started_at = datetime.now(timezone.utc) - timedelta(days=10)
+    db_session.add(user)
+    await db_session.flush()
+
     headers = make_auth_headers(user.id)
 
     for i in range(3):

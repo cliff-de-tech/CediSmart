@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, Animated, Dimensions, StatusBar } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, Image, TouchableOpacity, Animated, Dimensions, StatusBar, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../stores/themeStore';
 import * as Haptics from 'expo-haptics';
-import { Sun, Moon } from 'lucide-react-native';
+import { Sun, Moon, Check, Sparkles } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
@@ -11,6 +11,7 @@ const { width } = Dimensions.get('window');
 const WelcomeScreen = ({ navigation }: any) => {
   const { theme, toggleTheme } = useThemeStore();
   const isDark = theme === 'dark';
+  const [isTrialModalVisible, setIsTrialModalVisible] = useState(false);
 
   // Animation values
   const fadeAnimHeader = useRef(new Animated.Value(0)).current;
@@ -78,6 +79,20 @@ const WelcomeScreen = ({ navigation }: any) => {
 
   const handleGetStarted = () => {
     Haptics.selectionAsync().catch(() => {});
+    setIsTrialModalVisible(true);
+  };
+
+  const handleAcceptTrial = async () => {
+    setIsTrialModalVisible(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    await AsyncStorage.setItem('pending_trial_opt_in', 'true');
+    navigation.navigate('Register');
+  };
+
+  const handleDeclineTrial = async () => {
+    setIsTrialModalVisible(false);
+    Haptics.selectionAsync().catch(() => {});
+    await AsyncStorage.removeItem('pending_trial_opt_in');
     navigation.navigate('Register');
   };
 
@@ -185,6 +200,99 @@ const WelcomeScreen = ({ navigation }: any) => {
 
         </View>
       </SafeAreaView>
+
+      {/* Trial Offer Modal */}
+      <Modal
+        visible={isTrialModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsTrialModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/60">
+          <View className={`w-full p-6 rounded-t-[32px] border-t ${
+            isDark ? 'bg-[#181e19] border-dark-outline-variant/10' : 'bg-white border-gray-100'
+          }`}>
+            {/* Header */}
+            <View className="items-center mb-6">
+              <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center mb-3`}>
+                <Sparkles size={24} color={isDark ? '#4ade80' : '#16a34a'} />
+              </View>
+              <Text className={`text-2xl font-headline font-bold text-center ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                Unlock 7 Days Free
+              </Text>
+              <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} text-center mt-1`}>
+                Try CediSmart Pro features with zero limitations.
+              </Text>
+            </View>
+
+            {/* Feature List */}
+            <View className="space-y-4 mb-8">
+              <View className="flex-row items-start">
+                <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                  <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
+                </View>
+                <View className="flex-1">
+                  <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                    Automated SMS Transaction Sync
+                  </Text>
+                  <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                    Auto-read Mobile Money transaction alerts from your SMS history.
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row items-start">
+                <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                  <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
+                </View>
+                <View className="flex-1">
+                  <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                    Unlimited Ledgers & Vaults
+                  </Text>
+                  <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                    Link unlimited bank/MoMo wallets and manage custom vaults.
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row items-start">
+                <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                  <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
+                </View>
+                <View className="flex-1">
+                  <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
+                    Beautiful CSV & PDF Exports
+                  </Text>
+                  <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                    Export all logs for tax compliance or business book-keeping.
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* CTAs */}
+            <View className="space-y-3">
+              <TouchableOpacity
+                onPress={handleAcceptTrial}
+                className="w-full bg-primary h-14 rounded-2xl items-center justify-center shadow-lg shadow-primary/20"
+              >
+                <Text className="text-white font-headline font-bold text-base">
+                  Start My 7-Day Free Trial
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleDeclineTrial}
+                className="w-full h-12 items-center justify-center"
+              >
+                <Text className={`font-headline font-semibold text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Decline Offer & Continue with Free Tier
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

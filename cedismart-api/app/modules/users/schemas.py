@@ -47,6 +47,10 @@ class UserResponse(BaseModel):
     currency: str
     is_premium: bool
     premium_expires_at: datetime | None
+    trial_started_at: datetime | None
+    is_trial_active: bool
+    trial_days_remaining: int
+    has_premium_access: bool
     kyc_verified: bool
     ghana_card: str | None
     created_at: datetime
@@ -63,8 +67,12 @@ class UserResponse(BaseModel):
                 "email": data.email,
                 "full_name": data.full_name,
                 "currency": data.currency,
-                "is_premium": data.has_premium_access,
+                "is_premium": data.is_premium,
                 "premium_expires_at": data.premium_expires_at,
+                "trial_started_at": data.trial_started_at,
+                "is_trial_active": data.is_trial_active,
+                "trial_days_remaining": data.trial_days_remaining,
+                "has_premium_access": data.has_premium_access,
                 "kyc_verified": data.kyc_verified,
                 "ghana_card": data.ghana_card,
                 "created_at": data.created_at,

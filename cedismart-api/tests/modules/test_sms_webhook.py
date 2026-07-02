@@ -1,9 +1,9 @@
 import pytest
 from httpx import AsyncClient
-from tests.conftest import make_auth_headers
+from tests.conftest import make_auth_headers, assert_error_response
 
 async def _setup_momo(client: AsyncClient, make_user) -> tuple:
-    user = await make_user()
+    user = await make_user(is_premium=True)
     headers = make_auth_headers(user.id)
 
     # Create a mobile money account with the target phone number
@@ -90,7 +90,7 @@ async def test_sms_webhook_expense_with_fee(client: AsyncClient, make_user) -> N
 
 async def test_sms_webhook_not_found(client: AsyncClient, make_user) -> None:
     # Test webhook with a phone number that has no linked account
-    user = await make_user()
+    user = await make_user(is_premium=True)
     headers = make_auth_headers(user.id)
 
     body = (
@@ -107,3 +107,28 @@ async def test_sms_webhook_not_found(client: AsyncClient, make_user) -> None:
         headers=headers
     )
     assert resp.status_code == 404
+
+async def test_sms_webhook_premium_required(client: AsyncClient, make_user, db_session) -> None:
+    from datetime import datetime, timezone, timedelta
+    # Create an expired user (created 10 days ago, is_premium=False)
+    user = await make_user(is_premium=False)
+    user.created_at = datetime.now(timezone.utc) - timedelta(days=10)
+    db_session.add(user)
+    await db_session.flush()
+
+    headers = make_auth_headers(user.id)
+    body = (
+        "You have received GHS 50.00 from Kojo Mensah (0241234567). "
+        "Your new balance is GHS 150.00. Transaction ID: 194827189."
+    )
+    resp = await client.post(
+        "/api/v1/transactions/sms-webhook",
+        json={
+            "sender": "MobileMoney",
+            "message_body": body,
+            "phone": "0241234567"
+        },
+        headers=headers
+    )
+    assert_error_response(resp, 403, "PREMIUM_REQUIRED")
+

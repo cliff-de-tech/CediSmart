@@ -13,7 +13,11 @@ from typing import Annotated
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.exceptions import AppException
+from app.modules.auth.models import User
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
@@ -305,6 +309,13 @@ async def sms_webhook(
     log the transaction under the corresponding wallet, and adjust
     ledger balance automatically.
     """
+    user = await db.scalar(select(User).where(User.id == user_id))
+    if not user or not user.has_premium_access:
+        raise AppException(
+            status_code=403,
+            error_code="PREMIUM_REQUIRED",
+            message="Auto-syncing Mobile Money SMS transactions is a premium feature. Please upgrade to Pro."
+        )
     tx = await service.parse_and_log_sms(
         user_id=user_id,
         phone=payload.phone,

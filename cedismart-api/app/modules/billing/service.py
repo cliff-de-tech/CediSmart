@@ -20,13 +20,17 @@ class BillingService:
         # Get amount based on plan
         if plan == "pro":
             amount_ghs = 15.00
+        elif plan == "pro_yearly":
+            amount_ghs = 120.00
         elif plan == "business":
             amount_ghs = 49.00
+        elif plan == "business_yearly":
+            amount_ghs = 399.00
         else:
             raise AppException(
                 status_code=400,
                 error_code="INVALID_PLAN",
-                message="Invalid plan selection. Choose 'pro' or 'business'."
+                message="Invalid plan selection. Choose 'pro', 'pro_yearly', 'business', or 'business_yearly'."
             )
 
         reference = f"cedi_{uuid.uuid4().hex}"

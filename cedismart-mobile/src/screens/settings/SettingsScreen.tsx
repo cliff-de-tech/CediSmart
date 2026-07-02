@@ -71,6 +71,11 @@ const SettingsScreen = ({ navigation, route }: any) => {
 
   // KYC States
   const kycSheetRef = useRef<BottomSheet>(null);
+  const pricingSheetRef = useRef<BottomSheet>(null);
+  const [selectedPlan, setSelectedPlan] = useState<'pro' | 'business'>('pro');
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [isActivatingTrial, setIsActivatingTrial] = useState(false);
+  const [isCancellingPlan, setIsCancellingPlan] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
   const [ghanaCardNumber, setGhanaCardNumber] = useState('');
   const [cardNum, setCardNum] = useState('');
@@ -936,13 +941,18 @@ const SettingsScreen = ({ navigation, route }: any) => {
     }
   };
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (plan: 'pro' | 'business', cycle: 'monthly' | 'yearly') => {
     if (isUpgrading) return;
     setIsUpgrading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    
+    const planKey = cycle === 'yearly' ? `${plan}_yearly` : plan;
+    
     try {
-      const response = await apiClient.post('/billing/initialize', { plan: 'pro' });
+      const response = await apiClient.post('/billing/initialize', { plan: planKey });
       const { authorization_url } = response.data;
+      
+      pricingSheetRef.current?.close();
       
       // Open in-app browser for payment checkout
       await WebBrowser.openBrowserAsync(authorization_url);
@@ -966,7 +976,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 updateUser(profileResp.data);
                 if (profileResp.data.is_premium) {
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-                  Alert.alert('Success', 'Welcome to CediSmart Pro! Your premium status is now active.');
+                  Alert.alert('Success', 'Welcome to CediSmart Premium! Your features are now unlocked.');
                 } else {
                   Alert.alert('Pending', 'We did not receive a payment success confirmation yet. If you paid, please wait a moment and try refreshing your profile in settings.');
                 }
@@ -984,6 +994,52 @@ const SettingsScreen = ({ navigation, route }: any) => {
       Alert.alert('Error', 'Failed to initialize payment gateway. Please try again.');
       setIsUpgrading(false);
     }
+  };
+
+  const handleStartTrial = async () => {
+    if (isActivatingTrial) return;
+    setIsActivatingTrial(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    try {
+      const response = await apiClient.post('/billing/start-trial');
+      updateUser(response.data);
+      Alert.alert('Trial Activated', 'Your 7-day free trial of CediSmart Pro has started! Enjoy full features.');
+    } catch (err) {
+      console.warn('Failed to start trial:', err);
+      Alert.alert('Error', 'Unable to activate free trial at this time.');
+    } finally {
+      setIsActivatingTrial(false);
+    }
+  };
+
+  const handleCancelPlan = () => {
+    Alert.alert(
+      user?.is_premium ? 'Cancel Subscription' : 'Opt-out of Trial',
+      user?.is_premium 
+        ? 'Are you sure you want to cancel your CediSmart Pro subscription? You will lose access to auto-sync and unlimited vaults immediately.'
+        : 'Are you sure you want to end your free trial? You will return to the free tier immediately.',
+      [
+        { text: 'Keep Active', style: 'cancel' },
+        {
+          text: user?.is_premium ? 'Cancel Subscription' : 'End Trial',
+          style: 'destructive',
+          onPress: async () => {
+            setIsCancellingPlan(true);
+            try {
+              const response = await apiClient.post('/billing/cancel');
+              updateUser(response.data);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+              Alert.alert('Downgraded', 'Your plan has been cancelled successfully. You are now on the Free Tier.');
+            } catch (err) {
+              console.warn('Failed to cancel plan:', err);
+              Alert.alert('Error', 'Unable to cancel your subscription at this time. Please check your network connection.');
+            } finally {
+              setIsCancellingPlan(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleManualSync = async () => {
@@ -1031,7 +1087,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
         'Exporting transaction history is only available for Pro members. Upgrade now to get access!',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Upgrade to Pro', onPress: handleUpgrade }
+          { text: 'Upgrade to Pro', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
         ]
       );
       return;
@@ -1114,7 +1170,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
         'Custom App Icons are only available for Pro members. Upgrade now to get access!',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Upgrade to Pro', onPress: handleUpgrade }
+          { text: 'Upgrade to Pro', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
         ]
       );
       return;
@@ -1285,23 +1341,57 @@ const SettingsScreen = ({ navigation, route }: any) => {
                     'You are a Pro member! Enjoy unlimited vaults, CSV exports, and priority offline syncing.',
                     [{ text: 'Great!' }]
                   );
-                } else {
+                } else if (user?.is_trial_active) {
                   Alert.alert(
-                    'Upgrade to Pro',
-                    'Get unlimited vaults, CSV exports, and link unlimited bank/MoMo accounts for ₵10/month.',
+                    'Free Trial Active',
+                    `You are currently enjoying CediSmart Pro for free! You have ${user?.trial_days_remaining || 0} days left. Would you like to subscribe to a paid plan now to avoid interruption?`,
                     [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Upgrade Now', onPress: handleUpgrade }
+                      { text: 'Later', style: 'cancel' },
+                      { text: 'View Plans', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
                     ]
                   );
+                } else if (!user?.trial_started_at) {
+                  Alert.alert(
+                    'Start Free Trial',
+                    'Activate your 7-day free trial of CediSmart Pro now to enjoy automatic syncing and unlimited features.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Start Trial Now', onPress: handleStartTrial }
+                    ]
+                  );
+                } else {
+                  pricingSheetRef.current?.snapToIndex(0);
                 }
               }}
-              color={user?.is_premium ? "#4c56af" : undefined}
+              color={user?.is_premium || user?.is_trial_active ? "#4c56af" : undefined}
             >
-              <Text className={`font-bold text-base ${user?.is_premium ? (isDark ? 'text-indigo-400' : 'text-secondary') : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-                {user?.is_premium ? 'CediSmart Pro' : 'Free Tier (Tap to upgrade)'}
+              <Text className={`font-bold text-base ${(user?.is_premium || user?.is_trial_active) ? (isDark ? 'text-indigo-400' : 'text-secondary') : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                {user?.is_premium 
+                  ? 'CediSmart Pro' 
+                  : user?.is_trial_active 
+                  ? `Free Trial (${user?.trial_days_remaining} days left)`
+                  : !user?.trial_started_at
+                  ? 'Free Tier (Redeem Trial)'
+                  : 'Free Tier (Tap to upgrade)'}
               </Text>
             </SettingItem>
+            
+            {/* Conditional Cancel Option */}
+            {(user?.is_premium || user?.is_trial_active) && (
+              <TouchableOpacity
+                onPress={handleCancelPlan}
+                disabled={isCancellingPlan}
+                className="mt-3 py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/5 items-center justify-center flex-row active:scale-95"
+              >
+                {isCancellingPlan ? (
+                  <ActivityIndicator size="small" color="#ef4444" />
+                ) : (
+                  <Text className="text-red-500 font-bold text-sm">
+                    {user?.is_premium ? 'Cancel Paid Subscription' : 'Opt-out of Free Trial'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Appearance Section */}
@@ -1419,7 +1509,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                     'Custom App Icons are a premium feature. Upgrade to Pro to customize your home screen!',
                     [
                       { text: 'Cancel', style: 'cancel' },
-                      { text: 'Upgrade to Pro', onPress: handleUpgrade }
+                      { text: 'Upgrade to Pro', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
                     ]
                   );
                 }
@@ -1882,6 +1972,170 @@ const SettingsScreen = ({ navigation, route }: any) => {
               <Text className={`font-headline font-bold text-sm ${isDark ? 'text-primary' : 'text-primary'}`}>
                 Add Another Account
               </Text>
+            </TouchableOpacity>
+
+          </View>
+        </BottomSheetScrollView>
+      </BottomSheet>
+
+      {/* Plans & Pricing Bottom Sheet */}
+      <BottomSheet
+        ref={pricingSheetRef}
+        index={-1}
+        snapPoints={['85%', '100%']}
+        backdropComponent={renderBackdrop}
+        enablePanDownToClose
+        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+      >
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+          <View className="px-6 py-4">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className={`text-2xl font-headline font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Choose Your Plan</Text>
+              <TouchableOpacity onPress={() => pricingSheetRef.current?.close()}>
+                <Text className="text-primary font-bold text-sm">Cancel</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs leading-relaxed mb-6`}>
+              Select a plan to unlock advanced features. Your subscription directly supports the development of CediSmart!
+            </Text>
+
+            {/* Billing Cycle Toggle */}
+            <View className={`flex-row p-1 rounded-2xl mb-6 ${isDark ? 'bg-dark-surface-container' : 'bg-gray-100'}`}>
+              <TouchableOpacity
+                onPress={() => setBillingCycle('monthly')}
+                className={`flex-1 py-3 items-center rounded-xl ${billingCycle === 'monthly' ? 'bg-primary shadow-sm' : ''}`}
+              >
+                <Text className={`font-bold text-xs ${billingCycle === 'monthly' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Monthly Billing
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setBillingCycle('yearly')}
+                className={`flex-1 py-3 items-center rounded-xl flex-row justify-center ${billingCycle === 'yearly' ? 'bg-primary shadow-sm' : ''}`}
+              >
+                <Text className={`font-bold text-xs ${billingCycle === 'yearly' ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Yearly Billing
+                </Text>
+                <View className="ml-1.5 bg-yellow-500/20 px-1.5 py-0.5 rounded-full">
+                  <Text className="text-[9px] font-bold text-yellow-500">SAVE 33%</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Plan Cards */}
+            <View className="space-y-4">
+              {/* Pro Plan */}
+              <TouchableOpacity
+                onPress={() => setSelectedPlan('pro')}
+                className={`p-5 rounded-2xl border-2 flex-row justify-between items-start ${
+                  selectedPlan === 'pro'
+                    ? 'border-primary bg-primary/5'
+                    : isDark ? 'border-dark-outline-variant/10 bg-dark-surface-container-lowest' : 'border-gray-100 bg-white'
+                }`}
+              >
+                <View className="flex-1 mr-4">
+                  <View className="flex-row items-center mb-1">
+                    <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-charcoal'}`}>CediSmart Pro</Text>
+                    <View className="ml-2 bg-primary/20 px-2 py-0.5 rounded-full">
+                      <Text className="text-[10px] font-bold text-primary">Popular</Text>
+                    </View>
+                  </View>
+                  <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mb-3 leading-relaxed`}>
+                    Perfect for individuals looking for automated Mobile Money syncing and personal budgeting.
+                  </Text>
+                  
+                  {/* Features */}
+                  <View className="space-y-2">
+                    <View className="flex-row items-center">
+                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Auto SMS Sync (Android & iOS)</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Unlimited Financial Accounts</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Unlimited Budget Categories</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>CSV & PDF Exports</Text>
+                    </View>
+                  </View>
+                </View>
+                <View className="items-end">
+                  <Text className="text-2xl font-bold text-primary">
+                    ₵{billingCycle === 'monthly' ? '15' : '120'}
+                  </Text>
+                  <Text className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    per {billingCycle === 'monthly' ? 'month' : 'year'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Business Plan */}
+              <TouchableOpacity
+                onPress={() => setSelectedPlan('business')}
+                className={`p-5 rounded-2xl border-2 flex-row justify-between items-start ${
+                  selectedPlan === 'business'
+                    ? 'border-primary bg-primary/5'
+                    : isDark ? 'border-dark-outline-variant/10 bg-dark-surface-container-lowest' : 'border-gray-100 bg-white'
+                }`}
+              >
+                <View className="flex-1 mr-4">
+                  <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-charcoal'} mb-1`}>CediBusiness</Text>
+                  <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mb-3 leading-relaxed`}>
+                    Designed for micro-shops, merchant lines, and sharing ledgers with shop attendants.
+                  </Text>
+                  
+                  {/* Features */}
+                  <View className="space-y-2">
+                    <View className="flex-row items-center">
+                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>All Pro Features Included</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Merchant & Agent Line Sync</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>WhatsApp Invoice Generator</Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Share Ledger with 2 Attendants</Text>
+                    </View>
+                  </View>
+                </View>
+                <View className="items-end">
+                  <Text className="text-2xl font-bold text-primary">
+                    ₵{billingCycle === 'monthly' ? '49' : '399'}
+                  </Text>
+                  <Text className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    per {billingCycle === 'monthly' ? 'month' : 'year'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Subscribe CTA */}
+            <TouchableOpacity
+              onPress={() => handleUpgrade(selectedPlan, billingCycle)}
+              disabled={isUpgrading}
+              className={`w-full py-4 mt-8 rounded-xl items-center justify-center shadow-lg ${
+                isUpgrading ? 'bg-gray-300' : 'bg-primary shadow-primary/30'
+              }`}
+            >
+              {isUpgrading ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <Text className="text-white font-bold text-base">
+                  Get Started with {selectedPlan === 'pro' ? 'Pro' : 'Business'}
+                </Text>
+              )}
             </TouchableOpacity>
 
           </View>

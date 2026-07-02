@@ -50,3 +50,44 @@ async def test_paystack_webhook_success(client: AsyncClient, make_user, db_sessi
     result = await db_session.execute(select(User).where(User.id == user.id))
     user_db = result.scalar_one()
     assert user_db.is_premium is True
+
+@pytest.mark.asyncio
+async def test_start_trial(client: AsyncClient, make_user) -> None:
+    user = await make_user(is_premium=False)
+    headers = make_auth_headers(user.id)
+
+    # Initialize request
+    resp = await client.post("/api/v1/billing/start-trial", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["is_trial_active"] is True
+    assert body["trial_days_remaining"] == 7
+    assert body["has_premium_access"] is True
+
+    # Duplicate call
+    resp_dup = await client.post("/api/v1/billing/start-trial", headers=headers)
+    assert resp_dup.status_code == 400
+    assert resp_dup.json()["error"]["code"] == "TRIAL_ALREADY_USED"
+
+@pytest.mark.asyncio
+async def test_cancel_trial_and_premium(client: AsyncClient, make_user, db_session) -> None:
+    # 1. Test cancel trial
+    user = await make_user(is_premium=False)
+    headers = make_auth_headers(user.id)
+    await client.post("/api/v1/billing/start-trial", headers=headers)
+
+    resp = await client.post("/api/v1/billing/cancel", headers=headers)
+    assert resp.status_code == 200
+    assert resp.json()["is_trial_active"] is False
+    assert resp.json()["has_premium_access"] is False
+
+    # 2. Test cancel paid premium
+    user_paid = await make_user(is_premium=True, phone="+233207777777")
+    headers_paid = make_auth_headers(user_paid.id)
+
+    resp_paid = await client.post("/api/v1/billing/cancel", headers=headers_paid)
+    assert resp_paid.status_code == 200
+    assert resp_paid.json()["is_premium"] is False
+    assert resp_paid.json()["has_premium_access"] is False
+
+
