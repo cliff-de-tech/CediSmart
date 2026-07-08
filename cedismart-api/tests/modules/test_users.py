@@ -340,10 +340,81 @@ async def test_report_bug_submitted(client: AsyncClient, make_user) -> None:
         assert body["issue_number"] == 42
         assert body["issue_url"] == "https://github.com/cliff-de-tech/CediSmart/issues/42"
 
-        mock_client.post.assert_called_once()
-        args, kwargs = mock_client.post.call_args
+        assert mock_client.post.call_count == 2
+        
+        # Verify first call was for GitHub
+        github_call = mock_client.post.call_args_list[0]
+        args, kwargs = github_call
+        assert "https://api.github.com/repos" in args[0]
         assert "mock_token" in kwargs["headers"]["Authorization"]
         assert kwargs["json"]["title"] == "Database connection error"
+
+        # Verify second call was for Discord
+        discord_call = mock_client.post.call_args_list[1]
+        args, kwargs = discord_call
+        assert "discord.com/api/webhooks" in args[0]
+        assert "embeds" in kwargs["json"]
+
+
+async def test_register_device_token(client: AsyncClient, make_user) -> None:
+    user = await make_user()
+    headers = make_auth_headers(user.id)
+
+    # 1. Register a new token
+    resp = await client.post(
+        "/api/v1/users/me/device-tokens",
+        json={
+            "token": "ExponentPushToken[12345]",
+            "device_name": "iPhone XR",
+            "platform": "ios",
+        },
+        headers=headers
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "success"
+
+    # 2. Register again (update/idempotent check)
+    resp = await client.post(
+        "/api/v1/users/me/device-tokens",
+        json={
+            "token": "ExponentPushToken[12345]",
+            "device_name": "iPhone XR Updated",
+            "platform": "ios",
+        },
+        headers=headers
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "success"
+
+
+async def test_remove_device_token(client: AsyncClient, make_user) -> None:
+    user = await make_user()
+    headers = make_auth_headers(user.id)
+
+    # Register first
+    await client.post(
+        "/api/v1/users/me/device-tokens",
+        json={
+            "token": "ExponentPushToken[67890]",
+            "device_name": "Pixel 7",
+            "platform": "android",
+        },
+        headers=headers
+    )
+
+    # Remove
+    resp = await client.request(
+        "DELETE",
+        "/api/v1/users/me/device-tokens",
+        json={
+            "token": "ExponentPushToken[67890]"
+        },
+        headers=headers
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "success"
+
+
 
 
 
