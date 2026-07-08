@@ -117,5 +117,104 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-});
+  // 6. Scroll Reveal Animation (IntersectionObserver)
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  if (!prefersReducedMotion) {
+    const revealObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '0px 0px -40px 0px',
+      }
+    );
+
+    document.querySelectorAll('.reveal-on-scroll').forEach((el) => {
+      revealObserver.observe(el);
+    });
+  } else {
+    // If user prefers reduced motion, show everything immediately
+    document.querySelectorAll('.reveal-on-scroll').forEach((el) => {
+      el.classList.add('revealed');
+    });
+  }
+
+  // 7. Animated Stat Counter
+  const statNumbers = document.querySelectorAll('.stat-number[data-target]');
+  let statsAnimated = false;
+
+  const animateCounter = (element) => {
+    const target = parseInt(element.dataset.target);
+    const suffix = element.dataset.suffix || '';
+    const duration = 2000; // 2 seconds
+    const startTime = performance.now();
+
+    const updateCounter = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease out cubic for a smooth deceleration
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(eased * target);
+
+      // Format number with commas for large values
+      const formatted = current.toLocaleString();
+      element.textContent = formatted + suffix;
+
+      if (progress < 1) {
+        requestAnimationFrame(updateCounter);
+      }
+    };
+
+    requestAnimationFrame(updateCounter);
+  };
+
+  if (statNumbers.length > 0) {
+    const statsObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !statsAnimated) {
+            statsAnimated = true;
+            statNumbers.forEach(animateCounter);
+            statsObserver.disconnect();
+          }
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    statNumbers.forEach((el) => statsObserver.observe(el));
+  }
+
+  // 8. Active Navigation Highlight on Scroll
+  const sections = document.querySelectorAll('section[id]');
+  
+  const highlightNav = () => {
+    const scrollY = window.scrollY + 120;
+    
+    sections.forEach(section => {
+      const sectionTop = section.offsetTop;
+      const sectionHeight = section.offsetHeight;
+      const sectionId = section.getAttribute('id');
+      const navLink = document.querySelector(`.nav-link[href="#${sectionId}"]`);
+      
+      if (navLink) {
+        if (scrollY >= sectionTop && scrollY < sectionTop + sectionHeight) {
+          navLink.style.color = 'var(--primary)';
+        } else {
+          navLink.style.color = '';
+        }
+      }
+    });
+  };
+
+  window.addEventListener('scroll', highlightNav, { passive: true });
+
+});
