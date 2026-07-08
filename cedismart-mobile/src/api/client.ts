@@ -15,7 +15,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.199:8000/a
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 60000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },

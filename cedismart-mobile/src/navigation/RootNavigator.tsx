@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
-import { View, ActivityIndicator, AppState, AppStateStatus } from 'react-native';
+import { View, ActivityIndicator, AppState, AppStateStatus, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
@@ -13,6 +13,7 @@ import { registerForPushNotificationsAsync } from '../utils/notifications';
 const RootNavigator = () => {
   const { isAuthenticated, isLoading, login, setLoading, logout, user } = useAuthStore();
   const [isLocked, setIsLocked] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const backgroundTimeRef = useRef<number | null>(null);
   const isInitialSessionHydrationRef = useRef(true);
   const wentToBackgroundRef = useRef(false);
@@ -117,12 +118,50 @@ const RootNavigator = () => {
     const hydrateSession = async () => {
       try {
         const accessToken = await SecureStore.getItemAsync('access_token');
-        if (accessToken) {
-          const response = await apiClient.get('/users/me');
-          login(response.data);
-        } else {
+        if (!accessToken) {
           logout();
+          return;
         }
+
+        // Retry with escalating timeouts to handle Render cold starts.
+        // Attempt 1: 8s (warm server), Attempt 2: 20s, Attempt 3: 45s (cold start).
+        const attempts = [8000, 20000, 45000];
+        let lastError: any = null;
+
+        for (let i = 0; i < attempts.length; i++) {
+          try {
+            if (i > 0) {
+              setLoadingMessage('Waking up server, hang tight…');
+            }
+            const response = await apiClient.get('/users/me', {
+              timeout: attempts[i],
+            });
+            login(response.data);
+            return; // Success — exit early
+          } catch (err: any) {
+            lastError = err;
+            const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
+            const isNetworkError = err.message === 'Network Error' || !err.response;
+
+            if (isTimeout || isNetworkError) {
+              // Retriable — server is likely cold-starting
+              console.warn(`Session hydration attempt ${i + 1}/${attempts.length} timed out (${attempts[i]}ms)`);
+              if (i < attempts.length - 1) {
+                setLoadingMessage(`Server is starting up… retrying (${i + 2}/${attempts.length})`);
+              }
+              continue;
+            }
+
+            // Non-retriable error (401, 403, etc.) — break immediately
+            break;
+          }
+        }
+
+        // All attempts exhausted or hit a non-retriable error
+        console.error('Session hydration failed:', lastError?.message || lastError);
+        await SecureStore.deleteItemAsync('access_token').catch(() => {});
+        await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+        logout();
       } catch (error: any) {
         console.error('Session hydration failed:', error?.message || error);
         await SecureStore.deleteItemAsync('access_token').catch(() => {});
@@ -130,6 +169,7 @@ const RootNavigator = () => {
         logout();
       } finally {
         setLoading(false);
+        setLoadingMessage('');
         setTimeout(() => {
           isInitialSessionHydrationRef.current = false;
         }, 1000);
@@ -141,8 +181,13 @@ const RootNavigator = () => {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
+      <View className="flex-1 items-center justify-center bg-background" style={{ gap: 16 }}>
         <ActivityIndicator size="large" color="#0A6E4A" />
+        {loadingMessage ? (
+          <Text style={{ color: '#9ca3af', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 }}>
+            {loadingMessage}
+          </Text>
+        ) : null}
       </View>
     );
   }
