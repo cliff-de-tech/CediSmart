@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
-import { View, ActivityIndicator, AppState, AppStateStatus, Text } from 'react-native';
+import { View, ActivityIndicator, AppState, AppStateStatus, Text, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
@@ -47,11 +47,24 @@ const RootNavigator = () => {
 
   // Register for push notifications on login/authentication
   useEffect(() => {
-    if (isAuthenticated) {
-      registerForPushNotificationsAsync().catch(err => {
-        console.warn('Failed to register push notifications:', err);
-      });
-    }
+    const registerToken = async () => {
+      if (isAuthenticated) {
+        try {
+          const token = await registerForPushNotificationsAsync();
+          if (token && token !== 'expo-go-dummy-token') {
+            await apiClient.post('/users/me/device-tokens', {
+              token: token,
+              device_name: Platform.OS === 'ios' ? 'iPhone' : 'Android Device',
+              platform: Platform.OS,
+            });
+            console.log('[Notifications] Token registered with server successfully.');
+          }
+        } catch (err: any) {
+          console.warn('[Notifications] Failed to send push token to server:', err?.message || err);
+        }
+      }
+    };
+    registerToken();
   }, [isAuthenticated]);
 
   // App lock listener

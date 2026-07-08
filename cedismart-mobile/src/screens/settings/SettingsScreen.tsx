@@ -799,6 +799,16 @@ const SettingsScreen = ({ navigation, route }: any) => {
         style: 'destructive', 
         onPress: async () => {
           try {
+            // Retrieve and remove device push token from server
+            const token = await AsyncStorage.getItem('expo_push_token');
+            if (token && token !== 'expo-go-dummy-token') {
+              await apiClient.delete('/users/me/device-tokens', { data: { token } });
+            }
+          } catch (err) {
+            console.warn('[Notifications] Failed to remove push token from server:', err);
+          }
+
+          try {
             // Attempt to inform backend (optional, but good practice)
             const refreshToken = await SecureStore.getItemAsync('refresh_token');
             if (refreshToken) {

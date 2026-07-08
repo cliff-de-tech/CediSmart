@@ -22,10 +22,12 @@ from typing import Any, cast
 
 import redis.asyncio as aioredis
 from sqlalchemy import case, func, or_, select
+from sqlalchemy.orm import joinedload
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
+from app.core.push_notifications import send_push_notification
 from app.modules.budgets.models import Budget
 from app.modules.budgets.schemas import BudgetUpsertRequest
 from app.modules.categories.models import Category
@@ -389,3 +391,62 @@ async def delete_budget(
     await db.delete(budget)
     await db.flush()
     await invalidate_budget_cache(user_id, year, month, redis)
+
+
+async def check_and_trigger_budget_alerts(
+    user_id: uuid.UUID,
+    category_id: uuid.UUID,
+    year: int,
+    month: int,
+    db: AsyncSession,
+    redis: aioredis.Redis,
+) -> None:
+    """Check budget spent status and trigger push notification alerts.
+
+    Warns at 80% (warning) and 100% (exceeded), with spam prevention via Redis.
+    """
+    # 1. Fetch the budget for this user, category, year, and month
+    result = await db.execute(
+        select(Budget)
+        .options(joinedload(Budget.category))
+        .where(
+            Budget.user_id == user_id,
+            Budget.category_id == category_id,
+            Budget.budget_year == year,
+            Budget.budget_month == month,
+        )
+    )
+    budget = result.scalar_one_or_none()
+    if not budget or budget.amount <= 0:
+        return
+
+    # 2. Compute spent progress
+    progress_dict = await _compute_budget_progress(user_id, year, month, db, budget_ids=[budget.id])
+    spent = progress_dict.get(budget.id, Decimal("0"))
+
+    percentage = (spent / budget.amount) * 100
+    alert_key = f"budget_alert_state:{user_id}:{budget.id}:{year}:{month}"
+    
+    current_state_bytes = await redis.get(alert_key)
+    current_state = current_state_bytes.decode("utf-8") if current_state_bytes else None
+
+    category_name = budget.category.name if budget.category else "Category"
+
+    if percentage < 80:
+        if current_state:
+            await redis.delete(alert_key)
+    elif 80 <= percentage < 100:
+        if current_state not in ("warning", "exceeded"):
+            # Trigger 80% warning
+            title = f"⚠️ Budget Warning: {category_name}"
+            body = f"You've spent ₵{spent:,.2f} of your ₵{budget.amount:,.2f} budget ({percentage:.1f}%)."
+            await send_push_notification(user_id, title, body, {"screen": "Budgets"}, db)
+            await redis.set(alert_key, "warning", ex=2592000)  # Expire in 30 days
+    elif percentage >= 100:
+        if current_state != "exceeded":
+            # Trigger 100% exceeded warning
+            title = f"🚨 Budget Exceeded: {category_name}"
+            body = f"You just exceeded your budget of ₵{budget.amount:,.2f}! Total spent: ₵{spent:,.2f} ({percentage:.1f}%)."
+            await send_push_notification(user_id, title, body, {"screen": "Budgets"}, db)
+            await redis.set(alert_key, "exceeded", ex=2592000)  # Expire in 30 days
+

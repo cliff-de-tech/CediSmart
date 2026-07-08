@@ -14,7 +14,15 @@ from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.core.redis import get_redis
 from app.modules.users import service
-from app.modules.users.schemas import UserResponse, UserUpdateRequest, KYCVerifyRequest, BugReportRequest, BugReportResponse
+from app.modules.users.schemas import (
+    UserResponse,
+    UserUpdateRequest,
+    KYCVerifyRequest,
+    BugReportRequest,
+    BugReportResponse,
+    DeviceTokenRegisterRequest,
+    DeviceTokenRemoveRequest,
+)
 
 router = APIRouter()
 
@@ -139,4 +147,45 @@ async def report_bug(
     """Report a bug. Submits a GitHub issue or logs locally depending on config."""
     res = await service.report_user_bug(user_id=user_id, payload=body, db=db)
     return BugReportResponse(**res)
+
+
+# ---------------------------------------------------------------------------
+# POST /me/device-tokens
+# ---------------------------------------------------------------------------
+
+
+@router.post(
+    "/me/device-tokens",
+    status_code=200,
+    summary="Register a new device token for push notifications",
+)
+async def register_device_token(
+    body: DeviceTokenRegisterRequest,
+    user_id: CurrentUser,
+    db: DBSession,
+):
+    """Register or update an Expo push token for the authenticated user."""
+    await service.register_device_token(user_id=user_id, payload=body, db=db)
+    return {"status": "success", "message": "Device token registered successfully."}
+
+
+# ---------------------------------------------------------------------------
+# DELETE /me/device-tokens
+# ---------------------------------------------------------------------------
+
+
+@router.delete(
+    "/me/device-tokens",
+    status_code=200,
+    summary="Deregister a device token",
+)
+async def remove_device_token(
+    body: DeviceTokenRemoveRequest,
+    user_id: CurrentUser,
+    db: DBSession,
+):
+    """Deregister an Expo push token from the authenticated user (e.g. on logout)."""
+    await service.remove_device_token(user_id=user_id, payload=body, db=db)
+    return {"status": "success", "message": "Device token removed successfully."}
+
 

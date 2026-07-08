@@ -90,3 +90,14 @@ class BugReportResponse(BaseModel):
     issue_number: int | None = None
     issue_url: str | None = None
     status: str
+
+
+class DeviceTokenRegisterRequest(BaseModel):
+    token: str = Field(..., min_length=1, max_length=255)
+    device_name: str | None = Field(None, max_length=100)
+    platform: str = Field(..., min_length=3, max_length=20)
+
+
+class DeviceTokenRemoveRequest(BaseModel):
+    token: str = Field(..., min_length=1, max_length=255)
+

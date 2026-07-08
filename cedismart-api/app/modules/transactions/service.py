@@ -265,7 +265,20 @@ async def create_transaction(
     tx = result.scalar_one()
 
     await _invalidate_caches(user_id, tx.transaction_date, redis)
+
+    if tx.transaction_type == "expense" and not tx.is_deleted:
+        from app.modules.budgets.service import check_and_trigger_budget_alerts
+        await check_and_trigger_budget_alerts(
+            user_id=user_id,
+            category_id=tx.category_id,
+            year=tx.transaction_date.year,
+            month=tx.transaction_date.month,
+            db=db,
+            redis=redis,
+        )
+
     return tx
+
 
 
 async def update_transaction(
@@ -311,7 +324,20 @@ async def update_transaction(
     tx = result.scalar_one()
 
     await _invalidate_caches(user_id, tx.transaction_date, redis)
+
+    if tx.transaction_type == "expense" and not tx.is_deleted:
+        from app.modules.budgets.service import check_and_trigger_budget_alerts
+        await check_and_trigger_budget_alerts(
+            user_id=user_id,
+            category_id=tx.category_id,
+            year=tx.transaction_date.year,
+            month=tx.transaction_date.month,
+            db=db,
+            redis=redis,
+        )
+
     return tx
+
 
 
 async def delete_transaction(
@@ -329,6 +355,18 @@ async def delete_transaction(
     tx.is_deleted = True
     await db.flush()
     await _invalidate_caches(user_id, tx.transaction_date, redis)
+
+    if tx.transaction_type == "expense":
+        from app.modules.budgets.service import check_and_trigger_budget_alerts
+        await check_and_trigger_budget_alerts(
+            user_id=user_id,
+            category_id=tx.category_id,
+            year=tx.transaction_date.year,
+            month=tx.transaction_date.month,
+            db=db,
+            redis=redis,
+        )
+
 
 
 async def bulk_create_transactions(
@@ -389,6 +427,7 @@ async def bulk_create_transactions(
     valid_category_ids: set[uuid.UUID] = {row[0] for row in categories_result.all()}
 
     affected_months: set[tuple[int, int]] = set()
+    affected_budgets: set[tuple[uuid.UUID, int, int]] = set()
 
     for item in payload.transactions:
         if item.client_id in existing_client_ids:
@@ -417,6 +456,10 @@ async def bulk_create_transactions(
         db.add(tx)
         existing_client_ids.add(item.client_id)  # prevent in-batch duplicates
         affected_months.add((item.transaction_date.year, item.transaction_date.month))
+        if item.transaction_type == "expense":
+            affected_budgets.add(
+                (item.category_id, item.transaction_date.year, item.transaction_date.month)
+            )
         created += 1
 
     if created > 0:
@@ -430,7 +473,20 @@ async def bulk_create_transactions(
             ]
         )
 
+        if affected_budgets:
+            from app.modules.budgets.service import check_and_trigger_budget_alerts
+            for category_id, year, month in affected_budgets:
+                await check_and_trigger_budget_alerts(
+                    user_id=user_id,
+                    category_id=category_id,
+                    year=year,
+                    month=month,
+                    db=db,
+                    redis=redis,
+                )
+
     return {"created": created, "skipped": skipped, "errors": errors}
+
 
 
 async def get_summary(

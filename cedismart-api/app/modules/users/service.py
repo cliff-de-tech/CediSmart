@@ -19,8 +19,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppException
-from app.modules.auth.models import User
-from app.modules.users.schemas import UserUpdateRequest, KYCVerifyRequest, BugReportRequest
+from app.modules.auth.models import User, UserDeviceToken
+from app.modules.users.schemas import (
+    UserUpdateRequest,
+    KYCVerifyRequest,
+    BugReportRequest,
+    DeviceTokenRegisterRequest,
+    DeviceTokenRemoveRequest,
+)
 
 # Matches the prefix defined in auth/service.py
 _REFRESH_TOKEN_REDIS_PREFIX = "refresh:"
@@ -356,3 +362,53 @@ async def report_user_bug(
         "issue_url": issue_url,
         "status": status,
     }
+
+
+async def register_device_token(
+    user_id: uuid.UUID,
+    payload: DeviceTokenRegisterRequest,
+    db: AsyncSession,
+) -> None:
+    """Register a new device push token for the user, or update if it exists.
+
+    If the token is already registered to a different user, we re-associate it with
+    the current user.
+    """
+    result = await db.execute(
+        select(UserDeviceToken).where(UserDeviceToken.token == payload.token)
+    )
+    existing_token = result.scalar_one_or_none()
+
+    if existing_token:
+        existing_token.user_id = user_id
+        existing_token.device_name = payload.device_name
+        existing_token.platform = payload.platform
+        existing_token.is_active = True
+    else:
+        new_token = UserDeviceToken(
+            user_id=user_id,
+            token=payload.token,
+            device_name=payload.device_name,
+            platform=payload.platform,
+            is_active=True,
+        )
+        db.add(new_token)
+
+
+async def remove_device_token(
+    user_id: uuid.UUID,
+    payload: DeviceTokenRemoveRequest,
+    db: AsyncSession,
+) -> None:
+    """Deregister/remove a device push token from the user (e.g. on logout)."""
+    result = await db.execute(
+        select(UserDeviceToken).where(
+            UserDeviceToken.token == payload.token,
+            UserDeviceToken.user_id == user_id,
+        )
+    )
+    existing_token = result.scalar_one_or_none()
+
+    if existing_token:
+        await db.delete(existing_token)
+

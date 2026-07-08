@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import TIMESTAMP, Boolean, String, text
+from sqlalchemy import TIMESTAMP, Boolean, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin
@@ -53,6 +53,9 @@ class User(TimestampMixin, Base):
     budgets: Mapped[list["Budget"]] = relationship(
         "Budget", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
     )
+    device_tokens: Mapped[list["UserDeviceToken"]] = relationship(
+        "UserDeviceToken", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
+    )
 
     @property
     def has_premium_access(self) -> bool:
@@ -97,6 +100,29 @@ class User(TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<User id={self.id} phone={self.phone}>"
+
+
+class UserDeviceToken(TimestampMixin, Base):
+    """A user's registered device token for push notifications."""
+
+    __tablename__ = "user_device_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True,
+        default=uuid.uuid4,
+        server_default=text("gen_random_uuid()"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    device_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    platform: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+
+    user: Mapped["User"] = relationship("User", back_populates="device_tokens", lazy="raise")
 
 
 # Resolve forward references — these imports are for type-checking only.
