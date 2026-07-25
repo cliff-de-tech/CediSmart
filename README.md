@@ -98,7 +98,7 @@ The backend is **fully implemented and tested**. 31 endpoints across 7 modules, 
 | Database | PostgreSQL 16 | `NUMERIC(14,2)` for money — Float is never acceptable in fintech |
 | Cache | Redis 7 | OTP storage (5-min TTL), JWT revocation, report caching |
 | Auth | RS256 JWT + bcrypt | Asymmetric signing, per-token revocation via `jti` claims |
-| SMS/OTP | Termii API | Ghana-native SMS gateway — lower latency than Twilio for GH numbers |
+| Auth Verification | Clerk SDK / API | Phone verification & SMS OTP offloaded securely to Clerk |
 | Rate Limiting | slowapi | Auth endpoints protected at 3–5 req/15min per IP |
 | Migrations | Alembic | Schema history is immutable — no direct DB edits, ever |
 | Config | pydantic-settings | Fully typed environment variables — no `os.getenv()` scattered in code |
@@ -126,13 +126,8 @@ CediSmart uses a **Modular Monolith** — a single deployable unit with enforced
                              │
               ┌──────────────┼──────────────┐
               ▼              ▼              ▼
-         PostgreSQL        Redis          Termii
-         (Railway)        (Railway)      (SMS GW)
-                                           │
-                              ┌────────────┘
-                              ▼
-                         Cloudflare
-                        (CDN + Proxy)
+         PostgreSQL        Redis          Clerk
+         (Railway)        (Railway)     (Auth API)
 ```
 
 ### API Surface
@@ -141,13 +136,11 @@ All endpoints versioned under `/api/v1/`. Every response uses a consistent error
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/auth/register/initiate` | Send OTP via Termii SMS |
-| POST | `/auth/register/verify` | Verify OTP, create account, issue JWT |
+| POST | `/auth/register/clerk` | Create user profile after Clerk verification |
 | POST | `/auth/login` | Phone + PIN authentication |
 | POST | `/auth/token/refresh` | Rotate access token via refresh token |
 | POST | `/auth/logout` | Revoke refresh token from Redis |
-| POST | `/auth/pin/reset/initiate` | Send PIN reset OTP |
-| POST | `/auth/pin/reset/confirm` | Verify OTP, update PIN hash |
+| POST | `/auth/pin/reset/confirm` | Reset account PIN using verified Clerk session |
 | GET | `/users/me` | Fetch authenticated user profile |
 | PATCH | `/users/me` | Update name, email, currency |
 | DELETE | `/users/me` | GDPR-style anonymisation + token revocation |
@@ -316,7 +309,7 @@ Subsequent updates following the MVP release will focus on automation, transacti
 - 🔌 **Open Banking APIs**: Live syncing of accounts and cards using payment platforms like Paystack, Mono, or Fincra.
 - ⏰ **Automated Recurring Bills**: Scheduler engine for recurring payments (e.g. rent, internet data, Susu groups) with push notifications.
 - Susu **Group Saving & SUSU Ledger**: Support for Susu saving circles, allowing tracking of contributions across multiple users.
-- 🛡️ **Enterprise Security Hardening**: Implementing SSL pinning in mobile, Termii API SMS request caps, and private database subnets.
+- 🛡️ **Enterprise Security Hardening**: Implementing SSL pinning in mobile, API rate limiting, and private database subnets.
 - 💱 **Multi-Currency Support**: Track assets in GHS, USD, NGN, and GBP with real-time exchange rates.
 
 For technical scope and implementation details, see [Full Product & Technical Blueprint](./docs/budget-app-blueprint.md#part-13-future-product-roadmap).

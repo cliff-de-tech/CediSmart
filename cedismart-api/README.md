@@ -41,7 +41,7 @@ CediSmart helps users track spending, manage budgets, and take control of their 
 | **Task Queue**     | ARQ (Redis-based background workers)            |
 | **Auth**           | JWT (RS256) + bcrypt PIN hashing                |
 | **Rate Limiting**  | slowapi                                         |
-| **SMS/OTP**        | Termii API                                      |
+| **Auth Verification** | Clerk SDK/API                                  |
 | **Hosting**        | Railway.app                                     |
 
 ---
@@ -66,7 +66,7 @@ CediSmart follows a **Modular Monolith** pattern — a single deployable unit wi
                     │
         ┌───────────┼───────────┐
         ▼           ▼           ▼
-   PostgreSQL     Redis      Termii
+   PostgreSQL     Redis       Clerk
 ```
 
 ---
@@ -366,7 +366,7 @@ Key backend engine updates planned for subsequent releases:
 - ⏰ **ARQ Susu/Recurring Scheduler**: Background cron worker engine utilizing Redis to process monthly recurring transaction postings.
 - 👥 **Susu Group Relations**: Multi-tenant database schema changes to link transactions to shared saving pools and compute group balances.
 - 💸 **Exchange Rates Engine**: Integration with open-exchange APIs to periodically fetch rates and calculate non-GHS values in PostgreSQL.
-- 🛡️ **Gateway Safety**: Setting up Termii SMS request rate limits per IP and phone prefix to block OTP script exploits.
+- 🛡️ **Gateway Safety**: Setting up Clerk rate limiting policies to prevent account creation spam.
 
 ---
 

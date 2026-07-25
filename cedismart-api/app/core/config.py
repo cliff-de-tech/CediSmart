@@ -15,6 +15,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # --- Database ---
@@ -35,9 +36,6 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8081"
 
-    # --- Termii SMS (OTP) ---
-    TERMII_API_KEY: str = ""
-    TERMII_SENDER_ID: str = "CediSmart"
 
     # --- Smile ID ---
     SMILE_ID_PARTNER_ID: str = ""

@@ -97,8 +97,7 @@ jobs:
       ENVIRONMENT: testing
       DEBUG: "false"
       ALLOWED_ORIGINS: "http://localhost:3000"
-      TERMII_API_KEY: "ci-stub"
-      TERMII_SENDER_ID: "CediSmart"
+
 
     steps:
       - name: Checkout code

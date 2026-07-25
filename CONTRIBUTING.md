@@ -117,7 +117,7 @@ Closes #88
 ```
 docs(api): update environment variables table
 
-- Add TERMII_API_KEY and TERMII_SENDER_ID
+- Add GEMINI_API_KEY to configurations
 - Clarify RSA_PRIVATE_KEY format (PEM with \n)
 ```
 
