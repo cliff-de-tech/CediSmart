@@ -75,6 +75,12 @@ CediSmart/
 └── cedismart-web/      # Landing Page Website & APK Download Portal
 ```
 
+### 🤖 Gemini 2.5 Flash AI Superpowers
+
+CediSmart integrates Google's **Gemini 2.5 Flash** model (via Google AI Studio) to deliver advanced local features:
+* **Gemini SMS Parser**: In Africa (especially Ghana), transaction syncing via open banking APIs is unavailable. CediSmart solves this by automatically parsing Mobile Money (MTN MoMo, Telecel Cash, AirtelTigo Money) and bank transaction SMS alerts into structured ledger records. Enforced via strict API JSON schemas.
+* **Ghanaian Pidgin AI Assistant**: Provides localized, warm, and highly insightful financial coaching in Ghanaian Pidgin (with terms like *chale*, *wahala*, *dey active*), helping users understand budgets, spending, and savings without corporate jargon.
+
 ---
 
 ## Backend — Production API

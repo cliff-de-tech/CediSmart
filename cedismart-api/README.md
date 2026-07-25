@@ -182,8 +182,10 @@ uvicorn app.main:app --reload --port 8000
 | `ALLOWED_ORIGINS`   | Comma-separated CORS origins             | `http://localhost:3000,http://localhost:8081`     |
 | `TERMII_API_KEY`    | Termii SMS API key                       | `TL...`                                          |
 | `TERMII_SENDER_ID`  | Termii sender ID                         | `CediSmart`                                      |
+| `GEMINI_API_KEY`    | Gemini API Key (for SMS parsing & Chat)  | `AIzaSy...` or `AQ...` (AI Studio key)           |
 
 See [`.env.example`](.env.example) for the full template with inline comments.
+
 
 ---
 

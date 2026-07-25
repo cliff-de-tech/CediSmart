@@ -616,7 +616,7 @@ async def get_summary(
 async def parse_sms_with_gemini(
     sms_content: str, db: AsyncSession, user_id: uuid.UUID
 ) -> dict[str, Any]:
-    """Parse SMS transaction notifications using Gemini 1.5 Flash API or a fallback rules-based engine."""
+    """Parse SMS transaction notifications using Gemini 2.5 Flash API or a fallback rules-based engine."""
     from app.core.config import settings
     import httpx
 
