@@ -253,7 +253,7 @@ class MomoSyncPackage : ReactPackage {
             }
             
             fs.writeFileSync(mainApplicationPath, appContent);
-            Log.d("MomoSyncModule", "MainApplication.kt updated with MomoSyncPackage.");
+            console.log("MomoSyncModule: MainApplication.kt updated with MomoSyncPackage.");
         }
       }
 
