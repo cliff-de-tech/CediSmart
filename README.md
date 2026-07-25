@@ -51,16 +51,19 @@
 
 ## The Problem
 
-Most budgeting apps are designed for bank-account-first economies. Ghana is different.
+We work hard. We earn. And somehow — month-end comes and we're asking "where did everything go?"
 
-- The majority of financial activity flows through **MTN MoMo and Vodafone/Telecel Cash**, not traditional bank accounts
-- A significant portion of users are on **prepaid data** — every kilobyte counts
-- Networks drop. Transactions must survive being offline
-- Identity is a **phone number**, not an email address
+It's not a discipline problem. It's a visibility problem.
+
+Most budgeting apps weren't built with our reality in mind. They assume credit cards, direct bank APIs (like Plaid), and constant high-speed connection. But in Ghana, money moves differently:
+
+- **Mobile Money First**: The majority of financial transactions flow through MTN MoMo, Telecel Cash, and AT Money—not traditional bank accounts.
+- **Unstructured Logs**: Transactions are notified via SMS alerts. Without automation, tracking spending requires tedious, manual entry that people quickly abandon.
+- **Data & Connectivity Constraints**: Network signals drop frequently. A financial tracker must survive offline and consume minimal data.
 
 CediSmart is built from first principles for this reality — not adapted from a Western template.
 
-> 💡 **Design principle:** optimize for reliability under constrained connectivity before optimizing for feature breadth.
+> 💡 **Design principle:** Optimize for local financial rails (MoMo, bank SMS alerts) and constrained connectivity before optimizing for feature breadth.
 
 ---
 
