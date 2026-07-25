@@ -250,6 +250,12 @@ class MomoSyncPackage : ReactPackage {
                     'override fun getPackages(): List<ReactPackage> {',
                     'override fun getPackages(): List<ReactPackage> {\n      val packages = PackageList(this).packages.toMutableList()\n      packages.add(MomoSyncPackage())\n      return packages'
                 );
+            } else if (appContent.includes('PackageList(this).packages.apply {')) {
+                // Modern Expo SDK 51+ apply block
+                appContent = appContent.replace(
+                    'PackageList(this).packages.apply {',
+                    'PackageList(this).packages.apply {\n              add(MomoSyncPackage())'
+                );
             }
             
             fs.writeFileSync(mainApplicationPath, appContent);
