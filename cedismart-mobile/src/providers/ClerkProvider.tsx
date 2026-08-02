@@ -1,7 +1,7 @@
 import React from 'react';
 import { ClerkProvider } from '@clerk/clerk-expo';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { Platform, View, Text } from 'react-native';
 
 const timeoutPromise = (ms: number) => new Promise<null>((resolve) => setTimeout(() => resolve(null), ms));
 
@@ -55,6 +55,19 @@ interface ClerkProviderWrapperProps {
 }
 
 export const ClerkProviderWrapper = ({ children }: ClerkProviderWrapperProps) => {
+  if (!clerkPublishableKey) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0d631b', padding: 20 }}>
+        <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' }}>
+          Configuration Error
+        </Text>
+        <Text style={{ color: '#e2e8f0', fontSize: 14, textAlign: 'center' }}>
+          Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY. Please verify your build environment variables.
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ClerkProvider
       publishableKey={clerkPublishableKey}

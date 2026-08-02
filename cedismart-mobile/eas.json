@@ -14,7 +14,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://cedismart-api.onrender.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://cedismart-api.onrender.com/api/v1",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Y3V0ZS13b2xmLTczLmNsZXJrLmFjY291bnRzLmRldiQ"
       }
     },
     "production": {
@@ -22,7 +23,8 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://cedismart-api.onrender.com/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://cedismart-api.onrender.com/api/v1",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_Y3V0ZS13b2xmLTczLmNsZXJrLmFjY291bnRzLmRldiQ"
       }
     }
   },
