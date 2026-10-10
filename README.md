@@ -33,6 +33,7 @@
 
 - [The Problem](#the-problem)
 - [What This Is](#what-this-is)
+- [Gemini 2.5 Flash AI Features](#-gemini-25-flash-ai-superpowers)
 - [Backend — Production API](#backend--production-api)
   - [Tech Stack](#tech-stack)
   - [Architecture](#architecture)
@@ -41,8 +42,8 @@
   - [Security Posture](#security-posture)
   - [Testing](#testing)
   - [CI/CD](#cicd)
-- [Mobile App — In Progress](#mobile-app--in-progress)
-- [Web App — MVP](#web-app--mvp)
+- [Mobile App — Complete](#mobile-app--complete)
+- [Web Landing Page & Showcase](#web-landing-page--showcase)
 - [Project Status](#project-status)
 - [Running Locally](#running-locally)
 - [About](#about)
