@@ -87,7 +87,7 @@ export const ConfettiEffect: React.FC<ConfettiEffectProps> = ({ active, onComple
   if (!active) return null;
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {particles.map((p, index) => {
         const rotate = p.rotation.interpolate({
           inputRange: [0, 360],

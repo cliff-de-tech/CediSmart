@@ -49,7 +49,7 @@ const ForgotPINScreen = ({ navigation }: any) => {
   };
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (step === 'otp') {
       interval = setInterval(() => {
         setTimer((prev) => (prev > 0 ? prev - 1 : 0));

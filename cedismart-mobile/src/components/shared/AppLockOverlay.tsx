@@ -35,7 +35,7 @@ export const AppLockOverlay: React.FC<AppLockOverlayProps> = ({ visible, onUnloc
   const biometricInProgressRef = useRef(false);
 
   useEffect(() => {
-    let timerId: NodeJS.Timeout;
+    let timerId: ReturnType<typeof setTimeout>;
 
     if (!visible) {
       setPin('');

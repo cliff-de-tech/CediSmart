@@ -114,7 +114,7 @@ export const CoinBackground = () => {
     <View 
       pointerEvents="none" 
       style={[
-        StyleSheet.absoluteFillObject, 
+        StyleSheet.absoluteFill,
         styles.container, 
         { opacity: containerOpacity }
       ]}

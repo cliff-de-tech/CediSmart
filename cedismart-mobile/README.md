@@ -44,9 +44,9 @@ A modern, offline-capable mobile app for the CediSmart fintech platform. Built w
 
 | Layer | Technology | Why |
 |---|---|---|
-| **Framework** | Expo (SDK 54) | Managed workflow — no native code needed for MVP |
+| **Framework** | Expo (SDK 57) | Managed workflow — no native code needed for MVP |
 | **Language** | TypeScript (strict) | Type safety across the entire app |
-| **React** | React 19.1 | Latest hooks, concurrent rendering |
+| **React** | React 19.2.3 | Latest hooks, concurrent rendering |
 | **Navigation** | React Navigation v6 | Industry-standard, production-proven |
 | **HTTP Client** | Axios | JWT interceptors, request/response middleware |
 | **Server State** | TanStack Query v5 | Automatic caching, background refetch, offline support |
@@ -154,9 +154,9 @@ cedismart-mobile/
 
 ### Prerequisites
 
-- **Node.js 18+** and **npm** (or **yarn**)
-- **Expo CLI:** `npm install -g expo-cli`
-- **Xcode 15+** (for iOS simulator, macOS only)
+- **Node.js 22.13+** (Node.js 24 LTS recommended) and **npm** (or **yarn**)
+- **Expo CLI:** use the project-local CLI with `npx expo`
+- **Xcode 26.4+** (for iOS simulator, macOS only)
 - **Android Studio** (for Android emulator or device)
 - **CediSmart API** running locally or accessible via URL
 
@@ -180,9 +180,15 @@ cp .env.example .env
 ### 3. Start Expo Dev Server
 
 ```bash
-npm start
-# or: expo start
+npm start -- --clear
+# or: npx expo start --clear
 ```
+
+Use Expo Go for SDK 57 when opening this project on a physical device. After upgrading, stop any existing Metro server and restart it with the command above to clear cached SDK 54 bundles.
+
+Custom native features such as dynamic app icons and the Android SMS receiver require a development or preview build. Rebuild existing native apps after this SDK upgrade.
+
+**Known Expo Doctor warning:** `@howincodes/expo-dynamic-app-icon@3.0.2` requires `expo-modules-core` as a peer dependency. The project declares the SDK 57-compatible version to satisfy it. Expo Doctor nevertheless warns that this package should not be installed directly; removing it produces a missing-peer warning instead. The installed version is shared with Expo, and the other 20 Doctor checks pass.
 
 The Expo CLI will display options:
 

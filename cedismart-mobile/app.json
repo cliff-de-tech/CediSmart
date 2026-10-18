@@ -63,7 +63,10 @@
         }
       ],
       "expo-web-browser",
-      "./plugins/withAndroidSmsReceiver"
+      "./plugins/withAndroidSmsReceiver",
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
