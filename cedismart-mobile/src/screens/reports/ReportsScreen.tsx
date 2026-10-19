@@ -1,18 +1,20 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, ActivityIndicator, Dimensions, RefreshControl } from 'react-native';
+import { GlassSurface } from '../../components/glass/GlassSurface';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, LineChart } from "react-native-gifted-charts";
-import { Calendar, ChevronLeft, ChevronRight, PieChart as PieIcon, TrendingUp, ArrowDownCircle, ArrowUpCircle } from 'lucide-react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { ChevronLeft, ChevronRight, PieChart as PieIcon, TrendingUp, ArrowDownCircle, ArrowUpCircle } from 'lucide-react-native';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import { CoinBackground } from '../../components/shared/CoinBackground';
 
-const screenWidth = Dimensions.get('window').width;
-
 const ReportsScreen = () => {
+  const { width: screenWidth } = useWindowDimensions();
+  const { clearance: tabBarClearance } = useGlassTabBarMetrics();
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const user = useAuthStore((state) => state.user);
@@ -103,44 +105,85 @@ const ReportsScreen = () => {
     });
   }, [trendData]);
 
+  // Calculate exact inner plot width so grid lines & x-axis labels stay strictly inside the GlassSurface card
+  // Outer padding: 24*2 = 48, Card padding: 20*2 = 40, Y-axis label width: 38
+  const chartPlotWidth = Math.max(180, screenWidth - 48 - 40 - 42);
+  const lineInitialSpacing = 18;
+  const lineEndSpacing = 18;
+  const lineSpacing = useMemo(() => {
+    const segments = Math.max(1, lineData.length - 1);
+    return Math.max(28, Math.floor((chartPlotWidth - lineInitialSpacing - lineEndSpacing) / segments));
+  }, [chartPlotWidth, lineData.length]);
+
+  const barSpacing = useMemo(() => {
+    const count = Math.max(1, barData.length);
+    return Math.max(16, Math.floor((chartPlotWidth - 28 - count * 22) / count));
+  }, [chartPlotWidth, barData.length]);
+
   const KPICard = ({ title, amount, icon: Icon, color, textColor }: any) => (
-    <View className={`flex-1 ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-4 rounded-3xl border shadow-sm mr-2 last:mr-0`}>
-      <View 
-        className="w-8 h-8 rounded-full items-center justify-center mb-2"
-        style={{ backgroundColor: `${color}15` }}
-      >
-        <Icon size={16} color={color} />
+    <GlassSurface radius={24} style={{ flex: 1, minWidth: 0 }}>
+      <View style={{ padding: 14 }}>
+        <View 
+          className="w-8 h-8 rounded-full items-center justify-center mb-2"
+          style={{ backgroundColor: `${color}20` }}
+        >
+          <Icon size={16} color={color} />
+        </View>
+        <Text
+          className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-[10px] font-bold uppercase tracking-wider mb-1`}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+        <Text
+          className={`font-bold text-sm ${textColor}`}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
+        >
+          {formatGHS(amount)}
+        </Text>
       </View>
-      <Text className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-[10px] font-bold uppercase tracking-wider mb-1`}>{title}</Text>
-      <Text className={`font-bold text-sm ${textColor}`}>{formatGHS(amount)}</Text>
-    </View>
+    </GlassSurface>
   );
 
   const isLoading = isSummaryLoading || isCategoryLoading || isTrendLoading;
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-white'}`}>
-      <View className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
-        <CoinBackground />
+    <SafeAreaView edges={['top', 'left', 'right']} className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
+      <CoinBackground />
       {/* Header with Month Selector */}
-      <View className={`px-6 py-6 ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} border-b flex-row justify-between items-center`}>
-        <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Reports</Text>
-        <View className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-low' : 'bg-gray-50'} rounded-full px-3 py-1`}>
-          <TouchableOpacity onPress={() => changeMonth(-1)} className="p-1">
+      <View
+        className="px-6 pt-4 pb-4 flex-row flex-wrap justify-between items-center"
+        style={{ gap: 12 }}
+      >
+        <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Reports</Text>
+        <GlassSurface radius={24} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Previous month"
+            onPress={() => changeMonth(-1)}
+            style={{ minWidth: 42, minHeight: 42, alignItems: 'center', justifyContent: 'center' }}
+          >
             <ChevronLeft size={20} color={isDark ? '#e1e3e0' : '#1C1C2E'} />
           </TouchableOpacity>
-          <Text className={`mx-2 font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} min-w-[100px] text-center`}>
+          <Text className={`mx-1.5 font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} min-w-[105px] text-center text-sm`}>
             {monthName} {year}
           </Text>
-          <TouchableOpacity onPress={() => changeMonth(1)} className="p-1">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Next month"
+            onPress={() => changeMonth(1)}
+            style={{ minWidth: 42, minHeight: 42, alignItems: 'center', justifyContent: 'center' }}
+          >
             <ChevronRight size={20} color={isDark ? '#e1e3e0' : '#1C1C2E'} />
           </TouchableOpacity>
-        </View>
+        </GlassSurface>
       </View>
 
       <ScrollView 
         className="flex-1" 
-        contentContainerStyle={{ paddingBottom: 100 }} 
+        contentContainerStyle={{ paddingBottom: tabBarClearance + 24 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl 
@@ -154,10 +197,10 @@ const ReportsScreen = () => {
         {isLoading ? (
           <ActivityIndicator size="large" color="#0A6E4A" className="mt-20" />
         ) : (
-          <View className="px-6 py-6">
+          <View className="px-6 py-4">
             
             {/* KPI Row */}
-            <View className="flex-row mb-8">
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
               <KPICard 
                 title="Income" 
                 amount={summary?.total_income || 0} 
@@ -173,7 +216,7 @@ const ReportsScreen = () => {
                 textColor="text-error"
               />
               <KPICard 
-                title="Net" 
+                title="Saved / Left" 
                 amount={summary?.net || 0} 
                 icon={TrendingUp} 
                 color="#0A6E4A" 
@@ -181,69 +224,119 @@ const ReportsScreen = () => {
               />
             </View>
 
-            {/* Category Breakdown */}
-            <View className={`${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-6 rounded-3xl border shadow-sm mb-8`}>
-              <View className="flex-row items-center mb-6">
-                <PieIcon size={20} color={isDark ? '#2e7d32' : '#0A6E4A'} className="mr-2" />
-                <Text className={`text-lg font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Top Expenses</Text>
+            {/* Plain-Language Monthly Takeaway Card */}
+            <GlassSurface radius={24} style={{ marginBottom: 24 }}>
+              <View className="p-4">
+                <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} mb-1`}>
+                  {monthName} Takeaway
+                </Text>
+                <Text className={`text-xs leading-5 ${isDark ? 'text-gray-200' : 'text-charcoal'}`}>
+                  {(() => {
+                    const totalIncome = parseFloat(summary?.total_income || '0');
+                    const totalSpent = parseFloat(summary?.total_expense || '0');
+                    const netLeft = parseFloat(summary?.net || '0');
+                    const topCat = categoryData?.categories?.[0];
+                    if (totalIncome === 0 && totalSpent === 0) {
+                      return `No income or expenses recorded for ${monthName} ${year} yet. Log your daily spending on the Home tab to see where your money goes.`;
+                    }
+                    const topPart = topCat
+                      ? ` Your biggest spending category was ${topCat.name} (${formatGHS(topCat.amount)}).`
+                      : '';
+                    const netPart =
+                      netLeft >= 0
+                        ? ` You kept ${formatGHS(netLeft)} after expenses.`
+                        : ` You spent ${formatGHS(Math.abs(netLeft))} more than your recorded income.`;
+                    return `In ${monthName}, you earned ${formatGHS(totalIncome)} and spent ${formatGHS(totalSpent)}.${topPart}${netPart}`;
+                  })()}
+                </Text>
               </View>
-              
-              {barData.length > 0 ? (
-                <BarChart
-                  data={barData}
-                  barWidth={22}
-                  noOfSections={3}
-                  barBorderRadius={4}
-                  frontColor="lightgray"
-                  yAxisThickness={0}
-                  xAxisThickness={0}
-                  hideRules
-                  xAxisLabelTextStyle={{ color: isDark ? '#9CA3AF' : 'gray', fontSize: 10 }}
-                  yAxisTextStyle={{ color: isDark ? '#9CA3AF' : '#707a6c', fontSize: 10 }}
-                  isAnimated
-                />
-              ) : (
-                <Text className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-center py-10`}>No data for this month.</Text>
-              )}
-            </View>
+            </GlassSurface>
+
+            {/* Category Breakdown */}
+            <GlassSurface radius={28} elevated style={{ marginBottom: 24 }}>
+              <View style={{ padding: 20, overflow: 'hidden' }}>
+                <View className="flex-row items-center mb-5">
+                  <PieIcon size={20} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                  <Text className={`text-lg font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} ml-2.5`}>Top Expenses</Text>
+                </View>
+                
+                {barData.length > 0 ? (
+                  <View style={{ width: '100%', overflow: 'hidden' }}>
+                    <BarChart
+                      data={barData}
+                      width={chartPlotWidth}
+                      barWidth={22}
+                      spacing={barSpacing}
+                      initialSpacing={14}
+                      noOfSections={3}
+                      barBorderRadius={6}
+                      frontColor="#16A34A"
+                      yAxisThickness={0}
+                      xAxisThickness={0}
+                      yAxisLabelWidth={38}
+                      hideRules
+                      xAxisLabelTextStyle={{ color: isDark ? '#9CA3AF' : '#6B7280', fontSize: 10 }}
+                      yAxisTextStyle={{ color: isDark ? '#9CA3AF' : '#707a6c', fontSize: 10 }}
+                      isAnimated
+                    />
+                  </View>
+                ) : (
+                  <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-center py-10`}>No data for this month.</Text>
+                )}
+              </View>
+            </GlassSurface>
 
             {/* Spending Trend */}
-            <View className={`${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-6 rounded-3xl border shadow-sm`}>
-              <View className="flex-row items-center mb-6">
-                <TrendingUp size={20} color={isDark ? '#2e7d32' : '#0A6E4A'} className="mr-2" />
-                <Text className={`text-lg font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>6-Month Trend</Text>
-              </View>
+            <GlassSurface radius={28} elevated>
+              <View style={{ padding: 20, overflow: 'hidden' }}>
+                <View className="flex-row items-center mb-5">
+                  <TrendingUp size={20} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                  <Text className={`text-lg font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} ml-2.5`}>6-Month Trend</Text>
+                </View>
 
-              {lineData.length > 0 ? (
-                <LineChart
-                  data={lineData}
-                  thickness={3}
-                  color={isDark ? '#2e7d32' : '#0A6E4A'}
-                  hideDataPoints
-                  noOfSections={3}
-                  yAxisThickness={0}
-                  xAxisThickness={0}
-                  startFillColor={isDark ? '#2e7d32' : '#0A6E4A'}
-                  endFillColor={isDark ? '#2e7d32' : '#0A6E4A'}
-                  startOpacity={0.4}
-                  endOpacity={0.1}
-                  initialSpacing={0}
-                  areaChart
-                  isAnimated
-                  xAxisLabelTextStyle={{ color: isDark ? '#9CA3AF' : 'gray', fontSize: 10 }}
-                  yAxisTextStyle={{ color: isDark ? '#9CA3AF' : '#707a6c', fontSize: 10 }}
-                />
-              ) : (
-                <Text className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-center py-10`}>Waiting for more history...</Text>
-              )}
-            </View>
+                {lineData.length > 0 ? (
+                  <View style={{ width: '100%', overflow: 'hidden' }}>
+                    <LineChart
+                      data={lineData}
+                      width={chartPlotWidth}
+                      spacing={lineSpacing}
+                      initialSpacing={lineInitialSpacing}
+                      endSpacing={lineEndSpacing}
+                      thickness={3}
+                      color={isDark ? '#4ade80' : '#0A6E4A'}
+                      hideDataPoints={false}
+                      dataPointsColor={isDark ? '#86efac' : '#0A6E4A'}
+                      dataPointsRadius={3.5}
+                      noOfSections={3}
+                      yAxisThickness={0}
+                      xAxisThickness={1}
+                      xAxisColor={isDark ? 'rgba(74, 222, 128, 0.35)' : 'rgba(10, 110, 74, 0.25)'}
+                      yAxisLabelWidth={38}
+                      rulesLength={chartPlotWidth}
+                      rulesColor={isDark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.08)'}
+                      startFillColor={isDark ? '#4ade80' : '#0A6E4A'}
+                      endFillColor={isDark ? '#2e7d32' : '#0A6E4A'}
+                      startOpacity={0.35}
+                      endOpacity={0.05}
+                      areaChart
+                      curved
+                      isAnimated
+                      xAxisLabelTextStyle={{ color: isDark ? '#9CA3AF' : '#6B7280', fontSize: 10, width: 32, textAlign: 'center' }}
+                      yAxisTextStyle={{ color: isDark ? '#9CA3AF' : '#707a6c', fontSize: 10 }}
+                    />
+                  </View>
+                ) : (
+                  <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-center py-10`}>Waiting for more history...</Text>
+                )}
+              </View>
+            </GlassSurface>
 
           </View>
         )}
       </ScrollView>
-      </View>
     </SafeAreaView>
   );
 };
 
 export default ReportsScreen;
+

@@ -87,10 +87,11 @@ async def list_transactions(
     category_id: uuid.UUID | None = Query(None),
     account_id: uuid.UUID | None = Query(None),
     transaction_type: str | None = Query(None, pattern="^(income|expense|transfer)$"),
+    search: str | None = Query(None, max_length=100),
 ) -> TransactionListResponse:
     """Return a paginated list of transactions ordered by date descending.
 
-    Supports filtering by date range, category, account, and transaction type.
+    Supports filtering by date range, category, account, transaction type, and search text.
     Soft-deleted transactions are never returned.
     """
     transactions, total = await service.list_transactions(
@@ -103,6 +104,7 @@ async def list_transactions(
         category_id=category_id,
         account_id=account_id,
         transaction_type=transaction_type,
+        search=search,
     )
     return TransactionListResponse(
         data=[TransactionResponse.model_validate(t) for t in transactions],

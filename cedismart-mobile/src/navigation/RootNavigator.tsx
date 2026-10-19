@@ -149,6 +149,7 @@ const RootNavigator = () => {
             const response = await apiClient.get('/users/me', {
               timeout: attempts[i],
             });
+            await AsyncStorage.setItem('cached_user_profile', JSON.stringify(response.data)).catch(() => {});
             login(response.data);
             return; // Success — exit early
           } catch (err: any) {
@@ -157,10 +158,10 @@ const RootNavigator = () => {
             const isNetworkError = err.message === 'Network Error' || !err.response;
 
             if (isTimeout || isNetworkError) {
-              // Retriable — server is likely cold-starting
+              // Retriable — server is likely cold-starting or device is offline
               console.warn(`Session hydration attempt ${i + 1}/${attempts.length} timed out (${attempts[i]}ms)`);
               if (i < attempts.length - 1) {
-                setLoadingMessage(`Server is starting up… retrying (${i + 2}/${attempts.length})`);
+                setLoadingMessage(`Connecting… retrying (${i + 2}/${attempts.length})`);
               }
               continue;
             }
@@ -170,15 +171,28 @@ const RootNavigator = () => {
           }
         }
 
-        // All attempts exhausted or hit a non-retriable error
-        console.error('Session hydration failed:', lastError?.message || lastError);
-        await SecureStore.deleteItemAsync('access_token').catch(() => {});
-        await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+        const status = lastError?.response?.status;
+        if (status === 401 || status === 403) {
+          console.warn('Session token rejected (401/403), clearing credentials.');
+          await SecureStore.deleteItemAsync('access_token').catch(() => {});
+          await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+          await AsyncStorage.removeItem('cached_user_profile').catch(() => {});
+          logout();
+          return;
+        }
+
+        // Transient network/timeout error — keep tokens and use cached profile if available for offline mode
+        const cachedUserStr = await AsyncStorage.getItem('cached_user_profile').catch(() => null);
+        if (cachedUserStr) {
+          try {
+            const cachedUser = JSON.parse(cachedUserStr);
+            login(cachedUser);
+            return;
+          } catch {}
+        }
         logout();
       } catch (error: any) {
         console.error('Session hydration failed:', error?.message || error);
-        await SecureStore.deleteItemAsync('access_token').catch(() => {});
-        await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
         logout();
       } finally {
         setLoading(false);

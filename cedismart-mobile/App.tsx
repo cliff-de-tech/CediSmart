@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { AccessibilityPreferencesProvider } from './src/providers/AccessibilityPreferences';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -33,8 +34,10 @@ export default function App() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
           <SafeAreaProvider>
-            <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-            <RootNavigator />
+            <AccessibilityPreferencesProvider>
+              <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+              <RootNavigator />
+            </AccessibilityPreferencesProvider>
           </SafeAreaProvider>
         </QueryClientProvider>
       </GestureHandlerRootView>

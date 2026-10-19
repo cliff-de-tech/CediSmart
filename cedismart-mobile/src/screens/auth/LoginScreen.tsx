@@ -11,6 +11,7 @@ import apiClient, { setActiveTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
+import { GlassSurface } from '../../components/glass/GlassSurface';
 
 const normalizePhoneNumber = (phone: string): string => {
   if (!phone) return '';
@@ -165,6 +166,10 @@ const LoginScreen = ({ navigation }: any) => {
   const handlePress = (digit: string) => {
     setError('');
     if (step === 'phone') {
+      // Ignore leading 0 since +233 is already prefixed
+      if (phone.length === 0 && digit === '0') {
+        return;
+      }
       if (phone.length < 9) {
         const newPhone = phone + digit;
         setPhone(newPhone);
@@ -238,16 +243,16 @@ const LoginScreen = ({ navigation }: any) => {
         className="flex-1"
       >
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6" showsVerticalScrollIndicator={false}>
-          <View className="flex-1 justify-center py-8">
+          <View className="flex-1 justify-center py-6">
             <Animated.View 
               style={{ transform: [{ translateX: shakeAnimation }] }}
               className="items-center w-full"
             >
               {/* Branding Header */}
-              <View className="items-center mb-10">
-                <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-primary mb-3">Welcome Back</Text>
+              <View className="items-center mb-6">
+                <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} mb-2`}>Welcome Back</Text>
                 <Text className={`font-headline text-3xl font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight text-center`}>
-                  {step === 'profile_picker' ? 'Select Account' : step === 'phone' ? 'Enter Phone Number' : 'Enter Secure PIN'}
+                  {step === 'profile_picker' ? 'Select Profile' : step === 'phone' ? 'Enter Phone Number' : 'Enter Secure PIN'}
                 </Text>
               </View>
 
@@ -255,10 +260,10 @@ const LoginScreen = ({ navigation }: any) => {
                 /* STEP 0: PROFILE PICKER */
                 <View className="w-full mb-6">
                   <Text className={`font-label text-center text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-6`}>
-                    Saved Accounts
+                    Saved Profiles
                   </Text>
                   
-                  <View className="w-full space-y-3 mb-6">
+                  <View className="w-full mb-6">
                     {savedAccounts.map((acc) => {
                       const initials = (acc.full_name || '')
                         .split(' ')
@@ -269,144 +274,150 @@ const LoginScreen = ({ navigation }: any) => {
                       const formattedPhone = `+233 ${acc.phone.slice(4, 6)} ••• ••${acc.phone.slice(-2)}`;
 
                       return (
-                        <View 
-                          key={acc.phone} 
-                          className={`flex-row items-center justify-between w-full p-4 rounded-2xl border mb-3 ${
-                            isDark 
-                              ? 'bg-[#121613] border-dark-outline-variant/10' 
-                              : 'bg-white border-outline-variant/5'
-                          } shadow-sm`}
+                        <GlassSurface
+                          key={acc.phone}
+                          radius={22}
+                          elevated
+                          style={{ marginBottom: 12 }}
                         >
-                          <TouchableOpacity
-                            onPress={() => {
-                              const normalized = normalizePhoneNumber(acc.phone);
-                              setPhone(normalized.replace('+233', '').replace(/^0/, ''));
-                              setStep('pin');
-                              
-                              // Check and pre-configure biometrics for this selected account
-                              (async () => {
-                                const hasHardware = await LocalAuthentication.hasHardwareAsync();
-                                const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-                                if (hasHardware && isEnrolled) {
-                                  const phoneVal = await SecureStore.getItemAsync('biometric_phone');
-                                  if (phoneVal && normalizePhoneNumber(phoneVal) === normalized) {
-                                    const sanitized = normalized.replace(/[^\w.-]/g, '');
-                                    const pinVal = await SecureStore.getItemAsync(`user_pin_${sanitized}`);
-                                    if (pinVal) {
-                                      setIsBiometricAvailable(true);
-                                      setSavedPhone(normalized);
-                                      setSavedPin(pinVal);
-                                      setTimeout(() => {
-                                        handleBiometricAuth(normalized, pinVal);
-                                      }, 300);
+                          <View className="flex-row items-center justify-between w-full p-4">
+                            <TouchableOpacity
+                              onPress={() => {
+                                const normalized = normalizePhoneNumber(acc.phone);
+                                setPhone(normalized.replace('+233', '').replace(/^0/, ''));
+                                setStep('pin');
+                                
+                                // Check and pre-configure biometrics for this selected account
+                                (async () => {
+                                  const hasHardware = await LocalAuthentication.hasHardwareAsync();
+                                  const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+                                  if (hasHardware && isEnrolled) {
+                                    const phoneVal = await SecureStore.getItemAsync('biometric_phone');
+                                    if (phoneVal && normalizePhoneNumber(phoneVal) === normalized) {
+                                      const sanitized = normalized.replace(/[^\w.-]/g, '');
+                                      const pinVal = await SecureStore.getItemAsync(`user_pin_${sanitized}`);
+                                      if (pinVal) {
+                                        setIsBiometricAvailable(true);
+                                        setSavedPhone(normalized);
+                                        setSavedPin(pinVal);
+                                        setTimeout(() => {
+                                          handleBiometricAuth(normalized, pinVal);
+                                        }, 300);
+                                      }
+                                    } else {
+                                      setIsBiometricAvailable(false);
                                     }
-                                  } else {
-                                    setIsBiometricAvailable(false);
                                   }
-                                }
-                              })();
-                            }}
-                            className="flex-1 flex-row items-center mr-4"
-                          >
-                            <View className="w-12 h-12 rounded-full bg-primary/10 items-center justify-center mr-4 overflow-hidden">
-                              {accountAvatars[acc.phone] ? (
-                                <Image 
-                                  source={{ uri: accountAvatars[acc.phone] }} 
-                                  style={{ width: '100%', height: '100%' }}
-                                  resizeMode="cover"
-                                />
-                              ) : (
-                                <Text className="text-primary font-headline font-bold text-base">{initials || 'CS'}</Text>
-                              )}
-                            </View>
-                            <View className="flex-1">
-                              <Text className={`font-headline font-bold text-base ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>
-                                {acc.full_name || 'CediSmart User'}
-                              </Text>
-                              <Text className={`font-body text-xs ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-1`}>
-                                {formattedPhone}
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
+                                })();
+                              }}
+                              className="flex-1 flex-row items-center mr-4"
+                            >
+                              <View className="w-12 h-12 rounded-full bg-primary/15 items-center justify-center mr-4 overflow-hidden">
+                                {accountAvatars[acc.phone] ? (
+                                  <Image 
+                                    source={{ uri: accountAvatars[acc.phone] }} 
+                                    style={{ width: '100%', height: '100%' }}
+                                    resizeMode="cover"
+                                  />
+                                ) : (
+                                  <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-headline font-bold text-base`}>{initials || 'CS'}</Text>
+                                )}
+                              </View>
+                              <View className="flex-1">
+                                <Text className={`font-headline font-bold text-base ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>
+                                  {acc.full_name || 'CediSmart User'}
+                                </Text>
+                                <Text className={`font-body text-xs ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-1`}>
+                                  {formattedPhone}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
 
-                          {/* Delete profile shortcut */}
-                          <TouchableOpacity
-                            onPress={() => removeSavedAccount(acc.phone)}
-                            className={`p-2.5 rounded-full ${isDark ? 'bg-[#181e19]' : 'bg-gray-50'} active:opacity-75`}
-                          >
-                            <Trash2 size={16} color="#BA1A1A" />
-                          </TouchableOpacity>
-                        </View>
+                            {/* Delete profile shortcut */}
+                            <TouchableOpacity
+                              onPress={() => removeSavedAccount(acc.phone)}
+                              className={`p-2.5 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} active:opacity-75`}
+                            >
+                              <Trash2 size={16} color="#BA1A1A" />
+                            </TouchableOpacity>
+                          </View>
+                        </GlassSurface>
                       );
                     })}
                   </View>
 
-                  <TouchableOpacity
-                    onPress={() => {
-                      setStep('phone');
-                      setPhone('');
-                      setPin('');
-                    }}
-                    className={`w-full py-4 items-center justify-center rounded-2xl border border-dashed ${
-                      isDark ? 'border-dark-outline-variant/30' : 'border-outline-variant/30'
-                    } active:opacity-75`}
-                  >
-                    <Text className={`font-headline font-bold text-sm ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>
-                      + Add Another Account
-                    </Text>
-                  </TouchableOpacity>
+                  <GlassSurface variant="clear" radius={20}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setStep('phone');
+                        setPhone('');
+                        setPin('');
+                      }}
+                      className="w-full py-4 items-center justify-center active:opacity-75"
+                    >
+                      <Text className={`font-headline font-bold text-sm ${isDark ? 'text-[#4ade80]' : 'text-primary'}`}>
+                        + Add Another Account
+                      </Text>
+                    </TouchableOpacity>
+                  </GlassSurface>
                 </View>
               ) : step === 'phone' ? (
                 /* STEP 1: PHONE INPUT */
-                <View className={`w-full ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} rounded-3xl p-6 shadow-sm border ${isDark ? 'border-dark-outline-variant/10' : 'border-outline-variant/5'} mb-8`}>
-                  <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-3`}>Phone Number</Text>
-                  <View className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} rounded-2xl overflow-hidden h-14 border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
-                    <View className={`flex-row items-center px-4 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-high'} h-full border-r ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
-                      <Image 
-                        source={{ uri: 'https://flagsapi.com/GH/flat/64.png' }} 
-                        className="w-6 h-4 rounded-sm mr-2"
-                      />
-                      <Text className={`font-body font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>+233</Text>
+                <GlassSurface radius={26} elevated style={{ width: '100%', marginBottom: 24 }}>
+                  <View className="p-6">
+                    <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-3`}>Phone Number</Text>
+                    <View className={`flex-row items-center ${isDark ? 'bg-black/30' : 'bg-white/60'} rounded-2xl overflow-hidden h-14 border ${isDark ? 'border-white/10' : 'border-black/10'}`}>
+                      <View className={`flex-row items-center px-4 ${isDark ? 'bg-white/5' : 'bg-black/5'} h-full border-r ${isDark ? 'border-white/10' : 'border-black/10'}`}>
+                        <Image 
+                          source={{ uri: 'https://flagsapi.com/GH/flat/64.png' }} 
+                          className="w-6 h-4 rounded-sm mr-2"
+                        />
+                        <Text className={`font-body font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>+233</Text>
+                      </View>
+                      <View className="flex-1 justify-center px-4">
+                        <Text className={`font-body text-lg tracking-widest ${phone ? `${isDark ? 'text-dark-on-surface' : 'text-on-surface'} font-semibold` : isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                          {phone || 'XXXXXXXXX'}
+                        </Text>
+                      </View>
                     </View>
-                    <View className="flex-1 justify-center px-4">
-                      <Text className={`font-body text-lg tracking-widest ${phone ? `${isDark ? 'text-dark-on-surface' : 'text-on-surface'} font-semibold` : isDark ? 'text-gray-600' : 'text-gray-300'}`}>
-                        {phone || 'XXXXXXXXX'}
-                      </Text>
-                    </View>
+                    <Text className={`font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-3 leading-relaxed`}>
+                      Type your registered 9-digit mobile number using the keypad below.
+                    </Text>
                   </View>
-                  <Text className={`font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-3 leading-relaxed`}>
-                    Type your registered 9-digit mobile number using the keypad below.
-                  </Text>
-                </View>
+                </GlassSurface>
               ) : (
                 /* STEP 2: PIN INPUT */
-                <View className="w-full items-center mb-8">
+                <View className="w-full items-center mb-6">
                   {/* Phone Badge/Tag */}
-                  <TouchableOpacity 
-                    onPress={() => {
-                      if (savedAccounts.length > 0) {
-                        setStep('profile_picker');
-                      } else {
-                        setStep('phone');
-                      }
-                      setPin('');
-                    }}
-                    className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} px-5 py-2.5 rounded-full mb-6 border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'} ${isDark ? 'active:bg-dark-surface-container-lowest' : 'active:bg-surface-container-high'} transition-all`}
-                  >
-                    <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} font-bold text-xs mr-2`}>
-                      +233 {phone.slice(0, 2)} {phone.slice(2, 5)} {phone.slice(5)}
-                    </Text>
-                    <Edit2 size={12} color={isDark ? '#e1e3e0' : '#40493d'} />
-                  </TouchableOpacity>
+                  <GlassSurface variant="clear" radius={999} style={{ marginBottom: 20 }}>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        if (savedAccounts.length > 0) {
+                          setStep('profile_picker');
+                        } else {
+                          setStep('phone');
+                        }
+                        setPin('');
+                      }}
+                      className="flex-row items-center px-5 py-2.5 active:opacity-75"
+                    >
+                      <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} font-bold text-xs mr-2`}>
+                        +233 {phone.slice(0, 2)} {phone.slice(2, 5)} {phone.slice(5)}
+                      </Text>
+                      <Edit2 size={12} color={isDark ? '#e1e3e0' : '#40493d'} />
+                    </TouchableOpacity>
+                  </GlassSurface>
 
-                  <View className="flex-row justify-center space-x-4 mb-4">
-                    {[...Array(6)].map((_, i) => (
-                      <View
-                        key={i}
-                        className={`w-4 h-4 rounded-full border-2 border-primary ${i < pin.length ? 'bg-primary' : 'bg-transparent'}`}
-                      />
-                    ))}
-                  </View>
+                  <GlassSurface variant="clear" radius={999} style={{ paddingHorizontal: 22, paddingVertical: 12, marginBottom: 12 }}>
+                    <View className="flex-row justify-center items-center">
+                      {[...Array(6)].map((_, i) => (
+                        <View
+                          key={i}
+                          className={`w-3.5 h-3.5 rounded-full mx-2 border-2 ${isDark ? 'border-[#4ade80]' : 'border-primary'} ${i < pin.length ? (isDark ? 'bg-[#4ade80] scale-110' : 'bg-primary scale-110') : 'bg-transparent'}`}
+                        />
+                      ))}
+                    </View>
+                  </GlassSurface>
 
                   <TouchableOpacity 
                     onPress={() => {
@@ -414,9 +425,9 @@ const LoginScreen = ({ navigation }: any) => {
                       setError('');
                       navigation.navigate('ForgotPIN');
                     }}
-                    className="mt-2"
+                    className="mt-1"
                   >
-                    <Text className="font-body text-xs font-bold text-primary underline">
+                    <Text className={`font-body text-xs font-bold ${isDark ? 'text-[#4ade80]' : 'text-primary'} underline`}>
                       Forgot PIN?
                     </Text>
                   </TouchableOpacity>
@@ -437,16 +448,16 @@ const LoginScreen = ({ navigation }: any) => {
               />
             )}
 
-            <View className="mt-8 flex-row justify-center items-center">
+            <View className="mt-6 flex-row justify-center items-center">
               <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} font-body text-sm`}>Don't have an account? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                <Text className={`${isDark ? 'text-[#2e7d32]' : 'text-primary'} font-bold font-body text-sm underline`}>Register</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold font-body text-sm underline`}>Register</Text>
               </TouchableOpacity>
             </View>
 
-            <View className="mt-12 items-center opacity-40 flex-row justify-center space-x-2">
+            <View className="mt-8 items-center opacity-40 flex-row justify-center space-x-2">
               <Shield size={12} color={isDark ? '#e1e3e0' : '#1c1b1f'} fill={isDark ? '#e1e3e0' : '#1c1b1f'} />
-              <Text className={`font-label text-[9px] uppercase tracking-widest font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>End-to-End Encrypted</Text>
+              <Text className={`font-label text-[9px] uppercase tracking-widest font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} ml-1.5`}>End-to-End Encrypted</Text>
             </View>
           </View>
         </ScrollView>

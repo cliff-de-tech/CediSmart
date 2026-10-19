@@ -10,9 +10,24 @@ import { useSignUp } from '@clerk/clerk-expo';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
+import { GlassSurface } from '../../components/glass/GlassSurface';
+
+const normalizeGhanaPhoneDigits = (raw: string): string => {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('233') && digits.length >= 12) {
+    return digits.slice(3, 12);
+  }
+  if (digits.startsWith('0')) {
+    return digits.slice(1, 10);
+  }
+  return digits.slice(0, 9);
+};
 
 const phoneSchema = z.object({
-  phone: z.string().regex(/^[0-9]{9}$/, 'Enter a valid 9-digit phone number'),
+  phone: z
+    .string()
+    .transform((val) => normalizeGhanaPhoneDigits(val))
+    .refine((val) => /^[0-9]{9}$/.test(val), 'Enter a valid Ghana mobile number (e.g. 0241234567 or 241234567)'),
 });
 
 type PhoneForm = z.infer<typeof phoneSchema>;
@@ -33,7 +48,8 @@ const RegisterScreen = ({ navigation }: any) => {
         throw new Error('Verification service not loaded yet. Please try again.');
       }
       
-      const formattedPhone = `+233${data.phone}`;
+      const clean9 = normalizeGhanaPhoneDigits(data.phone);
+      const formattedPhone = `+233${clean9}`;
       console.log('[Register Clerk] Starting signUp for:', formattedPhone);
       
       // Start registration flow with Clerk
@@ -70,23 +86,23 @@ const RegisterScreen = ({ navigation }: any) => {
       >
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6">
           {/* Top Branding Section */}
-          <View className="pt-12 mb-12">
-            <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-primary mb-3">Join Sovereign Ledger</Text>
+          <View className="pt-10 mb-8">
+            <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} mb-3`}>Get Started in Seconds</Text>
             <Text className={`font-headline text-4xl font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight leading-tight`}>Create Account</Text>
-            <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-4 text-sm leading-relaxed max-w-[280px]`}>
-              Secure your financial future with Ghana's most trusted digital ledger system.
+            <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-3 text-sm leading-relaxed max-w-[300px]`}>
+              Record your daily spending, track Mobile Money & cash, and see where your money goes each month.
             </Text>
           </View>
 
           {/* Registration Form */}
-          <View className={`w-full ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} rounded-3xl p-8 shadow-sm`}>
-            <View className="space-y-8">
+          <GlassSurface radius={28} elevated style={{ width: '100%' }}>
+            <View className="p-7 space-y-6">
               {/* Phone Number Input Group */}
               <View className="space-y-3">
-                <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>Phone Number</Text>
-                <View className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} rounded-2xl overflow-hidden h-14 border ${isDark ? 'border-dark-outline-variant/20' : 'border-transparent'}`}>
+                <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-2`}>Mobile Phone Number</Text>
+                <View className={`flex-row items-center ${isDark ? 'bg-black/30' : 'bg-white/60'} rounded-2xl overflow-hidden h-14 border ${isDark ? 'border-white/10' : 'border-black/10'}`}>
                   {/* Prefix Container */}
-                  <View className={`flex-row items-center px-4 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-high'} h-full border-r ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
+                  <View className={`flex-row items-center px-4 ${isDark ? 'bg-white/5' : 'bg-black/5'} h-full border-r ${isDark ? 'border-white/10' : 'border-black/10'}`}>
                     <Image 
                       source={{ uri: 'https://flagsapi.com/GH/flat/64.png' }} 
                       className="w-6 h-4 rounded-sm mr-2"
@@ -100,19 +116,27 @@ const RegisterScreen = ({ navigation }: any) => {
                     render={({ field: { onChange, onBlur, value } }) => (
                       <TextInput
                         className={`flex-1 h-full px-4 font-body text-lg tracking-widest ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}
-                        placeholder="XXXXXXXXX"
-                        placeholderTextColor={isDark ? '#434942' : '#D1D5DB'}
+                        placeholder="024XXXXXXX"
+                        placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
                         keyboardType="phone-pad"
-                        maxLength={9}
+                        maxLength={10}
                         onBlur={onBlur}
-                        onChangeText={onChange}
+                        onChangeText={(txt) => {
+                          const digits = txt.replace(/\D/g, '');
+                          // If user types 10 digits starting with 0, normalize to 9 digits automatically
+                          if (digits.startsWith('0') && digits.length === 10) {
+                            onChange(digits.slice(1));
+                          } else {
+                            onChange(digits);
+                          }
+                        }}
                         value={value}
                       />
                     )}
                   />
                 </View>
-                <Text className={`font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed`}>
-                  Enter your 9-digit mobile number registered with telecom services.
+                <Text className={`font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed mt-2`}>
+                  Enter your Ghana mobile number (with or without the leading 0). We'll send a 6-digit verification code via SMS.
                 </Text>
                 {errors.phone && (
                   <Text className="text-error text-[10px] font-bold mt-1">{errors.phone.message}</Text>
@@ -120,10 +144,10 @@ const RegisterScreen = ({ navigation }: any) => {
               </View>
 
               {mutation.error ? (
-                <Text className="text-error text-xs font-semibold text-center mb-4">
+                <Text className="text-error text-xs font-semibold text-center my-2">
                   {(mutation.error as any)?.errors?.[0]?.message || 
                    (mutation.error as any)?.message || 
-                   'Failed to send OTP. Please try again.'}
+                   'Failed to send verification code. Please try again.'}
                 </Text>
               ) : null}
 
@@ -131,45 +155,45 @@ const RegisterScreen = ({ navigation }: any) => {
               <TouchableOpacity
                 onPress={handleSubmit(onSubmit)}
                 disabled={mutation.isPending}
-                className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20"
+                className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20 mt-4"
               >
                 <View className={`w-full h-14 items-center justify-center flex-row space-x-3 ${mutation.isPending ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') : 'bg-primary'}`}>
-                  <Text className="text-white font-headline font-bold text-base">
-                    {mutation.isPending ? 'Sending...' : 'Send OTP'}
+                  <Text className="text-white font-headline font-bold text-base mr-2">
+                    {mutation.isPending ? 'Sending Code...' : 'Send Verification Code'}
                   </Text>
                   <ArrowRight size={20} color="white" />
                 </View>
               </TouchableOpacity>
 
               {/* Terms & Privacy */}
-              <Text className={`text-center font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed px-4`}>
+              <Text className={`text-center font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed px-4 mt-4`}>
                 By continuing, you agree to our{' '}
-                <Text className={`${isDark ? 'text-[#2e7d32]' : 'text-primary'} font-bold underline`}>Terms of Service</Text>{' '}
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold underline`}>Terms of Service</Text>{' '}
                 and{' '}
-                <Text className={`${isDark ? 'text-[#2e7d32]' : 'text-primary'} font-bold underline`}>Privacy Policy</Text>.
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold underline`}>Privacy Policy</Text>.
               </Text>
             </View>
-          </View>
+          </GlassSurface>
 
           {/* Footer Actions */}
           <View className="mt-10 items-center space-y-6 pb-12">
             <View className="flex-row">
               <Text className={`font-body text-sm ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>Already have an account? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                <Text className="text-primary font-bold">Log In</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Log In</Text>
               </TouchableOpacity>
             </View>
 
             <View className="flex flex-col items-center space-y-4 pt-8">
               <View className="flex-row items-center opacity-40 space-x-2">
                 <Shield size={12} color={isDark ? '#e1e3e0' : '#1c1b1f'} fill={isDark ? '#e1e3e0' : '#1c1b1f'} />
-                <Text className={`font-label text-[9px] uppercase tracking-widest font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>End-to-End Encrypted</Text>
+                <Text className={`font-label text-[9px] uppercase tracking-widest font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} ml-1.5`}>End-to-End Encrypted</Text>
               </View>
               {/* Ghanaian Heritage Accent */}
-              <View className="flex-row space-x-1 opacity-20">
-                <View className="w-1.5 h-1.5 rounded-full bg-tertiary" />
-                <View className="w-1.5 h-1.5 rounded-full bg-primary" />
-                <View className="w-1.5 h-1.5 rounded-full bg-secondary" />
+              <View className="flex-row space-x-1 opacity-20 mt-2">
+                <View className="w-1.5 h-1.5 rounded-full bg-tertiary mx-0.5" />
+                <View className="w-1.5 h-1.5 rounded-full bg-primary mx-0.5" />
+                <View className="w-1.5 h-1.5 rounded-full bg-secondary mx-0.5" />
               </View>
             </View>
           </View>

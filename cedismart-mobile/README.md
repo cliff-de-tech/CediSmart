@@ -62,6 +62,18 @@ A modern, offline-capable mobile app for the CediSmart fintech platform. Built w
 
 ---
 
+## Liquid Glass interface
+
+The tab bar, quick actions, floating buttons, and sheet backgrounds use native Liquid Glass on supported iOS 26+ devices through `expo-glass-effect`. Android, web, older iOS versions, and clients without the native API use an opaque emerald-toned material with a subtle gradient. Financial cards and transaction rows retain solid backgrounds for readability.
+
+Shared components live in `src/components/glass/`. Press feedback and the tab highlight use Reanimated springs; native stack transitions follow the platform. The accessibility provider responds to Reduce Motion and Reduce Transparency, including changes made while the app is open. Navigation clears the home indicator, hides when the keyboard opens, and reserves space for scrollable content.
+
+Use SDK 57 Expo Go to try the native effect, or rebuild an existing development/preview client after installing this native module. A web preview shows the fallback, not iOS refraction.
+
+When checking on a device, test all four tabs, add-transaction and budget actions, account/category sheets, light/dark themes, keyboard dismissal, and the two accessibility settings. Confirm that the final list items and Settings actions remain reachable above the floating bar.
+
+---
+
 ## Architecture
 
 ```

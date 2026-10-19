@@ -87,3 +87,93 @@ async def test_support_feedback(client: AsyncClient, make_user) -> None:
             description="Please add dark mode support to the main ledger screen.",
             device_info={"os": "android", "app_version": "1.0.0"}
         )
+
+
+@pytest.mark.asyncio
+async def test_support_ticket_status_mock(client: AsyncClient) -> None:
+    with patch("app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock) as mock_status:
+        mock_status.return_value = {
+            "issue_number": 42,
+            "state": "open",
+            "title": "Support Ticket: Phone +233241234567",
+            "issue_url": "https://github.com/cliff-de-tech/CediSmart/issues/42",
+            "labels": ["support", "escalated", "ai-autofix"],
+            "pr_url": "https://github.com/cliff-de-tech/CediSmart/pull/43",
+            "pr_state": "open",
+            "latest_agent_comment": "ChatGPT (gpt-4o) Code Agent opened PR #43."
+        }
+
+        resp = await client.get("/api/v1/support/ticket-status/42")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["issue_number"] == 42
+        assert body["pr_url"] == "https://github.com/cliff-de-tech/CediSmart/pull/43"
+        assert "ai-autofix" in body["labels"]
+        mock_status.assert_called_once_with(issue_number=42)
+
+
+def test_looks_like_momo_sms() -> None:
+    from app.modules.support.service import SupportService
+
+    sample_sms = (
+        "Payment received for GHS 150.00 from KWAME MENSAH. "
+        "Current Balance: GHS 1,240.50. Financial Transaction ID: 29481920192."
+    )
+    assert SupportService._looks_like_momo_sms(sample_sms) is True
+    assert SupportService._looks_like_momo_sms("Hello how do I create a budget?") is False
+
+
+def test_extract_display_name_honorifics() -> None:
+    from app.modules.support.service import SupportService
+    from collections import namedtuple
+
+    MockUser = namedtuple("MockUser", ["full_name"])
+
+    # Strips title "Mr."
+    first, full = SupportService._extract_display_name("Mr. Kwame Mensah", None)
+    assert first == "Kwame"
+    assert full == "Kwame Mensah"
+
+    # Strips title "Dr."
+    first, full = SupportService._extract_display_name("Dr. Abena Poku", None)
+    assert first == "Abena"
+    assert full == "Abena Poku"
+
+    # Strips title "Mrs."
+    first, full = SupportService._extract_display_name("Mrs. Jane Doe", None)
+    assert first == "Jane"
+    assert full == "Jane Doe"
+
+    # Handles bare title "Mr." by falling back to db_user
+    db_user = MockUser(full_name="Cliff De Tech")
+    first, full = SupportService._extract_display_name("Mr.", db_user)
+    assert first == "Cliff"
+    assert full == "Cliff De Tech"
+
+
+@pytest.mark.asyncio
+async def test_ticket_status_user_facing_stages(client: AsyncClient) -> None:
+    with patch("app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock) as mock_status:
+        mock_status.return_value = {
+            "issue_number": 42,
+            "state": "open",
+            "title": "Support Ticket: Phone +233241234567",
+            "issue_url": "https://github.com/cliff-de-tech/CediSmart/issues/42",
+            "labels": ["support", "escalated"],
+            "pr_url": "https://github.com/cliff-de-tech/CediSmart/pull/43",
+            "pr_state": "merged",
+            "latest_agent_comment": "Fix has been merged.",
+            "user_status": "update_available",
+            "status_label": "Update Available",
+            "status_description": "A verified fix has been merged into CediSmart and will be included in the next app update.",
+            "stage_step": 4,
+        }
+
+        resp = await client.get("/api/v1/support/ticket-status/42")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["user_status"] == "update_available"
+        assert body["status_label"] == "Update Available"
+        assert body["stage_step"] == 4
+
+

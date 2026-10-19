@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator, Dimensions } from 'react-native';
+import { GlassSheetBackground } from '../../components/glass/GlassSheetBackground';
+import { GlassSurface } from '../../components/glass/GlassSurface';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
+import { View, Text, TouchableOpacity, ScrollView, Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator, Dimensions } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -37,30 +41,67 @@ const normalizePhoneNumber = (phone: string): string => {
   return `+233${clean}`;
 };
 
-const SettingItem = ({ icon: Icon, title, value, onPress, color, children, hideChevron }: any) => {
+const SettingItem = ({ icon: Icon, title, value, onPress, color, children, hideChevron, rightElement }: any) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const iconColor = color || (isDark ? '#e1e3e0' : '#1C1C2E');
   return (
-    <TouchableOpacity 
-      onPress={onPress}
-      disabled={!onPress}
-      className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-5 mb-2 rounded-2xl border shadow-sm`}
-    >
-      <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-gray-50'} items-center justify-center mr-4`}>
-        <Icon size={20} color={iconColor} />
-      </View>
-      <View className="flex-1">
-        <Text className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-[10px] font-bold uppercase tracking-wider mb-1`}>{title}</Text>
-        {children || <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>{value}</Text>}
-      </View>
-      {onPress && !hideChevron && <ChevronRight size={20} color={isDark ? '#4B5563' : '#D1D5DB'} />}
-    </TouchableOpacity>
+    <GlassSurface radius={22} style={{ marginBottom: 10 }}>
+      <TouchableOpacity 
+        onPress={onPress}
+        disabled={!onPress}
+        activeOpacity={0.8}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 18,
+          paddingVertical: 16,
+          width: '100%',
+        }}
+      >
+        <View
+          className={`w-10 h-10 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+          style={{ marginRight: 14, flexShrink: 0 }}
+        >
+          <Icon size={20} color={iconColor} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-[10px] font-bold uppercase tracking-wider mb-1`}
+            numberOfLines={1}
+          >
+            {title}
+          </Text>
+          {children || (
+            <Text
+              className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {value}
+            </Text>
+          )}
+        </View>
+        {rightElement ? (
+          <View style={{ marginLeft: 12, flexShrink: 0, justifyContent: 'center' }}>
+            {rightElement}
+          </View>
+        ) : (
+          onPress && !hideChevron && (
+            <View style={{ marginLeft: 10, flexShrink: 0 }}>
+              <ChevronRight size={20} color={isDark ? '#6B7280' : '#9CA3AF'} />
+            </View>
+          )
+        )}
+      </TouchableOpacity>
+    </GlassSurface>
   );
 };
 
 
 const SettingsScreen = ({ navigation, route }: any) => {
+  const { clearance: tabBarClearance } = useGlassTabBarMetrics();
   const { user, logout, updateUser, savedAccounts, loadSavedAccounts, removeSavedAccount, login } = useAuthStore();
   const { queue, clearQueue } = useOfflineStore();
   
@@ -1320,13 +1361,13 @@ const SettingsScreen = ({ navigation, route }: any) => {
   };
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
+    <SafeAreaView edges={['top', 'left', 'right']} className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
       <CoinBackground />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <ScrollView className="flex-1 px-6 py-8" showsVerticalScrollIndicator={false}>
+        <ScrollView className="flex-1 px-6 py-8" contentContainerStyle={{ paddingBottom: tabBarClearance + 24 }} showsVerticalScrollIndicator={false}>
           <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-8`}>Settings</Text>
 
           {/* Profile Section */}
@@ -1371,23 +1412,28 @@ const SettingsScreen = ({ navigation, route }: any) => {
             </Text>
           </SettingItem>
           <SettingItem 
-            icon={Landmark} 
-            title="Link MoMo / Bank Account" 
-            onPress={() => navigation.navigate('Accounts')} 
-          >
-            <Text className={`font-bold text-base ${isLinked ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-              {isLinked ? 'LINKED' : 'Not Linked'}
-            </Text>
-          </SettingItem>
-          <SettingItem 
             icon={Users} 
-            title="Switch Account" 
+            title="Switch Profile" 
             onPress={() => switchSheetRef.current?.snapToIndex(0)} 
           >
             <Text className={`font-bold text-base ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-              {savedAccounts.length > 1 ? `${savedAccounts.length} Accounts` : 'Manage'}
+              {savedAccounts.length > 1 ? `${savedAccounts.length} Profiles` : 'Manage'}
             </Text>
           </SettingItem>
+
+          {/* Tracked Financial Accounts Section */}
+          <View className="mt-6">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Tracked Accounts & MoMo</Text>
+            <SettingItem 
+              icon={Landmark} 
+              title="Cash, MoMo & Bank Accounts" 
+              onPress={() => navigation.navigate('Accounts')} 
+            >
+              <Text className={`font-bold text-base ${isLinked ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                {isLinked ? 'Manage' : 'Add Account'}
+              </Text>
+            </SettingItem>
+          </View>
 
           {/* Membership Section */}
           <View className="mt-6">
@@ -1461,16 +1507,17 @@ const SettingsScreen = ({ navigation, route }: any) => {
             <SettingItem 
               icon={SunMoon} 
               title="Dark Mode" 
-            >
-               <View className="flex-row justify-between items-center w-full">
-                 <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>Enable Dark Theme</Text>
-                 <Switch 
-                   value={isDarkMode} 
-                   onValueChange={(val) => setTheme(val ? 'dark' : 'light')}
-                   trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
-                 />
-               </View>
-            </SettingItem>
+              value="Enable Dark Theme"
+              onPress={() => setTheme(isDarkMode ? 'light' : 'dark')}
+              hideChevron
+              rightElement={
+                <Switch 
+                  value={isDarkMode} 
+                  onValueChange={(val) => setTheme(val ? 'dark' : 'light')}
+                  trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
+                />
+              }
+            />
           </View>
 
           {/* Security Section */}
@@ -1479,22 +1526,19 @@ const SettingsScreen = ({ navigation, route }: any) => {
             <SettingItem 
               icon={Shield} 
               title="Biometric Login" 
+              value={isBiometricSupported ? 'Use FaceID / Fingerprint' : 'Not supported'}
               onPress={() => isBiometricSupported && handleBiometricToggle(!isBiometricEnabled)}
               hideChevron
-            >
-              <View className="flex-row justify-between items-center w-full">
-                <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>
-                  {isBiometricSupported ? 'Use FaceID / Fingerprint' : 'Not supported'}
-                </Text>
-                {isBiometricSupported && (
+              rightElement={
+                isBiometricSupported ? (
                   <Switch 
                     value={isBiometricEnabled} 
                     onValueChange={handleBiometricToggle}
                     trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
                   />
-                )}
-              </View>
-            </SettingItem>
+                ) : undefined
+              }
+            />
             <SettingItem 
               icon={Shield} 
               title="Security PIN" 
@@ -1512,26 +1556,34 @@ const SettingsScreen = ({ navigation, route }: any) => {
           {/* Notifications Section */}
           <View className="mt-6">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Notifications</Text>
-            <SettingItem icon={Bell} title="SMS Alert Reminders">
-               <View className="flex-row justify-between items-center w-full">
-                 <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>Weekly SMS summaries</Text>
-                 <Switch 
-                   value={smsAlerts} 
-                   onValueChange={handleSmsAlertsToggle}
-                   trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
-                 />
-               </View>
-            </SettingItem>
-            <SettingItem icon={Bell} title="Budget Alert Notifications">
-               <View className="flex-row justify-between items-center w-full">
-                 <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>Send notification at limit</Text>
-                 <Switch 
-                   value={budgetAlerts} 
-                   onValueChange={handleBudgetAlertsToggle}
-                   trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
-                 />
-               </View>
-            </SettingItem>
+            <SettingItem
+              icon={Bell}
+              title="SMS Alert Reminders"
+              value="Weekly SMS summaries"
+              onPress={() => handleSmsAlertsToggle(!smsAlerts)}
+              hideChevron
+              rightElement={
+                <Switch 
+                  value={smsAlerts} 
+                  onValueChange={handleSmsAlertsToggle}
+                  trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
+                />
+              }
+            />
+            <SettingItem
+              icon={Bell}
+              title="Budget Alert Notifications"
+              value="Send notification at limit"
+              onPress={() => handleBudgetAlertsToggle(!budgetAlerts)}
+              hideChevron
+              rightElement={
+                <Switch 
+                  value={budgetAlerts} 
+                  onValueChange={handleBudgetAlertsToggle}
+                  trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
+                />
+              }
+            />
             {budgetAlerts && (
               <SettingItem 
                 icon={Bell} 
@@ -1603,26 +1655,50 @@ const SettingsScreen = ({ navigation, route }: any) => {
           </View>
 
           {/* Danger Zone */}
-          <View className="mt-10 mb-24">
-            <TouchableOpacity 
-              onPress={handleLogout}
-              className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-5 mb-4 rounded-2xl border shadow-sm`}
-            >
-              <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-gray-50'} items-center justify-center mr-4`}>
-                <LogOut size={20} color={isDark ? '#e1e3e0' : '#1C1C2E'} />
-              </View>
-              <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base flex-1`}>Logout</Text>
-            </TouchableOpacity>
+          <View className="mt-10 mb-6">
+            <GlassSurface radius={22} style={{ marginBottom: 12 }}>
+              <TouchableOpacity 
+                onPress={handleLogout}
+                activeOpacity={0.8}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 18,
+                  paddingVertical: 16,
+                  width: '100%',
+                }}
+              >
+                <View
+                  className={`w-10 h-10 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  style={{ marginRight: 14, flexShrink: 0 }}
+                >
+                  <LogOut size={20} color={isDark ? '#e1e3e0' : '#1C1C2E'} />
+                </View>
+                <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base flex-1`}>Logout</Text>
+              </TouchableOpacity>
+            </GlassSurface>
 
-            <TouchableOpacity 
-              onPress={handleDeleteAccount}
-              className={`flex-row items-center ${isDark ? 'bg-red-950/20 border-red-900/30' : 'bg-red-50 border-red-100'} p-5 rounded-2xl border`}
-            >
-              <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-white'} items-center justify-center mr-4`}>
-                <Trash2 size={20} color="#DC2626" />
-              </View>
-              <Text className="text-error font-bold text-base flex-1">Delete Account</Text>
-            </TouchableOpacity>
+            <GlassSurface radius={22}>
+              <TouchableOpacity 
+                onPress={handleDeleteAccount}
+                activeOpacity={0.8}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 18,
+                  paddingVertical: 16,
+                  width: '100%',
+                }}
+              >
+                <View
+                  className="w-10 h-10 rounded-full bg-red-500/15 items-center justify-center"
+                  style={{ marginRight: 14, flexShrink: 0 }}
+                >
+                  <Trash2 size={20} color="#DC2626" />
+                </View>
+                <Text className="text-error font-bold text-base flex-1">Delete Account</Text>
+              </TouchableOpacity>
+            </GlassSurface>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1630,66 +1706,75 @@ const SettingsScreen = ({ navigation, route }: any) => {
       {/* Report Bug Modal */}
       <Modal
         visible={isBugModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={() => setIsBugModalVisible(false)}
       >
-        <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-surface/95' : 'bg-white/95'}`}>
+        <View className="flex-1 bg-black/65">
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             className="flex-1 justify-center"
           >
-            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
-              <View className={`w-full p-6 rounded-3xl ${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-white shadow-xl border border-gray-100'}`}>
+            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20 }}>
+              <GlassSurface variant="thick" elevated radius={28} style={{ padding: 24, width: '100%' }}>
                 {/* Header */}
-                <View className="flex-row justify-between items-center mb-6">
-                  <View className="flex-row items-center">
-                    <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-red-950/30' : 'bg-red-55'} items-center justify-center mr-3`}>
-                      <Bug size={20} color="#DC2626" />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, width: '100%' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 12 }}>
+                    <View style={{ flexShrink: 0 }} className={`w-10 h-10 rounded-full ${isDark ? 'bg-red-500/20' : 'bg-red-50'} items-center justify-center mr-3`}>
+                      <Bug size={20} color="#EF4444" />
                     </View>
-                    <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Report a Bug</Text>
+                    <Text
+                      style={{ flex: 1, flexShrink: 1 }}
+                      className={`text-xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      Report a Bug
+                    </Text>
                   </View>
                   <TouchableOpacity 
                     onPress={() => setIsBugModalVisible(false)}
-                    className={`w-8 h-8 rounded-full ${isDark ? 'bg-dark-surface-container-high' : 'bg-gray-100'} items-center justify-center`}
+                    style={{ flexShrink: 0, marginLeft: 8 }}
+                    className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
                   >
                     <X size={18} color={isDark ? '#e1e3e0' : '#4B5563'} />
                   </TouchableOpacity>
                 </View>
 
                 {/* Subtitle */}
-                <Text className={`text-sm mb-6 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                <Text className={`text-sm mb-6 leading-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                   Help us improve CediSmart. Describe the issue in detail, and our support team will instantly track, escalate, and resolve it to keep your experience flawless.
                 </Text>
 
                 {/* Bug Title */}
-                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Bug Title</Text>
+                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Bug Title</Text>
                 <TextInput
                   value={bugTitle}
                   onChangeText={setBugTitle}
                   placeholder="e.g. App crashes on PIN creation"
-                  placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
-                  className={`w-full p-4 mb-4 rounded-xl border ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20 text-white' : 'bg-gray-50 border-gray-200 text-charcoal'} font-medium`}
+                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+                  className={`w-full p-4 mb-4 rounded-2xl border ${isDark ? 'bg-black/25 border-white/15 text-white' : 'bg-white/70 border-black/10 text-charcoal'} font-medium`}
                 />
 
                 {/* Bug Description */}
-                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Description</Text>
+                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Description</Text>
                 <TextInput
                   value={bugDescription}
                   onChangeText={setBugDescription}
                   placeholder="Please describe what happened, steps to reproduce, and any error message you saw..."
-                  placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
+                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
-                  className={`w-full p-4 mb-6 rounded-xl border h-36 ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20 text-white' : 'bg-gray-50 border-gray-200 text-charcoal'} font-medium`}
+                  className={`w-full p-4 mb-6 rounded-2xl border h-36 ${isDark ? 'bg-black/25 border-white/15 text-white' : 'bg-white/70 border-black/10 text-charcoal'} font-medium`}
                 />
 
                 {/* Submit Button */}
                 <TouchableOpacity
                   onPress={handleReportBug}
                   disabled={isSubmittingBug}
-                  className={`w-full py-4 rounded-xl flex-row justify-center items-center ${isSubmittingBug ? 'bg-gray-400' : 'bg-primary'}`}
+                  className={`w-full py-4 rounded-2xl flex-row justify-center items-center ${isSubmittingBug ? 'bg-gray-400' : 'bg-primary'}`}
                 >
                   {isSubmittingBug ? (
                     <ActivityIndicator size="small" color="white" />
@@ -1700,88 +1785,133 @@ const SettingsScreen = ({ navigation, route }: any) => {
                     </>
                   )}
                 </TouchableOpacity>
-              </View>
+              </GlassSurface>
             </ScrollView>
           </KeyboardAvoidingView>
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* Share Feedback Modal */}
       <Modal
         visible={isFeedbackModalVisible}
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         onRequestClose={() => setIsFeedbackModalVisible(false)}
       >
-        <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-surface/95' : 'bg-white/95'}`}>
+        <View className="flex-1 bg-black/65">
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             className="flex-1 justify-center"
           >
-            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
-              <View className={`w-full p-6 rounded-3xl ${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-white shadow-xl border border-gray-100'}`}>
+            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20 }}>
+              <GlassSurface variant="thick" elevated radius={28} style={{ padding: 24, width: '100%' }}>
                 {/* Header */}
-                <View className="flex-row justify-between items-center mb-6">
-                  <View className="flex-row items-center">
-                    <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-emerald-950/30' : 'bg-emerald-50'} items-center justify-center mr-3`}>
-                      <MessageSquare size={20} color="#0D631B" />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, width: '100%' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 12 }}>
+                    <View style={{ flexShrink: 0 }} className={`w-10 h-10 rounded-full ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-50'} items-center justify-center mr-3`}>
+                      <MessageSquare size={20} color={isDark ? '#4ade80' : '#0D631B'} />
                     </View>
-                    <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Share Feedback</Text>
+                    <Text
+                      style={{ flex: 1, flexShrink: 1 }}
+                      className={`text-xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      Share Feedback
+                    </Text>
                   </View>
                   <TouchableOpacity 
                     onPress={() => setIsFeedbackModalVisible(false)}
-                    className={`w-8 h-8 rounded-full ${isDark ? 'bg-dark-surface-container-high' : 'bg-gray-100'} items-center justify-center`}
+                    style={{ flexShrink: 0, marginLeft: 8 }}
+                    className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
                   >
                     <X size={18} color={isDark ? '#e1e3e0' : '#4B5563'} />
                   </TouchableOpacity>
                 </View>
 
                 {/* Subtitle */}
-                <Text className={`text-sm mb-6 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                <Text className={`text-sm mb-6 leading-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
                   Chale, help us shape CediSmart! Got a feature request, a suggestion, or a review? Send it directly to our Discord server.
                 </Text>
 
-                {/* Category Picker */}
-                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Feedback Category</Text>
-                <View className="flex-row mb-6 justify-between">
+                {/* Category Picker — Single-line labels that never hyphenate or break mid-word */}
+                <Text className={`text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Feedback Category</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 22 }}>
                   <TouchableOpacity
                     onPress={() => setFeedbackType('feature_request')}
-                    className={`flex-1 py-3 px-2 rounded-xl mr-2 items-center border ${feedbackType === 'feature_request' ? 'bg-primary border-primary' : (isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-gray-50 border-gray-200')}`}
+                    style={{ flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 6 }}
+                    className={`rounded-2xl items-center justify-center border ${
+                      feedbackType === 'feature_request'
+                        ? 'bg-primary border-primary'
+                        : isDark ? 'bg-black/25 border-white/15' : 'bg-white/70 border-black/10'
+                    }`}
                   >
-                    <Text className={`text-xs font-bold ${feedbackType === 'feature_request' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-charcoal')}`}>🚀 Feature</Text>
+                    <Text
+                      className={`text-xs font-bold text-center ${feedbackType === 'feature_request' ? 'text-white' : (isDark ? 'text-gray-200' : 'text-charcoal')}`}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      🚀 Feature
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setFeedbackType('suggestion')}
-                    className={`flex-1 py-3 px-2 rounded-xl mr-2 items-center border ${feedbackType === 'suggestion' ? 'bg-primary border-primary' : (isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-gray-50 border-gray-200')}`}
+                    style={{ flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 6 }}
+                    className={`rounded-2xl items-center justify-center border ${
+                      feedbackType === 'suggestion'
+                        ? 'bg-primary border-primary'
+                        : isDark ? 'bg-black/25 border-white/15' : 'bg-white/70 border-black/10'
+                    }`}
                   >
-                    <Text className={`text-xs font-bold ${feedbackType === 'suggestion' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-charcoal')}`}>💡 Suggestion</Text>
+                    <Text
+                      className={`text-xs font-bold text-center ${feedbackType === 'suggestion' ? 'text-white' : (isDark ? 'text-gray-200' : 'text-charcoal')}`}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      💡 Suggestion
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setFeedbackType('other')}
-                    className={`flex-1 py-3 px-2 rounded-xl items-center border ${feedbackType === 'other' ? 'bg-primary border-primary' : (isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-gray-50 border-gray-200')}`}
+                    style={{ flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 6 }}
+                    className={`rounded-2xl items-center justify-center border ${
+                      feedbackType === 'other'
+                        ? 'bg-primary border-primary'
+                        : isDark ? 'bg-black/25 border-white/15' : 'bg-white/70 border-black/10'
+                    }`}
                   >
-                    <Text className={`text-xs font-bold ${feedbackType === 'other' ? 'text-white' : (isDark ? 'text-gray-300' : 'text-charcoal')}`}>❓ Other</Text>
+                    <Text
+                      className={`text-xs font-bold text-center ${feedbackType === 'other' ? 'text-white' : (isDark ? 'text-gray-200' : 'text-charcoal')}`}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      ❓ Other
+                    </Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Feedback Description */}
-                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>Description</Text>
+                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Description</Text>
                 <TextInput
                   value={feedbackDescription}
                   onChangeText={setFeedbackDescription}
                   placeholder="Describe your request, suggestion, or thoughts in detail here..."
-                  placeholderTextColor={isDark ? '#6B7280' : '#9CA3AF'}
+                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
                   multiline
                   numberOfLines={6}
                   textAlignVertical="top"
-                  className={`w-full p-4 mb-6 rounded-xl border h-36 ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20 text-white' : 'bg-gray-50 border-gray-200 text-charcoal'} font-medium`}
+                  className={`w-full p-4 mb-6 rounded-2xl border h-36 ${isDark ? 'bg-black/25 border-white/15 text-white' : 'bg-white/70 border-black/10 text-charcoal'} font-medium`}
                 />
 
                 {/* Submit Button */}
                 <TouchableOpacity
                   onPress={handleSendFeedback}
                   disabled={isSubmittingFeedback}
-                  className={`w-full py-4 rounded-xl flex-row justify-center items-center ${isSubmittingFeedback ? 'bg-gray-400' : 'bg-primary'}`}
+                  className={`w-full py-4 rounded-2xl flex-row justify-center items-center ${isSubmittingFeedback ? 'bg-gray-400' : 'bg-primary'}`}
                 >
                   {isSubmittingFeedback ? (
                     <ActivityIndicator size="small" color="white" />
@@ -1792,39 +1922,39 @@ const SettingsScreen = ({ navigation, route }: any) => {
                     </>
                   )}
                 </TouchableOpacity>
-              </View>
+              </GlassSurface>
             </ScrollView>
           </KeyboardAvoidingView>
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* Change PIN Bottom Sheet */}
       <BottomSheet
         ref={pinSheetRef}
         index={-1}
-        snapPoints={['75%', '100%']}
+        snapPoints={['90%', '100%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
         onClose={resetPinForm}
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <View className="px-6 py-4 items-center">
-            <View className="w-full flex-row justify-between items-center mb-8">
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 36 }}>
+          <View className="px-6 py-3 items-center">
+            <View className="w-full flex-row justify-between items-center mb-5">
               <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Change PIN</Text>
               <TouchableOpacity onPress={() => pinSheetRef.current?.close()}>
-                <Text className="text-primary font-bold">Cancel</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Cancel</Text>
               </TouchableOpacity>
             </View>
 
-            <View className="items-center w-full mb-8">
+            <View className="items-center w-full mb-5">
               {/* Step indicator/header */}
-              <Text className={`text-sm font-semibold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-wider mb-4`}>
+              <Text className={`text-xs font-bold ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider mb-3`}>
                 {pinStep === 1 ? 'Enter Current PIN' : pinStep === 2 ? 'Enter New PIN' : 'Confirm New PIN'}
               </Text>
 
               {/* Dots */}
-              <View className="flex-row justify-center space-x-4 mb-4">
+              <View className="flex-row justify-center space-x-4 mb-2">
                 {[...Array(6)].map((_, i) => {
                   let filled = false;
                   if (pinStep === 1) filled = i < currentPin.length;
@@ -1834,7 +1964,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   return (
                     <View
                       key={i}
-                      className={`w-4 h-4 rounded-full border-2 border-primary ${filled ? 'bg-primary' : 'bg-transparent'}`}
+                      className={`w-4 h-4 rounded-full border-2 ${isDark ? 'border-[#4ade80]' : 'border-primary'} ${filled ? (isDark ? 'bg-[#4ade80]' : 'bg-primary') : 'bg-transparent'}`}
                     />
                   );
                 })}
@@ -1856,7 +1986,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
       <BottomSheet
         ref={kycSheetRef}
         index={-1}
-        snapPoints={['75%', '100%']}
+        snapPoints={['85%', '100%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
         onClose={() => {
@@ -1865,14 +1995,14 @@ const SettingsScreen = ({ navigation, route }: any) => {
           setDobKyc('');
           setKycError('');
         }}
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 36 }}>
           <View className="px-6 py-4">
             <View className="flex-row justify-between items-center mb-6">
               <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Verify Identity</Text>
               <TouchableOpacity onPress={() => kycSheetRef.current?.close()}>
-                <Text className="text-primary font-bold">Cancel</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Cancel</Text>
               </TouchableOpacity>
             </View>
 
@@ -1885,9 +2015,9 @@ const SettingsScreen = ({ navigation, route }: any) => {
               <View>
                 <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Ghana Card Number</Text>
                 <TextInput
-                  className={`${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10 text-dark-charcoal' : 'bg-white border-gray-100 text-charcoal'} px-4 py-4 rounded-xl border text-base shadow-sm`}
+                  className={`${isDark ? 'bg-black/25 border-white/15 text-dark-charcoal' : 'bg-white border-gray-100 text-charcoal'} px-4 py-4 rounded-xl border text-base shadow-sm`}
                   placeholder="GHA-123456789-0"
-                  placeholderTextColor={theme === 'dark' ? '#4b5563' : '#D1D5DB'}
+                  placeholderTextColor={theme === 'dark' ? '#6b7280' : '#D1D5DB'}
                   value={cardNum}
                   onChangeText={(val) => setCardNum(val.toUpperCase())}
                   autoCapitalize="characters"
@@ -1899,9 +2029,9 @@ const SettingsScreen = ({ navigation, route }: any) => {
               <View>
                 <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Full Name (as on card)</Text>
                 <TextInput
-                  className={`${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10 text-dark-charcoal' : 'bg-white border-gray-100 text-charcoal'} px-4 py-4 rounded-xl border text-base shadow-sm`}
+                  className={`${isDark ? 'bg-black/25 border-white/15 text-dark-charcoal' : 'bg-white border-gray-100 text-charcoal'} px-4 py-4 rounded-xl border text-base shadow-sm`}
                   placeholder="e.g. Kofi Mensah"
-                  placeholderTextColor={theme === 'dark' ? '#4b5563' : '#D1D5DB'}
+                  placeholderTextColor={theme === 'dark' ? '#6b7280' : '#D1D5DB'}
                   value={fullNameKyc}
                   onChangeText={setFullNameKyc}
                   editable={!isVerifying}
@@ -1911,9 +2041,9 @@ const SettingsScreen = ({ navigation, route }: any) => {
               <View>
                 <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Date of Birth</Text>
                 <TextInput
-                  className={`${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10 text-dark-charcoal' : 'bg-white border-gray-100 text-charcoal'} px-4 py-4 rounded-xl border text-base shadow-sm`}
+                  className={`${isDark ? 'bg-black/25 border-white/15 text-dark-charcoal' : 'bg-white border-gray-100 text-charcoal'} px-4 py-4 rounded-xl border text-base shadow-sm`}
                   placeholder="YYYY-MM-DD"
-                  placeholderTextColor={theme === 'dark' ? '#4b5563' : '#D1D5DB'}
+                  placeholderTextColor={theme === 'dark' ? '#6b7280' : '#D1D5DB'}
                   value={dobKyc}
                   onChangeText={setDobKyc}
                   editable={!isVerifying}
@@ -1946,35 +2076,35 @@ const SettingsScreen = ({ navigation, route }: any) => {
       <BottomSheet
         ref={biometricPinSheetRef}
         index={-1}
-        snapPoints={['75%', '100%']}
+        snapPoints={['90%', '100%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
         onClose={() => {
           setBiometricPin('');
           setBiometricPinError('');
         }}
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <View className="px-6 py-4 items-center">
-            <View className="w-full flex-row justify-between items-center mb-8">
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 36 }}>
+          <View className="px-6 py-3 items-center">
+            <View className="w-full flex-row justify-between items-center mb-5">
               <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Enable Biometrics</Text>
               <TouchableOpacity onPress={() => biometricPinSheetRef.current?.close()}>
-                <Text className="text-primary font-bold">Cancel</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Cancel</Text>
               </TouchableOpacity>
             </View>
 
-            <View className="items-center w-full mb-8">
-              <Text className={`text-sm font-semibold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-wider mb-4`}>
+            <View className="items-center w-full mb-5">
+              <Text className={`text-xs font-bold ${isDark ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider mb-3`}>
                 Enter Security PIN to Confirm
               </Text>
 
               {/* Dots */}
-              <View className="flex-row justify-center space-x-4 mb-4">
+              <View className="flex-row justify-center space-x-4 mb-2">
                 {[...Array(6)].map((_, i) => (
                   <View
                     key={i}
-                    className={`w-4 h-4 rounded-full border-2 border-primary ${i < biometricPin.length ? 'bg-primary' : 'bg-transparent'}`}
+                    className={`w-4 h-4 rounded-full border-2 ${isDark ? 'border-[#4ade80]' : 'border-primary'} ${i < biometricPin.length ? (isDark ? 'bg-[#4ade80]' : 'bg-primary') : 'bg-transparent'}`}
                   />
                 ))}
               </View>
@@ -1997,19 +2127,19 @@ const SettingsScreen = ({ navigation, route }: any) => {
       <BottomSheet
         ref={switchSheetRef}
         index={-1}
-        snapPoints={['50%', '80%']}
+        snapPoints={['65%', '90%']}
         backdropComponent={(props) => (
           <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
         )}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}>
           <View className="px-6 py-4">
             <View className="w-full flex-row justify-between items-center mb-6">
               <Text className={`text-2xl font-headline font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Switch Profile</Text>
               <TouchableOpacity onPress={() => switchSheetRef.current?.close()}>
-                <Text className="text-primary font-bold">Close</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Close</Text>
               </TouchableOpacity>
             </View>
 
@@ -2124,11 +2254,11 @@ const SettingsScreen = ({ navigation, route }: any) => {
             <TouchableOpacity
               onPress={handleAddAccount}
               className={`w-full py-4 border-2 border-dashed ${
-                isDark ? 'border-primary/40 bg-[#1f2920]' : 'border-primary/30 bg-primary/5'
+                isDark ? 'border-[#4ade80]/40 bg-[#1f2920]' : 'border-primary/30 bg-primary/5'
               } rounded-2xl items-center justify-center mb-6 flex-row space-x-2`}
             >
               <Plus size={18} color={isDark ? '#4ade80' : '#16a34a'} />
-              <Text className={`font-headline font-bold text-sm ${isDark ? 'text-primary' : 'text-primary'}`}>
+              <Text className={`font-headline font-bold text-sm ${isDark ? 'text-[#4ade80]' : 'text-primary'}`}>
                 Add Another Account
               </Text>
             </TouchableOpacity>
@@ -2141,17 +2271,17 @@ const SettingsScreen = ({ navigation, route }: any) => {
       <BottomSheet
         ref={pricingSheetRef}
         index={-1}
-        snapPoints={['85%', '100%']}
+        snapPoints={['90%', '100%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}>
           <View className="px-6 py-4">
             <View className="flex-row justify-between items-center mb-6">
               <Text className={`text-2xl font-headline font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Choose Your Plan</Text>
               <TouchableOpacity onPress={() => pricingSheetRef.current?.close()}>
-                <Text className="text-primary font-bold text-sm">Cancel</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-sm`}>Cancel</Text>
               </TouchableOpacity>
             </View>
 
@@ -2197,7 +2327,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   <View className="flex-row items-center mb-1">
                     <Text className={`text-lg font-bold ${isDark ? 'text-white' : 'text-charcoal'}`}>CediSmart Pro</Text>
                     <View className="ml-2 bg-primary/20 px-2 py-0.5 rounded-full">
-                      <Text className="text-[10px] font-bold text-primary">Popular</Text>
+                      <Text className={`text-[10px] font-bold ${isDark ? 'text-[#4ade80]' : 'text-primary'}`}>Popular</Text>
                     </View>
                   </View>
                   <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mb-3 leading-relaxed`}>
@@ -2207,25 +2337,25 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   {/* Features */}
                   <View className="space-y-2">
                     <View className="flex-row items-center">
-                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Check size={12} color={isDark ? '#4ade80' : '#0A6E4A'} className="mr-2" />
                       <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Auto SMS Sync (Android & iOS)</Text>
                     </View>
                     <View className="flex-row items-center">
-                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Check size={12} color={isDark ? '#4ade80' : '#0A6E4A'} className="mr-2" />
                       <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Unlimited Financial Accounts</Text>
                     </View>
                     <View className="flex-row items-center">
-                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Check size={12} color={isDark ? '#4ade80' : '#0A6E4A'} className="mr-2" />
                       <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Unlimited Budget Categories</Text>
                     </View>
                     <View className="flex-row items-center">
-                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Check size={12} color={isDark ? '#4ade80' : '#0A6E4A'} className="mr-2" />
                       <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>CSV & PDF Exports</Text>
                     </View>
                   </View>
                 </View>
                 <View className="items-end">
-                  <Text className="text-2xl font-bold text-primary">
+                  <Text className={`text-2xl font-bold ${isDark ? 'text-[#4ade80]' : 'text-primary'}`}>
                     ₵{billingCycle === 'monthly' ? '15' : '120'}
                   </Text>
                   <Text className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
@@ -2252,25 +2382,25 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   {/* Features */}
                   <View className="space-y-2">
                     <View className="flex-row items-center">
-                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Check size={12} color={isDark ? '#4ade80' : '#0A6E4A'} className="mr-2" />
                       <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>All Pro Features Included</Text>
                     </View>
                     <View className="flex-row items-center">
-                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Check size={12} color={isDark ? '#4ade80' : '#0A6E4A'} className="mr-2" />
                       <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Merchant & Agent Line Sync</Text>
                     </View>
                     <View className="flex-row items-center">
-                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Check size={12} color={isDark ? '#4ade80' : '#0A6E4A'} className="mr-2" />
                       <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>WhatsApp Invoice Generator</Text>
                     </View>
                     <View className="flex-row items-center">
-                      <Check size={12} color="#0A6E4A" className="mr-2" />
+                      <Check size={12} color={isDark ? '#4ade80' : '#0A6E4A'} className="mr-2" />
                       <Text className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Share Ledger with 2 Attendants</Text>
                     </View>
                   </View>
                 </View>
                 <View className="items-end">
-                  <Text className="text-2xl font-bold text-primary">
+                  <Text className={`text-2xl font-bold ${isDark ? 'text-[#4ade80]' : 'text-primary'}`}>
                     ₵{billingCycle === 'monthly' ? '49' : '399'}
                   </Text>
                   <Text className={`text-[10px] ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
@@ -2311,9 +2441,13 @@ const SettingsScreen = ({ navigation, route }: any) => {
           setSwitchingTarget(null);
         }}
       >
-        <View className="flex-1 justify-end bg-black/60">
-          <View className={`w-full ${isDark ? 'bg-dark-background' : 'bg-background'} rounded-t-[32px] px-6 py-8 items-center border-t ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'} shadow-2xl`}>
-            
+        <View className="flex-1 justify-end bg-black/65">
+          <GlassSurface
+            variant="thick"
+            elevated
+            radius={32}
+            style={{ width: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0, paddingHorizontal: 24, paddingTop: 28, paddingBottom: 32, alignItems: 'center' }}
+          >
             {/* Header */}
             <View className="w-full flex-row justify-between items-center mb-6">
               <Text className={`text-xl font-headline font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
@@ -2325,7 +2459,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   setSwitchingTarget(null);
                 }}
               >
-                <Text className="text-primary font-bold text-sm">Cancel</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-sm`}>Cancel</Text>
               </TouchableOpacity>
             </View>
 
@@ -2347,8 +2481,8 @@ const SettingsScreen = ({ navigation, route }: any) => {
               {[...Array(6)].map((_, i) => (
                 <View
                   key={i}
-                  className={`w-3.5 h-3.5 rounded-full border-2 border-primary ${
-                    i < switchPin.length ? 'bg-primary' : 'bg-transparent'
+                  className={`w-3.5 h-3.5 rounded-full border-2 ${isDark ? 'border-[#4ade80]' : 'border-primary'} ${
+                    i < switchPin.length ? (isDark ? 'bg-[#4ade80]' : 'bg-primary') : 'bg-transparent'
                   }`}
                 />
               ))}
@@ -2360,7 +2494,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
             ) : null}
 
             {/* PIN Pad */}
-            <View className="w-full pb-6">
+            <View className="w-full pb-2">
               <PINPad
                 onPress={handleSwitchPinDigitPress}
                 onBackspace={handleSwitchPinBackspace}
@@ -2382,7 +2516,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 biometricType={biometricType}
               />
             </View>
-          </View>
+          </GlassSurface>
         </View>
       </Modal>
 
@@ -2390,17 +2524,17 @@ const SettingsScreen = ({ navigation, route }: any) => {
       <BottomSheet
         ref={offlineQueueSheetRef}
         index={-1}
-        snapPoints={['50%', '90%']}
+        snapPoints={['65%', '90%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}>
           <View className="px-6 py-4">
             <View className="w-full flex-row justify-between items-center mb-6">
               <Text className={`text-2xl font-headline font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Offline Queue</Text>
               <TouchableOpacity onPress={() => offlineQueueSheetRef.current?.close()}>
-                <Text className="text-primary font-bold">Close</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Close</Text>
               </TouchableOpacity>
             </View>
 
@@ -2536,17 +2670,17 @@ const SettingsScreen = ({ navigation, route }: any) => {
       <BottomSheet
         ref={appIconSheetRef}
         index={-1}
-        snapPoints={['50%']}
+        snapPoints={['65%', '85%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}>
           <View className="px-6 py-4">
             <View className="w-full flex-row justify-between items-center mb-6">
               <Text className={`text-2xl font-headline font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Premium App Icon</Text>
               <TouchableOpacity onPress={() => appIconSheetRef.current?.close()}>
-                <Text className="text-primary font-bold">Close</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Close</Text>
               </TouchableOpacity>
             </View>
 
@@ -2609,6 +2743,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
         onClose={() => setIsSupportModalVisible(false)}
         phone={user?.phone}
         userName={user?.full_name}
+        screenContext="settings"
       />
     </SafeAreaView>
   );

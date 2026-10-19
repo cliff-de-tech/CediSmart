@@ -9,6 +9,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
 import { SupportModal } from '../../components/shared/SupportModal';
+import { GlassSurface } from '../../components/glass/GlassSurface';
 
 const OTPVerifyScreen = ({ route, navigation }: any) => {
   const { phone, flow = 'register', pin } = route.params;
@@ -201,58 +202,57 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           className="flex-1"
         >
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-8">
-            {/* Decoration Layer */}
-            <View className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl" />
-            
-            <View className="flex-1 justify-center py-12">
-              <View className="mb-10">
-                <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-primary mb-3">Sovereign Identity</Text>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6">
+            <View className="flex-1 justify-center py-10">
+              <View className="mb-8">
+                <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} mb-2`}>Your Profile</Text>
                 <Text className={`font-headline text-4xl font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight leading-tight`}>About You</Text>
-                <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-4 text-sm leading-relaxed`}>Help us personalize your ledger experience.</Text>
+                <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-3 text-sm leading-relaxed`}>What name should CediSmart use to greet you?</Text>
               </View>
 
-              <View className={`${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} rounded-3xl p-8 shadow-sm`}>
-                <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-4`}>Title</Text>
-                <View className="flex-row space-x-2 mb-8">
-                  {(['Mr.', 'Mrs.', 'Ms.', 'None'] as const).map((t) => (
-                    <TouchableOpacity
-                      key={t}
-                      onPress={() => setTitle(t)}
-                      className={`flex-1 py-3 items-center rounded-xl border ${title === t ? 'bg-primary border-primary shadow-sm shadow-primary/20' : `${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}`}
-                    >
-                      <Text className={`font-label text-xs font-bold ${title === t ? 'text-white' : isDark ? 'text-gray-500' : 'text-gray-400'}`}>{t === 'None' ? 'N/A' : t}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <View className="mb-10">
-                  <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-4`}>Full Name</Text>
-                  <TextInput
-                    className={`${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} px-5 py-4 rounded-2xl font-body text-lg ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} border ${isDark ? 'border-dark-outline-variant/20' : 'border-transparent'}`}
-                    placeholder="e.g. Kofi Mensah"
-                    placeholderTextColor={isDark ? '#434942' : '#D1D5DB'}
-                    value={fullName}
-                    onChangeText={setFullName}
-                    autoFocus
-                  />
-                </View>
-
-                {detailsError ? (
-                  <Text className="text-error text-sm font-semibold mb-4 text-center">{detailsError}</Text>
-                ) : null}
-
-                <TouchableOpacity
-                  onPress={handleContinueToPin}
-                  disabled={!fullName.trim() || isFinalizingSignUp}
-                  className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20"
-                >
-                  <View className={`w-full h-14 items-center justify-center flex-row space-x-3 ${!fullName.trim() || isFinalizingSignUp ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') : 'bg-primary'}`}>
-                    <Text className="text-white font-headline font-bold text-base">{isFinalizingSignUp ? 'Setting up...' : 'Continue'}</Text>
-                    {!isFinalizingSignUp && <ArrowRight size={20} color="white" />}
+              <GlassSurface radius={28} elevated>
+                <View className="p-7">
+                  <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-3`}>Title</Text>
+                  <View className="flex-row mb-6">
+                    {(['Mr.', 'Mrs.', 'Ms.', 'None'] as const).map((t) => (
+                      <TouchableOpacity
+                        key={t}
+                        onPress={() => setTitle(t)}
+                        className={`flex-1 py-3 mx-1 items-center rounded-xl border ${title === t ? 'bg-primary border-primary shadow-sm shadow-primary/20' : `${isDark ? 'bg-black/25' : 'bg-white/60'} ${isDark ? 'border-white/10' : 'border-black/10'}`}`}
+                      >
+                        <Text className={`font-label text-xs font-bold ${title === t ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>{t === 'None' ? 'N/A' : t}</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              </View>
+
+                  <View className="mb-8">
+                    <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-3`}>Full Name</Text>
+                    <TextInput
+                      className={`${isDark ? 'bg-black/30' : 'bg-white/60'} px-5 py-4 rounded-2xl font-body text-lg ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} border ${isDark ? 'border-white/10' : 'border-black/10'}`}
+                      placeholder="e.g. Kofi Mensah"
+                      placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
+                      value={fullName}
+                      onChangeText={setFullName}
+                      autoFocus
+                    />
+                  </View>
+
+                  {detailsError ? (
+                    <Text className="text-error text-sm font-semibold mb-4 text-center">{detailsError}</Text>
+                  ) : null}
+
+                  <TouchableOpacity
+                    onPress={handleContinueToPin}
+                    disabled={!fullName.trim() || isFinalizingSignUp}
+                    className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20"
+                  >
+                    <View className={`w-full h-14 items-center justify-center flex-row ${!fullName.trim() || isFinalizingSignUp ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') : 'bg-primary'}`}>
+                      <Text className="text-white font-headline font-bold text-base mr-2">{isFinalizingSignUp ? 'Setting up...' : 'Continue'}</Text>
+                      {!isFinalizingSignUp && <ArrowRight size={20} color="white" />}
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </GlassSurface>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -267,34 +267,35 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-8">
-          {/* Decoration Layer */}
-          <View className="absolute top-20 -right-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-          <View className="absolute bottom-10 -left-20 w-80 h-80 bg-secondary/5 rounded-full blur-3xl" />
-          
-          <View className="flex-1 justify-center items-center py-12">
+        <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6">
+          <View className="flex-1 justify-center items-center py-10">
             {/* Lock Icon */}
-            <View className={`w-20 h-20 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} items-center justify-center mb-8 shadow-sm`}>
-              <Lock size={32} color={isDark ? '#2e7d32' : '#0d631b'} fill={isDark ? '#2e7d32' : '#0d631b'} opacity={0.8} />
-            </View>
+            <GlassSurface
+              tint="emerald"
+              elevated
+              radius={999}
+              style={{ width: 76, height: 76, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}
+            >
+              <Lock size={32} color={isDark ? '#4ade80' : '#0d631b'} fill={isDark ? 'rgba(74,222,128,0.25)' : 'rgba(13,99,27,0.18)'} />
+            </GlassSurface>
 
-            <Text className={`font-headline font-extrabold text-3xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight mb-2`}>Security Check</Text>
-            <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed text-center mb-6`}>
-              OTP sent to <Text className={`font-semibold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{phone}</Text>
+            <Text className={`font-headline font-extrabold text-3xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight mb-2`}>Enter Verification Code</Text>
+            <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed text-center mb-8`}>
+              6-digit SMS code sent to <Text className={`font-semibold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{phone}</Text>
             </Text>
 
             {/* OTP Input Grid */}
-            <View className="flex-row justify-between w-full mb-10">
+            <View className="flex-row justify-between w-full mb-8">
               {otp.map((digit, index) => (
                 <TextInput
                   key={index}
                   ref={(el) => { inputRefs.current[index] = el; }}
-                  className={`w-[14%] aspect-square ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} border ${isDark ? 'border-dark-outline-variant/30' : 'border-outline-variant/20'} rounded-xl text-center font-headline font-bold text-2xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} shadow-sm ${isDark ? 'focus:border-[#2e7d32]' : 'focus:border-primary'}`}
+                  className={`w-[14.5%] aspect-square ${isDark ? 'bg-black/35' : 'bg-white/75'} border ${isDark ? 'border-white/20' : 'border-black/15'} rounded-2xl text-center font-headline font-bold text-2xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} shadow-sm ${isDark ? 'focus:border-[#4ade80]' : 'focus:border-primary'}`}
                   keyboardType="number-pad"
                   maxLength={6}
                   value={digit}
                   placeholder={digit === '' ? '•' : ''}
-                  placeholderTextColor={isDark ? '#434942' : '#D1D5DB'}
+                  placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
                   onChangeText={(value) => handleOtpChange(value, index)}
                   onKeyPress={(e) => handleKeyPress(e, index)}
                   autoFocus={index === 0}
@@ -305,19 +306,21 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
             </View>
 
             {/* Timer & Action */}
-            <View className="items-center space-y-4 mb-12">
-              <View className={`flex-row items-center space-x-2 px-4 py-2 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
-                <Clock size={14} color={isDark ? '#2e7d32' : '#0d631b'} />
-                <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
-                  Resend in {formatTime(timer)}
-                </Text>
-              </View>
+            <View className="items-center mb-10">
+              <GlassSurface variant="clear" radius={999} style={{ marginBottom: 14 }}>
+                <View className="flex-row items-center px-4 py-2">
+                  <Clock size={14} color={isDark ? '#4ade80' : '#0d631b'} />
+                  <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} ml-2`}>
+                    Resend in {formatTime(timer)}
+                  </Text>
+                </View>
+              </GlassSurface>
               
               <TouchableOpacity 
                 onPress={() => timer === 0 && resendMutation.mutate()} 
                 disabled={timer > 0 || resendMutation.isPending}
               >
-                <Text className={`font-label text-sm font-bold ${timer > 0 ? 'text-primary opacity-30' : 'text-primary'}`}>
+                <Text className={`font-label text-sm font-bold ${isDark ? 'text-[#4ade80]' : 'text-primary'} ${timer > 0 ? 'opacity-30' : ''}`}>
                   Resend Code
                 </Text>
               </TouchableOpacity>
@@ -336,12 +339,12 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
               disabled={otp.some(d => d === '') || verifyOtpMutation.isPending}
               className="w-full h-14 rounded-2xl overflow-hidden shadow-lg shadow-primary/10"
             >
-              <View className={`w-full h-full items-center justify-center flex-row space-x-2 ${
+              <View className={`w-full h-full items-center justify-center flex-row ${
                 otp.some(d => d === '') || verifyOtpMutation.isPending 
                   ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') 
                   : 'bg-primary'
               }`}>
-                <Text className={`font-headline font-bold text-base ${
+                <Text className={`font-headline font-bold text-base mr-2 ${
                   otp.some(d => d === '') || verifyOtpMutation.isPending 
                     ? (isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant') 
                     : 'text-white'
@@ -355,21 +358,23 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
             </TouchableOpacity>
 
             <Text className={`text-center font-body text-[10px] ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} px-8 mt-6`}>
-              By verifying, you agree to CediSmart's <Text className={`${isDark ? 'text-[#2e7d32]' : 'text-primary'} font-bold`}>Terms of Service</Text> and <Text className={`${isDark ? 'text-[#2e7d32]' : 'text-primary'} font-bold`}>Privacy Policy</Text>.
+              By verifying, you agree to CediSmart's <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Terms of Service</Text> and <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Privacy Policy</Text>.
             </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
       {/* Support Action */}
-      <View className="absolute bottom-10 right-8">
-        <TouchableOpacity 
-          onPress={() => setSupportVisible(true)}
-          className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}
-        >
-          <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
-          <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
-        </TouchableOpacity>
+      <View className="absolute bottom-10 right-6">
+        <GlassSurface radius={999} elevated>
+          <TouchableOpacity 
+            onPress={() => setSupportVisible(true)}
+            className="flex-row items-center px-4 py-3 active:opacity-80"
+          >
+            <HelpCircle size={18} color={isDark ? '#4ade80' : '#0d631b'} />
+            <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} ml-2`}>Support</Text>
+          </TouchableOpacity>
+        </GlassSurface>
       </View>
 
       <SupportModal

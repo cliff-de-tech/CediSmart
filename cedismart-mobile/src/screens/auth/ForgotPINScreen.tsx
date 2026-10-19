@@ -9,6 +9,8 @@ import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
 import { SupportModal } from '../../components/shared/SupportModal';
+import { GlassSurface } from '../../components/glass/GlassSurface';
+import { GlassButton } from '../../components/glass/GlassButton';
 
 // Helper to normalize phone
 const normalizePhoneNumber = (phone: string): string => {
@@ -286,32 +288,32 @@ const ForgotPINScreen = ({ navigation }: any) => {
         >
           <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6">
             {/* Top Back Action */}
-            <TouchableOpacity onPress={() => navigation.goBack()} className="pt-6 pb-2">
-              <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} items-center justify-center`}>
+            <View className="pt-4 pb-2 items-start">
+              <GlassButton onPress={() => navigation.goBack()} size={42} accessibilityLabel="Go Back">
                 <ArrowLeft size={20} color={isDark ? '#e1e3e0' : '#1c1b1f'} />
-              </View>
-            </TouchableOpacity>
+              </GlassButton>
+            </View>
 
-            <View className="pt-8 mb-12">
-              <Text className="font-label text-[10px] font-bold uppercase tracking-widest text-primary mb-3">Recover Account</Text>
+            <View className="pt-6 mb-10">
+              <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} mb-2`}>Recover Account</Text>
               <Text className={`font-headline text-4xl font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight leading-tight`}>Forgot PIN</Text>
-              <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-4 text-sm leading-relaxed max-w-[280px]`}>
+              <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mt-3 text-sm leading-relaxed max-w-[280px]`}>
                 Enter your registered phone number to verify your identity.
               </Text>
             </View>
 
-            <View className={`w-full ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} rounded-3xl p-8 shadow-sm`}>
-              <View className="space-y-6">
+            <GlassSurface radius={28} elevated style={{ width: '100%' }}>
+              <View className="p-7 space-y-6">
                 <View className="space-y-3">
-                  <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>Phone Number</Text>
-                  <View className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} rounded-2xl overflow-hidden h-14 border ${isDark ? 'border-dark-outline-variant/20' : 'border-transparent'}`}>
-                    <View className={`flex-row items-center px-4 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-high'} h-full border-r ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
+                  <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-2`}>Phone Number</Text>
+                  <View className={`flex-row items-center ${isDark ? 'bg-black/30' : 'bg-white/60'} rounded-2xl overflow-hidden h-14 border ${isDark ? 'border-white/10' : 'border-black/10'}`}>
+                    <View className={`flex-row items-center px-4 ${isDark ? 'bg-white/5' : 'bg-black/5'} h-full border-r ${isDark ? 'border-white/10' : 'border-black/10'}`}>
                       <Text className={`font-body font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>+233</Text>
                     </View>
                     <TextInput
                       className={`flex-1 h-full px-4 font-body text-lg tracking-widest ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}
                       placeholder="XXXXXXXXX"
-                      placeholderTextColor={isDark ? '#434942' : '#D1D5DB'}
+                      placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
                       keyboardType="phone-pad"
                       maxLength={9}
                       value={phone}
@@ -324,34 +326,36 @@ const ForgotPINScreen = ({ navigation }: any) => {
                 </View>
 
                 {error ? (
-                  <Text className="text-error text-xs font-semibold text-center mb-2">{error}</Text>
+                  <Text className="text-error text-xs font-semibold text-center my-2">{error}</Text>
                 ) : null}
 
                 <TouchableOpacity
                   onPress={() => sendOtpMutation.mutate()}
                   disabled={phone.length < 9 || sendOtpMutation.isPending}
-                  className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20"
+                  className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20 mt-4"
                 >
-                  <View className={`w-full h-14 items-center justify-center flex-row space-x-3 ${phone.length < 9 || sendOtpMutation.isPending ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') : 'bg-primary'}`}>
-                    <Text className="text-white font-headline font-bold text-base">
+                  <View className={`w-full h-14 items-center justify-center flex-row ${phone.length < 9 || sendOtpMutation.isPending ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') : 'bg-primary'}`}>
+                    <Text className="text-white font-headline font-bold text-base mr-2">
                       {sendOtpMutation.isPending ? 'Sending...' : 'Send OTP'}
                     </Text>
                     <ArrowRight size={20} color="white" />
                   </View>
                 </TouchableOpacity>
               </View>
-            </View>
+            </GlassSurface>
           </ScrollView>
         </KeyboardAvoidingView>
         {/* Support Action */}
-        <View className="absolute bottom-10 right-8">
-          <TouchableOpacity 
-            onPress={() => setSupportVisible(true)}
-            className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}
-          >
-            <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
-            <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
-          </TouchableOpacity>
+        <View className="absolute bottom-10 right-6">
+          <GlassSurface radius={999} elevated>
+            <TouchableOpacity 
+              onPress={() => setSupportVisible(true)}
+              className="flex-row items-center px-4 py-3 active:opacity-80"
+            >
+              <HelpCircle size={18} color={isDark ? '#4ade80' : '#0d631b'} />
+              <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} ml-2`}>Support</Text>
+            </TouchableOpacity>
+          </GlassSurface>
         </View>
 
         <SupportModal
@@ -373,34 +377,39 @@ const ForgotPINScreen = ({ navigation }: any) => {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           className="flex-1"
         >
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-8">
-            <TouchableOpacity onPress={() => setStep('phone')} className="pt-6 pb-2">
-              <View className={`w-10 h-10 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} items-center justify-center`}>
+          <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-6">
+            <View className="pt-4 pb-2 items-start">
+              <GlassButton onPress={() => setStep('phone')} size={42} accessibilityLabel="Go Back">
                 <ArrowLeft size={20} color={isDark ? '#e1e3e0' : '#1c1b1f'} />
-              </View>
-            </TouchableOpacity>
+              </GlassButton>
+            </View>
 
             <View className="flex-1 justify-center items-center py-6">
-              <View className={`w-20 h-20 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} items-center justify-center mb-8 shadow-sm`}>
-                <Lock size={32} color={isDark ? '#2e7d32' : '#0d631b'} fill={isDark ? '#2e7d32' : '#0d631b'} opacity={0.8} />
-              </View>
+              <GlassSurface
+                tint="emerald"
+                elevated
+                radius={999}
+                style={{ width: 76, height: 76, alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}
+              >
+                <Lock size={32} color={isDark ? '#4ade80' : '#0d631b'} fill={isDark ? 'rgba(74,222,128,0.25)' : 'rgba(13,99,27,0.18)'} />
+              </GlassSurface>
 
               <Text className={`font-headline font-extrabold text-3xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight mb-2`}>Security Check</Text>
-              <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed text-center mb-6`}>
+              <Text className={`font-body ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} leading-relaxed text-center mb-8`}>
                 OTP sent to <Text className={`font-semibold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{normalizePhoneNumber(phone)}</Text>
               </Text>
 
-              <View className="flex-row justify-between w-full mb-10">
+              <View className="flex-row justify-between w-full mb-8">
                 {otp.map((digit, index) => (
                   <TextInput
                     key={index}
                     ref={(el) => { inputRefs.current[index] = el; }}
-                    className={`w-[14%] aspect-square ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-surface-container-lowest'} border ${isDark ? 'border-dark-outline-variant/30' : 'border-outline-variant/20'} rounded-xl text-center font-headline font-bold text-2xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} shadow-sm`}
+                    className={`w-[14.5%] aspect-square ${isDark ? 'bg-black/35' : 'bg-white/75'} border ${isDark ? 'border-white/20' : 'border-black/15'} rounded-2xl text-center font-headline font-bold text-2xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} shadow-sm`}
                     keyboardType="number-pad"
                     maxLength={6}
                     value={digit}
                     placeholder={digit === '' ? '•' : ''}
-                    placeholderTextColor={isDark ? '#434942' : '#D1D5DB'}
+                    placeholderTextColor={isDark ? '#6b7280' : '#9ca3af'}
                     onChangeText={(value) => handleOtpChange(value, index)}
                     onKeyPress={(e) => handleKeyPress(e, index)}
                     autoFocus={index === 0}
@@ -410,19 +419,21 @@ const ForgotPINScreen = ({ navigation }: any) => {
                 ))}
               </View>
 
-              <View className="items-center space-y-4 mb-12">
-                <View className={`flex-row items-center space-x-2 px-4 py-2 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}>
-                  <Clock size={14} color={isDark ? '#2e7d32' : '#0d631b'} />
-                  <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
-                    Resend in {formatTime(timer)}
-                  </Text>
-                </View>
+              <View className="items-center mb-10">
+                <GlassSurface variant="clear" radius={999} style={{ marginBottom: 14 }}>
+                  <View className="flex-row items-center px-4 py-2">
+                    <Clock size={14} color={isDark ? '#4ade80' : '#0d631b'} />
+                    <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} ml-2`}>
+                      Resend in {formatTime(timer)}
+                    </Text>
+                  </View>
+                </GlassSurface>
                 
                 <TouchableOpacity 
                   onPress={() => timer === 0 && sendOtpMutation.mutate()} 
                   disabled={timer > 0 || sendOtpMutation.isPending}
                 >
-                  <Text className={`font-label text-sm font-bold ${timer > 0 ? 'text-primary opacity-30' : 'text-primary'}`}>
+                  <Text className={`font-label text-sm font-bold ${isDark ? 'text-[#4ade80]' : 'text-primary'} ${timer > 0 ? 'opacity-30' : ''}`}>
                     Resend Code
                   </Text>
                 </TouchableOpacity>
@@ -441,7 +452,7 @@ const ForgotPINScreen = ({ navigation }: any) => {
                 disabled={otp.some(d => d === '') || verifyOtpMutation.isPending}
                 className="w-full h-14 rounded-2xl overflow-hidden shadow-lg shadow-primary/10"
               >
-                <View className={`w-full h-full items-center justify-center flex-row space-x-2 ${
+                <View className={`w-full h-full items-center justify-center flex-row ${
                   otp.some(d => d === '') || verifyOtpMutation.isPending 
                     ? (isDark ? 'bg-dark-surface-container-low' : 'bg-gray-300') 
                     : 'bg-primary'
@@ -455,14 +466,16 @@ const ForgotPINScreen = ({ navigation }: any) => {
           </ScrollView>
         </KeyboardAvoidingView>
         {/* Support Action */}
-        <View className="absolute bottom-10 right-8">
-          <TouchableOpacity 
-            onPress={() => setSupportVisible(true)}
-            className={`flex-row items-center space-x-2 ${isDark ? 'bg-dark-surface-container-lowest/80' : 'bg-surface-container-lowest/80'} px-4 py-3 rounded-full shadow-lg border ${isDark ? 'border-dark-outline-variant/20' : 'border-outline-variant/10'}`}
-          >
-            <HelpCircle size={20} color={isDark ? '#2e7d32' : '#0d631b'} />
-            <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>Support</Text>
-          </TouchableOpacity>
+        <View className="absolute bottom-10 right-6">
+          <GlassSurface radius={999} elevated>
+            <TouchableOpacity 
+              onPress={() => setSupportVisible(true)}
+              className="flex-row items-center px-4 py-3 active:opacity-80"
+            >
+              <HelpCircle size={18} color={isDark ? '#4ade80' : '#0d631b'} />
+              <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} ml-2`}>Support</Text>
+            </TouchableOpacity>
+          </GlassSurface>
         </View>
 
         <SupportModal
@@ -479,11 +492,20 @@ const ForgotPINScreen = ({ navigation }: any) => {
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
       <CoinBackground />
-      <View className="flex-1 px-8 py-6">
-        <View className="items-center mb-6 pt-10">
-          <View className={`w-16 h-16 rounded-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-surface-container-low'} items-center justify-center mb-6 shadow-sm`}>
-            <KeyRound size={28} color={isDark ? '#2e7d32' : '#0d631b'} />
-          </View>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}
+        showsVerticalScrollIndicator={false}
+        className="px-6 py-4"
+      >
+        <View className="items-center mt-2">
+          <GlassSurface
+            tint="emerald"
+            elevated
+            radius={999}
+            style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}
+          >
+            <KeyRound size={28} color={isDark ? '#4ade80' : '#0d631b'} />
+          </GlassSurface>
 
           <Text className={`font-headline font-extrabold text-3xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight mb-2`}>
             {pinStep === 'create' ? 'Create New PIN' : 'Confirm New PIN'}
@@ -498,46 +520,46 @@ const ForgotPINScreen = ({ navigation }: any) => {
         {/* PIN Indicators */}
         <Animated.View 
           style={{ transform: [{ translateX: shakeAnimation }] }}
-          className="flex-row justify-center space-x-4 mb-8"
+          className="items-center my-3"
         >
-          {Array(6).fill(0).map((_, i) => {
-            const isFilled = pinStep === 'create' ? i < pin.length : i < confirmPin.length;
-            return (
-              <View
-                key={i}
-                className={`w-4 h-4 rounded-full border ${
-                  isFilled
-                    ? 'bg-primary border-primary scale-110'
-                    : isDark
-                    ? 'border-dark-outline-variant/40 bg-transparent'
-                    : 'border-outline-variant/30 bg-transparent'
-                }`}
-              />
-            );
-          })}
-        </Animated.View>
-
-        {error ? (
-          <Text className="text-error text-sm font-semibold mb-6 text-center">{error}</Text>
-        ) : null}
-
-        {resetPinMutation.isPending && (
-          <View className="items-center mb-6">
-            <Text className={`font-body text-xs ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
+          <GlassSurface variant="clear" radius={999} style={{ paddingHorizontal: 22, paddingVertical: 12 }}>
+            <View className="flex-row justify-center items-center">
+              {Array(6).fill(0).map((_, i) => {
+                const isFilled = pinStep === 'create' ? i < pin.length : i < confirmPin.length;
+                return (
+                  <View
+                    key={i}
+                    className={`w-3.5 h-3.5 rounded-full mx-2 border ${
+                      isFilled
+                        ? isDark ? 'bg-[#4ade80] border-[#4ade80] scale-110' : 'bg-primary border-primary scale-110'
+                        : isDark
+                        ? 'border-white/30 bg-transparent'
+                        : 'border-black/25 bg-transparent'
+                    }`}
+                  />
+                );
+              })}
+            </View>
+          </GlassSurface>
+          {error ? (
+            <Text className="text-error text-sm font-semibold mt-3 text-center">{error}</Text>
+          ) : null}
+          {resetPinMutation.isPending && (
+            <Text className={`font-body text-xs mt-3 ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
               Saving your new PIN securely...
             </Text>
-          </View>
-        )}
+          )}
+        </Animated.View>
 
         {/* PIN Pad */}
-        <View className="flex-1 justify-end pb-8">
+        <View className="pb-2">
           <PINPad
             onPress={handlePinPress}
             onBackspace={handlePinBackspace}
             disabled={resetPinMutation.isPending}
           />
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };

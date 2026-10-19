@@ -1,5 +1,10 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl } from 'react-native';
+import { GlassSheetBackground } from '../../components/glass/GlassSheetBackground';
+import { GlassButton } from '../../components/glass/GlassButton';
+import { GlassSurface } from '../../components/glass/GlassSurface';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { PieChart, Plus, ChevronDown, Tag, Trash2 } from 'lucide-react-native';
@@ -32,6 +37,7 @@ interface Budget {
 }
 
 const BudgetsScreen = () => {
+  const { clearance: tabBarClearance } = useGlassTabBarMetrics();
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const queryClient = useQueryClient();
@@ -140,42 +146,44 @@ const BudgetsScreen = () => {
   );
 
   return (
-    <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
+    <SafeAreaView edges={['top', 'left', 'right']} className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
       <CoinBackground />
       <View className="flex-1 px-6 py-8">
         <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2`}>My Budgets</Text>
         <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-8`}>Control your monthly spending</Text>
 
         {/* Summary Card */}
-        <View className="relative overflow-hidden bg-charcoal p-6 rounded-3xl mb-8 shadow-md">
-          <View className="absolute top-0 right-0 opacity-5 translate-x-4 -translate-y-4">
-            <PieChart size={150} color="white" strokeWidth={1} />
-          </View>
-          <View className="relative z-10">
-            <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Monthly Progress</Text>
-              <Text className="text-white font-extrabold text-sm">
-                {totals.budgeted > 0 ? Math.round((totals.spent / totals.budgeted) * 100) : 0}%
-              </Text>
+        <GlassSurface tint="emerald" elevated radius={28} style={{ marginBottom: 32 }}>
+          <View className="relative overflow-hidden p-6">
+            <View className="absolute top-0 right-0 opacity-10 translate-x-4 -translate-y-4">
+              <PieChart size={150} color={isDark ? '#4ade80' : '#0d631b'} strokeWidth={1} />
             </View>
-            <View className="h-3 w-full bg-white/10 rounded-full overflow-hidden mb-4">
-              <View 
-                className="h-full bg-success rounded-full" 
-                style={{ width: `${Math.min(100, totals.budgeted > 0 ? (totals.spent / totals.budgeted) * 100 : 0)}%` }} 
-              />
-            </View>
-            <View className="flex-row justify-between">
-              <View>
-                <Text className="text-white/50 text-[9px] font-bold uppercase tracking-widest mb-1">Spent</Text>
-                <Text className="text-white font-bold text-base">{formatGHS(totals.spent)}</Text>
+            <View className="relative z-10">
+              <View className="flex-row justify-between items-center mb-4">
+                <Text className={`${isDark ? 'text-white/70' : 'text-charcoal/70'} text-[10px] font-bold uppercase tracking-widest`}>Monthly Progress</Text>
+                <Text className={`${isDark ? 'text-white' : 'text-charcoal'} font-extrabold text-sm`}>
+                  {totals.budgeted > 0 ? Math.round((totals.spent / totals.budgeted) * 100) : 0}%
+                </Text>
               </View>
-              <View className="items-end">
-                <Text className="text-white/50 text-[9px] font-bold uppercase tracking-widest mb-1">Budgeted</Text>
-                <Text className="text-white font-bold text-base">{formatGHS(totals.budgeted)}</Text>
+              <View className={`h-3 w-full ${isDark ? 'bg-white/15' : 'bg-black/10'} rounded-full overflow-hidden mb-4`}>
+                <View 
+                  className="h-full bg-success rounded-full" 
+                  style={{ width: `${Math.min(100, totals.budgeted > 0 ? (totals.spent / totals.budgeted) * 100 : 0)}%` }} 
+                />
+              </View>
+              <View className="flex-row justify-between">
+                <View>
+                  <Text className={`${isDark ? 'text-white/60' : 'text-charcoal/60'} text-[9px] font-bold uppercase tracking-widest mb-1`}>Spent</Text>
+                  <Text className={`${isDark ? 'text-white' : 'text-charcoal'} font-bold text-base`}>{formatGHS(totals.spent)}</Text>
+                </View>
+                <View className="items-end">
+                  <Text className={`${isDark ? 'text-white/60' : 'text-charcoal/60'} text-[9px] font-bold uppercase tracking-widest mb-1`}>Budgeted</Text>
+                  <Text className={`${isDark ? 'text-white' : 'text-charcoal'} font-bold text-base`}>{formatGHS(totals.budgeted)}</Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
+        </GlassSurface>
 
         {isLoading ? (
           <ActivityIndicator size="large" color="#0A6E4A" className="mt-8" />
@@ -193,85 +201,99 @@ const BudgetsScreen = () => {
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
-              <View className={`${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-5 rounded-2xl mb-4 border shadow-sm`}>
-                <View className="flex-row justify-between items-start mb-4">
-                  <View className="flex-row items-center flex-1">
-                    <View 
-                      className="w-10 h-10 rounded-full items-center justify-center mr-3"
-                      style={{ backgroundColor: item.category.color ? `${item.category.color}15` : (theme === 'dark' ? '#1c221e' : '#F3F4F6') }}
+              <GlassSurface radius={22} elevated style={{ marginBottom: 14 }}>
+                <View className="p-5">
+                  <View className="flex-row justify-between items-start mb-4">
+                    <View className="flex-row items-center flex-1">
+                      <View 
+                        className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                        style={{ backgroundColor: item.category.color ? `${item.category.color}20` : (theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)') }}
+                      >
+                        <Tag size={18} color={item.category.color || (theme === 'dark' ? '#b2b6b1' : '#9CA3AF')} />
+                      </View>
+                      <View className="flex-1">
+                        <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>{item.category.name}</Text>
+                        <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs`}>
+                          {formatGHS(item.remaining_amount)} remaining
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity 
+                      onPress={() => {
+                        Alert.alert(
+                          'Remove Budget?',
+                          `Are you sure you want to remove your monthly budget for ${item.category.name}?`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', style: 'destructive', onPress: () => deleteMutation.mutate(item.id) },
+                          ]
+                        );
+                      }}
+                      className="p-2"
                     >
-                      <Tag size={18} color={item.category.color || (theme === 'dark' ? '#b2b6b1' : '#9CA3AF')} />
-                    </View>
-                    <View className="flex-1">
-                      <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>{item.category.name}</Text>
-                      <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs`}>
-                        {formatGHS(item.remaining_amount)} remaining
-                      </Text>
-                    </View>
+                      <Trash2 size={16} color="#DC2626" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity 
-                    onPress={() => deleteMutation.mutate(item.id)}
-                    className="p-2"
-                  >
-                    <Trash2 size={16} color="#DC2626" />
-                  </TouchableOpacity>
-                </View>
 
-                <View className="flex-row justify-between items-center mb-2">
-                  <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-sm`}>
-                    {formatGHS(item.spent_amount)} <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} font-normal`}>of {formatGHS(item.budgeted_amount)}</Text>
-                  </Text>
-                  <Text className="font-bold text-xs" style={{ color: getProgressColor(item.percentage_used, item.alert_at_percent) }}>
-                    {Math.round(item.percentage_used)}%
-                  </Text>
-                </View>
+                  <View className="flex-row justify-between items-center mb-2">
+                    <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-sm`}>
+                      {formatGHS(item.spent_amount)} <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} font-normal`}>of {formatGHS(item.budgeted_amount)}</Text>
+                    </Text>
+                    <Text className="font-bold text-xs" style={{ color: getProgressColor(item.percentage_used, item.alert_at_percent) }}>
+                      {Math.round(item.percentage_used)}%
+                    </Text>
+                  </View>
 
-                <View className={`h-2 w-full ${isDark ? 'bg-dark-surface-container-low' : 'bg-gray-100'} rounded-full overflow-hidden`}>
-                  <View 
-                    className="h-full rounded-full" 
-                    style={{ 
-                      width: `${Math.min(100, item.percentage_used)}%`,
-                      backgroundColor: getProgressColor(item.percentage_used, item.alert_at_percent)
-                    }} 
-                  />
+                  <View className={`h-2 w-full ${isDark ? 'bg-white/10' : 'bg-black/10'} rounded-full overflow-hidden`}>
+                    <View 
+                      className="h-full rounded-full" 
+                      style={{ 
+                        width: `${Math.min(100, item.percentage_used)}%`,
+                        backgroundColor: getProgressColor(item.percentage_used, item.alert_at_percent)
+                      }} 
+                    />
+                  </View>
                 </View>
-              </View>
+              </GlassSurface>
             )}
             ListEmptyComponent={
-              <View className="items-center justify-center py-12">
-                <PieChart size={48} color={theme === 'dark' ? '#434942' : '#D1D5DB'} className="mb-4" />
-                <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-center`}>No budgets set for this month.{"\n"}Set a limit to start saving!</Text>
-              </View>
+              <GlassSurface radius={26} style={{ marginTop: 12 }}>
+                <View className="items-center justify-center py-12 px-6">
+                  <PieChart size={48} color={theme === 'dark' ? '#4ade80' : '#0d631b'} className="mb-4" />
+                  <Text className={`${isDark ? 'text-gray-300' : 'text-gray-600'} text-center`}>No budgets set for this month.{"\n"}Set a limit to start saving!</Text>
+                </View>
+              </GlassSurface>
             }
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{ paddingBottom: tabBarClearance + 80 }}
           />
         )}
       </View>
 
       {/* FAB */}
-      <TouchableOpacity 
+      <GlassButton
+        accessibilityLabel="Create budget"
         onPress={() => bottomSheetRef.current?.snapToIndex(0)}
-        style={{ bottom: 110 }}
-        className="absolute right-6 w-16 h-16 bg-primary rounded-[24px] items-center justify-center shadow-2xl shadow-primary/50 active:scale-90 transition-all z-50"
+        size={60} elevated
+        style={{ position: 'absolute', bottom: tabBarClearance, right: 24, zIndex: 50 }}
       >
-        <Plus color="white" size={32} />
-      </TouchableOpacity>
+        <Plus color={isDark ? '#a4f3b9' : '#0d631b'} size={30} />
+      </GlassButton>
 
       {/* Add Budget Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
         index={-1}
-        snapPoints={['75%', '100%']}
+        snapPoints={['82%', '100%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
-        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}>
           <View className="px-6 py-4">
             <View className="flex-row justify-between items-center mb-8">
               <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Set Budget</Text>
               <TouchableOpacity onPress={() => bottomSheetRef.current?.close()}>
-                <Text className="text-primary font-bold">Close</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold`}>Close</Text>
               </TouchableOpacity>
             </View>
 
@@ -279,44 +301,48 @@ const BudgetsScreen = () => {
               {/* Category Picker Trigger */}
               <View>
                 <Text className={`text-sm font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Spending Category</Text>
-                <TouchableOpacity 
-                  onPress={() => categoryPickerRef.current?.snapToIndex(0)}
-                  className={`flex-row items-center justify-between ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-5 rounded-2xl border shadow-sm`}
-                >
-                  <Text className={`text-lg ${categoryName === 'Select Category' ? (isDark ? 'text-gray-400' : 'text-gray-500') : (isDark ? 'text-dark-charcoal' : 'text-charcoal')}`}>
-                    {categoryName}
-                  </Text>
-                  <ChevronDown color={theme === 'dark' ? '#4b5563' : '#9CA3AF'} size={20} />
-                </TouchableOpacity>
+                <GlassSurface variant="clear" radius={20}>
+                  <TouchableOpacity 
+                    onPress={() => categoryPickerRef.current?.snapToIndex(0)}
+                    className="flex-row items-center justify-between p-5"
+                  >
+                    <Text className={`text-lg ${categoryName === 'Select Category' ? (isDark ? 'text-gray-400' : 'text-gray-500') : (isDark ? 'text-dark-charcoal' : 'text-charcoal')}`}>
+                      {categoryName}
+                    </Text>
+                    <ChevronDown color={theme === 'dark' ? '#9ca3af' : '#6b7280'} size={20} />
+                  </TouchableOpacity>
+                </GlassSurface>
               </View>
 
               {/* Amount Input */}
-              <View>
+              <View className="mt-4">
                 <Text className={`text-sm font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Monthly Limit (₵)</Text>
-                <View className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-5 rounded-2xl border shadow-sm`}>
-                  <Text className={`text-xl font-bold ${isDark ? 'text-[#2e7d32]' : 'text-primary'} mr-2`}>₵</Text>
-                  <TextInput
-                    className={`flex-1 text-xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}
-                    keyboardType="decimal-pad"
-                    placeholder="0.00"
-                    placeholderTextColor={theme === 'dark' ? '#4b5563' : '#D1D5DB'}
-                    value={amount}
-                    onChangeText={setAmount}
-                  />
-                </View>
+                <GlassSurface variant="clear" radius={20}>
+                  <View className="flex-row items-center p-5">
+                    <Text className={`text-xl font-bold ${isDark ? 'text-[#4ade80]' : 'text-primary'} mr-2`}>₵</Text>
+                    <TextInput
+                      className={`flex-1 text-xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00"
+                      placeholderTextColor={theme === 'dark' ? '#6b7280' : '#9ca3af'}
+                      value={amount}
+                      onChangeText={setAmount}
+                    />
+                  </View>
+                </GlassSurface>
               </View>
 
               {/* Alert Threshold */}
-              <View>
+              <View className="mt-4">
                 <Text className={`text-sm font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Alert me at (%)</Text>
-                <View className="flex-row space-x-2">
+                <View className="flex-row">
                   {['50', '80', '90', '100'].map((val) => (
                     <TouchableOpacity
                       key={val}
                       onPress={() => setAlertAt(val)}
-                      className={`flex-1 py-3 items-center rounded-xl border ${alertAt === val ? 'bg-primary border-primary' : isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'}`}
+                      className={`flex-1 py-3 mx-1 items-center rounded-xl border ${alertAt === val ? 'bg-primary border-primary' : isDark ? 'bg-black/25 border-white/10' : 'bg-white/60 border-black/10'}`}
                     >
-                      <Text className={`font-bold ${alertAt === val ? 'text-white' : isDark ? 'text-gray-400' : 'text-gray-500'}`}>{val}%</Text>
+                      <Text className={`font-bold ${alertAt === val ? 'text-white' : isDark ? 'text-gray-300' : 'text-gray-600'}`}>{val}%</Text>
                     </TouchableOpacity>
                   ))}
                 </View>

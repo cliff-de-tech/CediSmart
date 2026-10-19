@@ -11,6 +11,7 @@ import apiClient, { setActiveTokens } from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { CoinBackground } from '../../components/shared/CoinBackground';
+import { GlassSurface } from '../../components/glass/GlassSurface';
 
 const SetPINScreen = ({ route, navigation }: any) => {
   const { phone, otp, full_name, clerk_user_id } = route.params;
@@ -142,16 +143,22 @@ const SetPINScreen = ({ route, navigation }: any) => {
   const renderDots = () => {
     const currentPin = step === 'create' ? pin : confirmPin;
     return (
-      <View className="flex-row justify-center space-x-6 mb-6">
-        {[...Array(6)].map((_, i) => (
-          <View
-            key={i}
-            className={`w-4 h-4 rounded-full shadow-sm transition-all duration-300 ${
-              i < currentPin.length ? 'bg-primary scale-125' : isDark ? 'bg-dark-surface-container-low' : 'bg-gray-200'
-            }`}
-          />
-        ))}
-      </View>
+      <GlassSurface variant="clear" radius={999} style={{ paddingHorizontal: 22, paddingVertical: 12, marginBottom: 16 }}>
+        <View className="flex-row justify-center items-center">
+          {[...Array(6)].map((_, i) => (
+            <View
+              key={i}
+              className={`w-3.5 h-3.5 rounded-full mx-2.5 ${
+                i < currentPin.length
+                  ? isDark ? 'bg-[#4ade80] scale-125' : 'bg-primary scale-125'
+                  : isDark
+                  ? 'bg-white/25'
+                  : 'bg-black/15'
+              }`}
+            />
+          ))}
+        </View>
+      </GlassSurface>
     );
   };
 
@@ -163,17 +170,16 @@ const SetPINScreen = ({ route, navigation }: any) => {
         showsVerticalScrollIndicator={false}
         className="px-6 py-4"
       >
-        {/* Decoration Layer */}
-        <View className="absolute inset-0 -z-10 opacity-[0.03] overflow-hidden">
-          <View className="absolute top-10 right-10 w-64 h-64 border-8 border-primary rounded-full blur-3xl" />
-          <View className="absolute bottom-20 left-10 w-96 h-96 border-8 border-tertiary rounded-full blur-3xl" />
-        </View>
-
         {/* Header Section */}
         <View className="items-center mt-2">
-          <View className={`w-14 h-14 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary-container'} items-center justify-center mb-4`}>
-            <Shield size={28} color={isDark ? '#2e7d32' : '#ffffff'} fill={isDark ? '#2e7d32' : 'white'} />
-          </View>
+          <GlassSurface
+            tint="emerald"
+            radius={999}
+            elevated
+            style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}
+          >
+            <Shield size={28} color={isDark ? '#4ade80' : '#0d631b'} fill={isDark ? 'rgba(74,222,128,0.25)' : 'rgba(13,99,27,0.18)'} />
+          </GlassSurface>
           <Text className={`font-headline font-extrabold text-3xl text-center ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} mb-2 tracking-tight`}>
             Secure Your Account
           </Text>
@@ -185,16 +191,16 @@ const SetPINScreen = ({ route, navigation }: any) => {
         {/* PIN Status */}
         <Animated.View 
           style={{ transform: [{ translateX: shakeAnimation }] }}
-          className="items-center my-4"
+          className="items-center my-3"
         >
-          <Text className="font-label text-xs uppercase tracking-widest text-primary font-bold mb-4">
+          <Text className={`font-label text-xs uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold mb-3`}>
             {step === 'create' ? 'Enter PIN' : 'Confirm PIN'}
           </Text>
           {renderDots()}
           
           <View className={`flex-row items-center space-x-2 px-4 transition-opacity ${error ? 'opacity-100' : 'opacity-0'}`}>
             <Info size={14} color="#ba1a1a" />
-            <Text className="font-label text-xs font-semibold text-error text-center">{error}</Text>
+            <Text className="font-label text-xs font-semibold text-error text-center ml-1.5">{error}</Text>
           </View>
         </Animated.View>
 
@@ -213,13 +219,13 @@ const SetPINScreen = ({ route, navigation }: any) => {
         </View>
       </ScrollView>
 
-      {/* Confirmation Overlay (Optional/Future V2) */}
+      {/* Confirmation Overlay */}
       {verifyMutation.isPending && (
         <View className={`absolute top-0 left-0 right-0 bottom-0 w-full h-full ${isDark ? 'bg-dark-background/70' : 'bg-surface/50'} items-center justify-center z-50`}>
-          <View className={`${isDark ? 'bg-dark-surface-container-lowest' : 'bg-white'} p-10 rounded-3xl shadow-2xl items-center border ${isDark ? 'border-dark-outline-variant/10' : 'border-transparent'}`}>
-            <ActivityIndicator size="large" color={isDark ? '#2e7d32' : '#0d631b'} />
+          <GlassSurface variant="thick" elevated radius={28} style={{ padding: 36, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={isDark ? '#4ade80' : '#0d631b'} />
             <Text className={`mt-4 font-headline font-bold text-lg ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>Verifying...</Text>
-          </View>
+          </GlassSurface>
         </View>
       )}
     </SafeAreaView>

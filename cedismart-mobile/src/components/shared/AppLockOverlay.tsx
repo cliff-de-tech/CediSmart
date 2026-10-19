@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Alert, Modal, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, Modal, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,6 +10,7 @@ import PINPad from './PINPad';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
 import { CoinBackground } from './CoinBackground';
+import { GlassSurface } from '../glass/GlassSurface';
 
 interface AppLockOverlayProps {
   visible: boolean;
@@ -168,14 +170,19 @@ export const AppLockOverlay: React.FC<AppLockOverlayProps> = ({ visible, onUnloc
       transparent={false}
       statusBarTranslucent
     >
-      <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'} justify-between px-6 py-10`}>
+      <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'} justify-between px-6 py-6`}>
         <CoinBackground />
         
         {/* Header Icon & Title */}
-        <View className="items-center mt-12">
-          <View className={`w-16 h-16 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center mb-4`}>
+        <View className="items-center mt-6">
+          <GlassSurface
+            tint="emerald"
+            elevated
+            radius={999}
+            style={{ width: 64, height: 64, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}
+          >
             <Shield size={32} color={isDark ? '#4ade80' : '#16a34a'} />
-          </View>
+          </GlassSurface>
           <Text className={`text-2xl font-headline font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
             App Locked
           </Text>
@@ -185,17 +192,19 @@ export const AppLockOverlay: React.FC<AppLockOverlayProps> = ({ visible, onUnloc
         </View>
 
         {/* PIN Indicators & Errors */}
-        <View className="items-center my-6">
-          <View className="flex-row justify-center space-x-4 mb-4">
-            {[...Array(6)].map((_, i) => (
-              <View
-                key={i}
-                className={`w-4 h-4 rounded-full border-2 border-primary ${
-                  i < pin.length ? 'bg-primary' : 'bg-transparent'
-                }`}
-              />
-            ))}
-          </View>
+        <View className="items-center my-4">
+          <GlassSurface variant="clear" radius={999} style={{ paddingHorizontal: 22, paddingVertical: 12, marginBottom: 12 }}>
+            <View className="flex-row justify-center items-center">
+              {[...Array(6)].map((_, i) => (
+                <View
+                  key={i}
+                  className={`w-3.5 h-3.5 rounded-full mx-2 border-2 border-primary ${
+                    i < pin.length ? 'bg-primary scale-110' : 'bg-transparent'
+                  }`}
+                />
+              ))}
+            </View>
+          </GlassSurface>
           
           <View className="h-6">
             {error ? (
@@ -207,7 +216,7 @@ export const AppLockOverlay: React.FC<AppLockOverlayProps> = ({ visible, onUnloc
         </View>
 
         {/* PINPad */}
-        <View className="mb-10 w-full">
+        <View className="mb-4 w-full">
           <PINPad
             onPress={handleDigitPress}
             onBackspace={handleBackspace}

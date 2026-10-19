@@ -6,7 +6,9 @@ import { encryptData, decryptData } from '../utils/secureStorage';
 export interface OfflineTransaction {
   client_id: string;
   account_id: string;
+  account_name?: string;
   category_id: string;
+  category_name?: string;
   amount: number;
   transaction_type: 'income' | 'expense';
   description?: string;

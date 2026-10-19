@@ -42,8 +42,9 @@ class Settings(BaseSettings):
     SMILE_ID_API_KEY: str = ""
     SMILE_ID_ENV: str = "sandbox"
 
-    # --- Gemini (AI SMS Parsing) ---
+    # --- Gemini & ChatGPT (AI SMS Parsing & Support Assistant) ---
     GEMINI_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
 
     # --- Clerk (Authentication) ---
     CLERK_SECRET_KEY: str = ""

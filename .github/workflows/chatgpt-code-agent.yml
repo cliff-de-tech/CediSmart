@@ -1,0 +1,62 @@
+name: ChatGPT Autonomous Code Agent
+
+on:
+  issues:
+    types: [opened, labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  models: read
+
+jobs:
+  chatgpt-autofix:
+    if: |
+      (github.event_name == 'issues' && (
+        contains(github.event.issue.labels.*.name, 'ai-autofix') ||
+        contains(github.event.issue.labels.*.name, 'support') ||
+        contains(github.event.issue.labels.*.name, 'feature-request') ||
+        contains(github.event.issue.body, '@chatgpt') ||
+        contains(github.event.issue.title, '@chatgpt')
+      )) ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@chatgpt') && github.event.comment.user.type != 'Bot')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout CediSmart Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Agent & Mobile Verification Dependencies
+        run: |
+          pip install httpx
+          if [ -d "cedismart-mobile" ]; then
+            cd cedismart-mobile
+            npm install --legacy-peer-deps --no-audit --no-fund || true
+          fi
+
+      - name: Run Autonomous ChatGPT (gpt-4o) Code Agent
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          COMMENT_BODY: ${{ github.event.comment.body || '' }}
+        run: python .github/scripts/chatgpt_code_agent.py

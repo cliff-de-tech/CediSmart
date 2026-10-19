@@ -267,19 +267,20 @@ async def update_account(
     payload: AccountUpdateRequest,
     db: AsyncSession,
 ) -> dict[str, Any]:
-    """Update mutable account fields (name, provider only).
-
-    opening_balance and account_type are immutable after creation.
-    Returns 400 if the client attempts to update locked fields (enforced
-    in the router via schema — only mutable fields are accepted here).
-    """
+    """Update mutable account fields (name, provider, or balance reconciliation)."""
     account = await _get_account_or_404(account_id, user_id, db)
 
     if payload.name is not None:
         account.name = payload.name
     if payload.provider is not None:
         account.provider = payload.provider
-    if payload.opening_balance is not None:
+
+    if payload.reconcile_to_balance is not None:
+        current_balances = await _compute_balances(user_id, db, [account.id])
+        current_balance = current_balances.get(account.id, Decimal(str(account.opening_balance)))
+        delta = payload.reconcile_to_balance - current_balance
+        account.opening_balance = Decimal(str(account.opening_balance)) + delta
+    elif payload.opening_balance is not None:
         account.opening_balance = payload.opening_balance
 
     await db.flush()

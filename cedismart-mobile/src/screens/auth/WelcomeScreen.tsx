@@ -5,6 +5,8 @@ import { useThemeStore } from '../../stores/themeStore';
 import * as Haptics from 'expo-haptics';
 import { Sun, Moon, Check, Sparkles } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GlassSurface } from '../../components/glass/GlassSurface';
+import { GlassButton } from '../../components/glass/GlassButton';
 
 const { width } = Dimensions.get('window');
 
@@ -79,7 +81,7 @@ const WelcomeScreen = ({ navigation }: any) => {
 
   const handleGetStarted = () => {
     Haptics.selectionAsync().catch(() => {});
-    setIsTrialModalVisible(true);
+    navigation.navigate('Register');
   };
 
   const handleAcceptTrial = async () => {
@@ -118,23 +120,20 @@ const WelcomeScreen = ({ navigation }: any) => {
         <View className="flex-1 justify-between px-8 py-6 relative">
           
           {/* Top Section with Theme Switcher & Header */}
-          <View className="w-full mt-4">
+          <View className="w-full mt-2">
             {/* Theme Toggle Icon Row */}
             <View className="w-full flex-row justify-end mb-4">
-              <TouchableOpacity
+              <GlassButton
                 onPress={handleThemeToggle}
-                className={`w-11 h-11 rounded-full items-center justify-center border shadow-md active:scale-90 transition-all ${
-                  isDark 
-                    ? 'bg-[#121613] border-dark-outline-variant/20' 
-                    : 'bg-white border-gray-200'
-                }`}
+                size={44}
+                accessibilityLabel="Toggle theme"
               >
                 {isDark ? (
                   <Sun size={20} color="#FBBF24" fill="#FBBF24" />
                 ) : (
                   <Moon size={20} color="#475569" fill="#475569" />
                 )}
-              </TouchableOpacity>
+              </GlassButton>
             </View>
 
             {/* Header Block */}
@@ -146,8 +145,8 @@ const WelcomeScreen = ({ navigation }: any) => {
               className="items-center"
             >
               <Text className="text-4xl font-headline font-black text-primary tracking-tight mb-2">CediSmart</Text>
-              <Text className={`text-base ${isDark ? 'text-gray-400' : 'text-gray-600'} font-body text-center leading-relaxed max-w-[280px]`}>
-                Master Your Finances, Grow Your Wealth.
+              <Text className={`text-base ${isDark ? 'text-gray-400' : 'text-gray-600'} font-body text-center leading-relaxed max-w-[290px]`}>
+                Track daily spending, Mobile Money & monthly budgets in cedis.
               </Text>
             </Animated.View>
           </View>
@@ -160,17 +159,20 @@ const WelcomeScreen = ({ navigation }: any) => {
             }}
             className="flex-1 justify-center items-center my-6"
           >
-            <View className={`w-full max-w-[340px] aspect-square rounded-[40px] overflow-hidden border shadow-2xl ${
-              isDark 
-                ? 'border-primary/20 shadow-primary/20 bg-[#0d1c10]' 
-                : 'border-primary/10 shadow-primary/5 bg-[#e8f5e9]'
-            }`}>
-              <Image 
-                source={require('../../../assets/welcome_illustration.jpg')}
-                className="w-full h-full"
-                resizeMode="cover"
-              />
-            </View>
+            <GlassSurface
+              radius={42}
+              elevated
+              tint="emerald"
+              style={{ width: '100%', maxWidth: 340, aspectRatio: 1, padding: 6 }}
+            >
+              <View className="flex-1 rounded-[36px] overflow-hidden">
+                <Image 
+                  source={require('../../../assets/welcome_illustration.jpg')}
+                  className="w-full h-full"
+                  resizeMode="cover"
+                />
+              </View>
+            </GlassSurface>
           </Animated.View>
 
           {/* Buttons Block */}
@@ -209,88 +211,97 @@ const WelcomeScreen = ({ navigation }: any) => {
         onRequestClose={() => setIsTrialModalVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/60">
-          <View className={`w-full p-6 rounded-t-[32px] border-t ${
-            isDark ? 'bg-[#181e19] border-dark-outline-variant/10' : 'bg-white border-gray-100'
-          }`}>
-            {/* Header */}
-            <View className="items-center mb-6">
-              <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center mb-3`}>
-                <Sparkles size={24} color={isDark ? '#4ade80' : '#16a34a'} />
-              </View>
-              <Text className={`text-2xl font-headline font-bold text-center ${isDark ? 'text-white' : 'text-charcoal'}`}>
-                Unlock 7 Days Free
-              </Text>
-              <Text className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'} text-center mt-1`}>
-                Try CediSmart Pro features with zero limitations.
-              </Text>
-            </View>
-
-            {/* Feature List */}
-            <View className="space-y-4 mb-8">
-              <View className="flex-row items-start">
-                <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                  <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
-                </View>
-                <View className="flex-1">
-                  <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-                    Automated SMS Transaction Sync
-                  </Text>
-                  <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
-                    Auto-read Mobile Money transaction alerts from your SMS history.
-                  </Text>
-                </View>
-              </View>
-
-              <View className="flex-row items-start">
-                <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                  <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
-                </View>
-                <View className="flex-1">
-                  <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-                    Unlimited Ledgers & Vaults
-                  </Text>
-                  <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
-                    Link unlimited bank/MoMo wallets and manage custom vaults.
-                  </Text>
-                </View>
-              </View>
-
-              <View className="flex-row items-start">
-                <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                  <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
-                </View>
-                <View className="flex-1">
-                  <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-200' : 'text-gray-800'}`}>
-                    Beautiful CSV & PDF Exports
-                  </Text>
-                  <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
-                    Export all logs for tax compliance or business book-keeping.
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* CTAs */}
-            <View className="space-y-3">
-              <TouchableOpacity
-                onPress={handleAcceptTrial}
-                className="w-full bg-primary h-14 rounded-2xl items-center justify-center shadow-lg shadow-primary/20"
-              >
-                <Text className="text-white font-headline font-bold text-base">
-                  Start My 7-Day Free Trial
+          <GlassSurface
+            variant="thick"
+            elevated
+            radius={32}
+            style={{ width: '100%', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
+          >
+            <View className="w-full p-6 pb-8">
+              {/* Header */}
+              <View className="items-center mb-6">
+                <GlassSurface
+                  tint="emerald"
+                  radius={999}
+                  style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}
+                >
+                  <Sparkles size={24} color={isDark ? '#4ade80' : '#16a34a'} />
+                </GlassSurface>
+                <Text className={`text-2xl font-headline font-bold text-center ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                  Unlock 7 Days Free
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleDeclineTrial}
-                className="w-full h-12 items-center justify-center"
-              >
-                <Text className={`font-headline font-semibold text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Decline Offer & Continue with Free Tier
+                <Text className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'} text-center mt-1`}>
+                  Try CediSmart Pro features with zero limitations.
                 </Text>
-              </TouchableOpacity>
+              </View>
+
+              {/* Feature List */}
+              <View className="space-y-4 mb-8">
+                <View className="flex-row items-start mb-3">
+                  <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                    <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>
+                      Automated SMS Transaction Sync
+                    </Text>
+                    <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                      Auto-read Mobile Money transaction alerts from your SMS history.
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-start mb-3">
+                  <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                    <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>
+                      Unlimited Ledgers & Vaults
+                    </Text>
+                    <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                      Link unlimited bank/MoMo wallets and manage custom vaults.
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-start">
+                  <View className="w-5 h-5 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                    <Check size={12} color={isDark ? '#4ade80' : '#16a34a'} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`font-headline font-bold text-sm ${isDark ? 'text-gray-100' : 'text-gray-800'}`}>
+                      Beautiful CSV & PDF Exports
+                    </Text>
+                    <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} mt-0.5`}>
+                      Export all logs for tax compliance or business book-keeping.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* CTAs */}
+              <View className="space-y-3">
+                <TouchableOpacity
+                  onPress={handleAcceptTrial}
+                  className="w-full bg-primary h-14 rounded-2xl items-center justify-center shadow-lg shadow-primary/20 mb-2"
+                >
+                  <Text className="text-white font-headline font-bold text-base">
+                    Start My 7-Day Free Trial
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleDeclineTrial}
+                  className="w-full h-12 items-center justify-center"
+                >
+                  <Text className={`font-headline font-semibold text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Decline Offer & Continue with Free Tier
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </GlassSurface>
         </View>
       </Modal>
     </View>

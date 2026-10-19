@@ -1,9 +1,13 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert, TextInput, ScrollView, Modal, RefreshControl, Platform, PermissionsAndroid, Clipboard, Linking, NativeModules, Image } from 'react-native';
+import { GlassSheetBackground } from '../../components/glass/GlassSheetBackground';
+import { GlassButton } from '../../components/glass/GlassButton';
+import { GlassSurface } from '../../components/glass/GlassSurface';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert, TextInput, ScrollView, Modal, RefreshControl, Platform, PermissionsAndroid, Clipboard, Linking, NativeModules, Image } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff, Zap, CheckCircle2, Info, ExternalLink, Copy } from 'lucide-react-native';
+import { ArrowLeft, Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff, Zap, CheckCircle2, Info, ExternalLink, Copy } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '../../stores/themeStore';
@@ -147,11 +151,11 @@ const AccountsScreen = ({ navigation }: any) => {
     }
   };
 
-  // Link Form State
+  // Account Form State
   const [linkingType, setLinkingType] = useState<'momo' | 'bank' | null>(null);
   const [selectedProvider, setSelectedProvider] = useState('');
   const [identifier, setIdentifier] = useState('');
-  const [startingBalance, setStartingBalance] = useState('250.00');
+  const [startingBalance, setStartingBalance] = useState('');
   const [isAuthorizing, setIsAuthorizing] = useState(false);
 
   // KYC Verification state
@@ -257,12 +261,12 @@ const AccountsScreen = ({ navigation }: any) => {
     }
   }, [cashAccount]);
 
-  // Mutation to save/update physical cash amount
+  // Mutation to save/update physical cash amount (reconciles current balance accurately)
   const saveCashMutation = useMutation({
     mutationFn: async (amount: number) => {
       if (cashAccount) {
         return apiClient.patch(`/accounts/${cashAccount.id}`, {
-          opening_balance: amount
+          reconcile_to_balance: amount
         });
       } else {
         return apiClient.post('/accounts/', {
@@ -276,27 +280,28 @@ const AccountsScreen = ({ navigation }: any) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });
-      Alert.alert('Success', 'Physical cash amount updated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      Alert.alert('Success', 'Physical cash balance updated!');
       cashSheetRef.current?.close();
     },
     onError: (err: any) => {
-      Alert.alert('Error', err.response?.data?.error?.message || 'Failed to update cash amount.');
+      Alert.alert('Error', err.response?.data?.error?.message || 'Failed to update cash balance.');
     }
   });
 
-  // Mutation to link a MoMo or Bank account
+  // Mutation to add a MoMo or Bank account
   const createMutation = useMutation({
     mutationFn: (newAccount: any) => apiClient.post('/accounts/', newAccount),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });
-      Alert.alert('Success', 'Account linked successfully!');
+      Alert.alert('Account Added', 'Your account is now being tracked.');
       bottomSheetRef.current?.close();
       setIdentifier('');
-      setStartingBalance('250.00');
+      setStartingBalance('');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.error?.message || 'Failed to link account.');
+      Alert.alert('Error', error.response?.data?.error?.message || 'Failed to add account.');
     }
   });
 
@@ -306,36 +311,33 @@ const AccountsScreen = ({ navigation }: any) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['reports'] });
-      Alert.alert('Success', 'Account disconnected successfully.');
+      Alert.alert('Account Removed', 'Account removed from tracking.');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.response?.data?.error?.message || 'Failed to disconnect account.');
+      Alert.alert('Error', error.response?.data?.error?.message || 'Failed to remove account.');
     }
   });
 
   const handleLink = () => {
-    const cleanId = identifier.trim().replace(/\s+/g, '');
-    if (!cleanId) {
-      Alert.alert('Missing Info', `Please enter your ${linkingType === 'momo' ? 'phone number' : 'account number'}.`);
-      return;
-    }
+    let cleanId = identifier.trim().replace(/\s+/g, '');
 
-    if (linkingType === 'momo') {
-      // Validate mobile number: exactly 10 digits starting with 0
+    if (linkingType === 'momo' && cleanId) {
+      if (/^\d{9}$/.test(cleanId) && !cleanId.startsWith('0')) {
+        cleanId = `0${cleanId}`;
+      }
       const phoneRegex = /^0\d{9}$/;
       if (!phoneRegex.test(cleanId)) {
-        Alert.alert('Invalid Number', 'Please enter a valid 10-digit phone number starting with 0.');
+        Alert.alert('Invalid Number', 'Please enter a valid 10-digit Ghana phone number (e.g. 0241234567) or leave it blank.');
         return;
       }
 
-      // Ghanaian network operators prefix validation
       const prefix = cleanId.substring(0, 3);
       if (selectedProvider === 'MTN MoMo') {
         const mtnPrefixes = ['024', '054', '055', '059', '025', '053'];
         if (!mtnPrefixes.includes(prefix)) {
           Alert.alert(
-            'Invalid Provider Number',
-            `The phone number prefix (${prefix}) does not match MTN MoMo.\n\nValid MTN prefixes: ${mtnPrefixes.join(', ')}`
+            'Check Operator Prefix',
+            `The number prefix (${prefix}) does not match MTN MoMo (${mtnPrefixes.join(', ')}).`
           );
           return;
         }
@@ -343,8 +345,8 @@ const AccountsScreen = ({ navigation }: any) => {
         const telecelPrefixes = ['020', '050'];
         if (!telecelPrefixes.includes(prefix)) {
           Alert.alert(
-            'Invalid Provider Number',
-            `The phone number prefix (${prefix}) does not match Telecel Cash.\n\nValid Telecel prefixes: ${telecelPrefixes.join(', ')}`
+            'Check Operator Prefix',
+            `The number prefix (${prefix}) does not match Telecel Cash (${telecelPrefixes.join(', ')}).`
           );
           return;
         }
@@ -352,73 +354,38 @@ const AccountsScreen = ({ navigation }: any) => {
         const atPrefixes = ['026', '056', '027', '057'];
         if (!atPrefixes.includes(prefix)) {
           Alert.alert(
-            'Invalid Provider Number',
-            `The phone number prefix (${prefix}) does not match AirtelTigo Money.\n\nValid AirtelTigo prefixes: ${atPrefixes.join(', ')}`
+            'Check Operator Prefix',
+            `The number prefix (${prefix}) does not match AirtelTigo Money (${atPrefixes.join(', ')}).`
           );
           return;
         }
       }
-    } else {
-      // Validate bank account: strictly 10 to 16 digits
-      const bankRegex = /^\d{10,16}$/;
-      if (!bankRegex.test(cleanId)) {
-        Alert.alert('Invalid Account', 'Please enter a valid bank account number (10 to 16 digits).');
-        return;
-      }
     }
 
-    const parsedBalance = parseFloat(startingBalance);
+    const rawBal = startingBalance.trim() === '' ? '0' : startingBalance.trim();
+    const parsedBalance = parseFloat(rawBal);
     if (isNaN(parsedBalance) || parsedBalance < 0) {
-      Alert.alert('Invalid Balance', 'Please enter a valid starting balance.');
+      Alert.alert('Invalid Balance', 'Please enter a valid starting balance (0 or more).');
       return;
     }
 
-    setIsAuthorizing(true);
-    setTimeout(() => {
-      setIsAuthorizing(false);
-      // Simulate Consent Gateway name verification
-      const resolvedName = cleanId.endsWith('99') ? 'Ama Serwaa' : (user?.full_name || 'Verified User');
-      
-      if (resolvedName !== user?.full_name) {
-        Alert.alert(
-          'Verification Failed',
-          `Consent Gateway resolved this account to '${resolvedName}', which does not match your verified Ghana Card name ('${user?.full_name || 'Holder'}').\n\nFor compliance and security, you can only link portals registered under your own name.`,
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      // If it matches, prompt to confirm
-      Alert.alert(
-        'Confirm Account Details',
-        `Consent Gateway resolved this account to:\n\nName: ${resolvedName}\nProvider: ${selectedProvider}\n\nDo you authorize CediSmart to link this portal?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Link Portal',
-            onPress: () => {
-              createMutation.mutate({
-                name: linkingType === 'momo' ? `${selectedProvider} Wallet` : `${selectedProvider} Account`,
-                account_type: linkingType === 'momo' ? 'mobile_money' : 'bank',
-                provider: selectedProvider,
-                account_number: cleanId,
-                opening_balance: parsedBalance
-              });
-            }
-          }
-        ]
-      );
-    }, 2000);
+    createMutation.mutate({
+      name: linkingType === 'momo' ? `${selectedProvider} Wallet` : `${selectedProvider} Account`,
+      account_type: linkingType === 'momo' ? 'mobile_money' : 'bank',
+      provider: selectedProvider,
+      account_number: cleanId || undefined,
+      opening_balance: parsedBalance
+    });
   };
 
   const confirmDisconnect = (accountId: string, accountName: string) => {
     Alert.alert(
-      'Disconnect Source',
-      `Are you sure you want to disconnect ${accountName}? This will stop tracking transaction history.`,
+      'Remove Account?',
+      `Are you sure you want to remove ${accountName} from your tracked accounts?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
-          text: 'Disconnect', 
+          text: 'Remove', 
           style: 'destructive', 
           onPress: () => deleteMutation.mutate(accountId) 
         }
@@ -427,19 +394,13 @@ const AccountsScreen = ({ navigation }: any) => {
   };
 
   const openLinkSheet = (type: 'momo' | 'bank') => {
-    if (type === 'bank' && !isKycVerified) {
-      setShowKycExplanation(true);
-      return;
-    }
-
     setLinkingType(type);
     if (type === 'momo') {
       setSelectedProvider('MTN MoMo');
-      setStartingBalance('250.00');
     } else {
       setSelectedProvider('GCB Bank');
-      setStartingBalance('1200.00');
     }
+    setStartingBalance('');
     setIdentifier('');
     bottomSheetRef.current?.snapToIndex(0);
   };
@@ -482,119 +443,151 @@ const AccountsScreen = ({ navigation }: any) => {
           />
         }
       >
-        <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2`}>My Accounts</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+          <GlassButton accessibilityLabel="Back to dashboard" onPress={() => navigation.goBack()}>
+            <ArrowLeft size={22} color={isDark ? '#a4f3b9' : '#0d631b'} />
+          </GlassButton>
+          <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`} style={{ flex: 1 }}>My Accounts</Text>
+        </View>
         <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-8`}>Add/Track your sources of Income.</Text>
 
         {/* Total net worth */}
-        <View className="relative overflow-hidden bg-charcoal p-6 rounded-3xl mb-8 shadow-md">
-          <View className="absolute top-0 right-0 opacity-5 translate-x-4 -translate-y-4">
-            <Landmark size={150} color="white" strokeWidth={1} />
-          </View>
-          <View className="relative z-10">
-            <View className="flex-row justify-between items-center mb-1">
-              <Text className="text-white/60 text-[10px] font-bold uppercase tracking-widest">Total Net Worth</Text>
-              <TouchableOpacity
-                onPress={() => toggleAccountVisibility('total')}
-                className="bg-white/20 px-3 py-1.5 rounded-xl flex-row items-center active:bg-white/30"
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                {hiddenAccounts['total'] ? (
-                  <EyeOff size={14} color="white" />
-                ) : (
-                  <Eye size={14} color="white" />
-                )}
-                <Text className="text-white text-[10px] font-bold ml-1.5">{hiddenAccounts['total'] ? 'Show' : 'Hide'}</Text>
-              </TouchableOpacity>
+        {/* Total Tracked Balance */}
+        <GlassSurface tint="emerald" elevated radius={28} style={{ marginBottom: 32, backgroundColor: 'rgba(14, 42, 20, 0.82)' }}>
+          <View className="relative overflow-hidden p-6">
+            <View className="absolute top-0 right-0 opacity-10 translate-x-4 -translate-y-4">
+              <Landmark size={150} color="white" strokeWidth={1} />
             </View>
-            <Text className="text-white text-3xl font-extrabold tracking-tight">
-              {hiddenAccounts['total'] ? "₵ ••••" : formatGHS(totalBalance)}
-            </Text>
+            <View className="relative z-10">
+              <View className="flex-row justify-between items-center mb-1">
+                <Text className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Total Tracked Balance</Text>
+                <TouchableOpacity
+                  onPress={() => toggleAccountVisibility('total')}
+                  className="bg-white/20 px-3 py-1.5 rounded-xl flex-row items-center active:bg-white/30"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  {hiddenAccounts['total'] ? (
+                    <EyeOff size={14} color="white" />
+                  ) : (
+                    <Eye size={14} color="white" />
+                  )}
+                  <Text className="text-white text-[10px] font-bold ml-1.5">{hiddenAccounts['total'] ? 'Show' : 'Hide'}</Text>
+                </TouchableOpacity>
+              </View>
+              <Text className="text-white text-3xl font-extrabold tracking-tight">
+                {hiddenAccounts['total'] ? "₵ ••••" : formatGHS(totalBalance)}
+              </Text>
+              <Text className="text-white/60 text-[11px] mt-1">
+                Based on starting balances & recorded transactions
+              </Text>
+            </View>
           </View>
-        </View>
+        </GlassSurface>
 
         {isLoading ? (
           <ActivityIndicator size="large" color="#0A6E4A" className="mt-8" />
         ) : (
           <View className="space-y-6 mb-12">
             {/* SOURCE CARDS */}
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest ml-1 mb-2`}>Linking Sources</Text>
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest ml-1 mb-2`}>Add or Update Accounts</Text>
 
             {/* MoMo Card */}
-            <TouchableOpacity 
-              onPress={() => openLinkSheet('momo')}
-              className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-5 rounded-2xl border shadow-sm mb-4 active:scale-[0.99] transition-all`}
-            >
-              <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center mr-4`}>
-                <Smartphone size={24} color={isDark ? '#2e7d32' : '#0A6E4A'} />
-              </View>
-              <View className="flex-1">
-                <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>Link MoMo Account</Text>
-                <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-0.5`}>MTN, Telecel, AirtelTigo Wallet</Text>
-              </View>
-              {isMomoLinked ? (
-                <Text className="text-success font-bold text-sm mr-2">LINKED</Text>
-              ) : (
-                <ChevronRight size={20} color={isDark ? '#4B5563' : '#D1D5DB'} />
-              )}
-            </TouchableOpacity>
+            <GlassSurface radius={22} style={{ marginBottom: 14 }}>
+              <TouchableOpacity 
+                onPress={() => openLinkSheet('momo')}
+                activeOpacity={0.8}
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 18, width: '100%' }}
+              >
+                <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 14, flexShrink: 0 }}>
+                  <Smartphone size={24} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>Add MoMo Wallet</Text>
+                  <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-0.5`}>Track MTN, Telecel, or AirtelTigo spending</Text>
+                </View>
+                {isMomoLinked ? (
+                  <Text className="text-success font-bold text-xs" style={{ marginLeft: 8, flexShrink: 0 }}>ADDED</Text>
+                ) : (
+                  <ChevronRight size={20} color={isDark ? '#6B7280' : '#9CA3AF'} />
+                )}
+              </TouchableOpacity>
+            </GlassSurface>
 
             {/* Bank Card */}
-            <TouchableOpacity 
-              onPress={() => openLinkSheet('bank')}
-              className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-5 rounded-2xl border shadow-sm mb-4 active:scale-[0.99] transition-all`}
-            >
-              <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center mr-4`}>
-                <Landmark size={24} color={isDark ? '#2e7d32' : '#0A6E4A'} />
-              </View>
-              <View className="flex-1">
-                <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>Link Bank Account</Text>
-                <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-0.5`}>Link your local Ghanaian bank account</Text>
-              </View>
-              {isBankLinked ? (
-                <Text className="text-success font-bold text-sm mr-2">LINKED</Text>
-              ) : (
-                <ChevronRight size={20} color={isDark ? '#4B5563' : '#D1D5DB'} />
-              )}
-            </TouchableOpacity>
+            <GlassSurface radius={22} style={{ marginBottom: 14 }}>
+              <TouchableOpacity 
+                onPress={() => openLinkSheet('bank')}
+                activeOpacity={0.8}
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 18, width: '100%' }}
+              >
+                <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 14, flexShrink: 0 }}>
+                  <Landmark size={24} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>Add Bank Account</Text>
+                  <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-0.5`}>Track your local Ghanaian bank balance</Text>
+                </View>
+                {isBankLinked ? (
+                  <Text className="text-success font-bold text-xs" style={{ marginLeft: 8, flexShrink: 0 }}>ADDED</Text>
+                ) : (
+                  <ChevronRight size={20} color={isDark ? '#6B7280' : '#9CA3AF'} />
+                )}
+              </TouchableOpacity>
+            </GlassSurface>
 
             {/* Physical Cash Card */}
-            <TouchableOpacity 
-              onPress={() => {
-                setCashInput(cashAccount ? parseFloat(cashAccount.balance).toString() : '0.00');
-                cashSheetRef.current?.snapToIndex(0);
-              }}
-              className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} p-5 rounded-2xl border shadow-sm mb-6 active:scale-[0.99] transition-all`}
-            >
-              <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center mr-4`}>
-                <Wallet size={24} color={isDark ? '#2e7d32' : '#0A6E4A'} />
-              </View>
-              <View className="flex-1">
-                <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>Physical Cash</Text>
-                <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-0.5`}>Manual cash in your wallet</Text>
-              </View>
-              <View className="flex-row items-center mr-2">
-                <Text className={`font-bold text-base ${isDark ? 'text-[#2e7d32]' : 'text-primary'}`}>
-                  {hiddenAccounts['cash'] ? "₵ ••••" : (cashAccount ? formatGHS(cashAccount.balance) : '₵0.00')}
-                </Text>
-                <TouchableOpacity
-                  onPress={(e) => { e.stopPropagation(); toggleAccountVisibility('cash'); }}
-                  className="ml-2"
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  {hiddenAccounts['cash'] ? (
-                    <EyeOff size={14} color={isDark ? '#2e7d32' : '#0A6E4A'} />
-                  ) : (
-                    <Eye size={14} color={isDark ? '#2e7d32' : '#0A6E4A'} />
-                  )}
-                </TouchableOpacity>
-              </View>
-              <ChevronRight size={20} color={isDark ? '#4B5563' : '#D1D5DB'} />
-            </TouchableOpacity>
+            <GlassSurface radius={22} style={{ marginBottom: 22 }}>
+              <TouchableOpacity 
+                onPress={() => {
+                  setCashInput(cashAccount ? parseFloat(cashAccount.balance).toString() : '0.00');
+                  cashSheetRef.current?.snapToIndex(0);
+                }}
+                activeOpacity={0.8}
+                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, width: '100%' }}
+              >
+                <View className={`w-11 h-11 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 12, flexShrink: 0 }}>
+                  <Wallet size={22} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+                  <Text
+                    className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-[15px]`}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
+                  >
+                    Physical Cash
+                  </Text>
+                  <Text
+                    className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-[11px] mt-0.5`}
+                    numberOfLines={1}
+                  >
+                    Tap to update cash in hand
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 6, flexShrink: 0 }}>
+                  <Text className={`font-bold text-[15px] ${isDark ? 'text-[#4ade80]' : 'text-primary'}`} numberOfLines={1}>
+                    {hiddenAccounts['cash'] ? "₵ ••••" : (cashAccount ? formatGHS(cashAccount.balance) : '₵0.00')}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={(e) => { e.stopPropagation(); toggleAccountVisibility('cash'); }}
+                    style={{ marginLeft: 6 }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    {hiddenAccounts['cash'] ? (
+                      <EyeOff size={14} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                    ) : (
+                      <Eye size={14} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+                <ChevronRight size={18} color={isDark ? '#6B7280' : '#9CA3AF'} />
+              </TouchableOpacity>
+            </GlassSurface>
 
             {/* ACTIVE SOURCES LIST */}
             {filteredLinkedAccounts.length > 0 && (
               <View className="mt-4">
-                <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest ml-1 mb-4`}>Linked Portals</Text>
+                <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest ml-1 mb-4`}>Tracked Wallets & Accounts</Text>
                 {filteredLinkedAccounts.map((item) => {
                   const card = (() => {
                     switch (item.provider) {
@@ -602,64 +595,64 @@ const AccountsScreen = ({ navigation }: any) => {
                         return {
                           bg: 'bg-amber-400 border-amber-500/20',
                           text: 'text-black',
-                          sub: 'text-black/60',
+                          sub: 'text-black/65',
                           logo: 'MTN MoMo',
                           chip: 'bg-black/80',
                           accentColor: '#000000',
                         };
                       case 'Telecel Cash':
                         return {
-                          bg: 'bg-red-600 border-red-700/20',
+                          bg: 'bg-red-600 border-red-400/30',
                           text: 'text-white',
-                          sub: 'text-white/60',
+                          sub: 'text-white/75',
                           logo: 'telecel cash',
-                          chip: 'bg-amber-400/80',
+                          chip: 'bg-amber-400/85',
                           accentColor: '#ffffff',
                         };
                       case 'AirtelTigo Money':
                       case 'AirtelTigo':
                         return {
-                          bg: 'bg-blue-600 border-blue-700/20',
+                          bg: 'bg-blue-600 border-blue-400/30',
                           text: 'text-white',
-                          sub: 'text-white/60',
+                          sub: 'text-white/75',
                           logo: 'at money',
-                          chip: 'bg-amber-400/80',
+                          chip: 'bg-amber-400/85',
                           accentColor: '#ffffff',
                         };
                       case 'GCB Bank':
                         return {
-                          bg: 'bg-emerald-800 border-emerald-900/20',
+                          bg: 'bg-emerald-800 border-emerald-600/30',
                           text: 'text-amber-100',
-                          sub: 'text-white/60',
+                          sub: 'text-white/75',
                           logo: 'GCB Bank',
-                          chip: 'bg-amber-400/80',
+                          chip: 'bg-amber-400/85',
                           accentColor: '#FFF8E7',
                         };
                       case 'Ecobank':
                         return {
-                          bg: 'bg-cyan-700 border-cyan-800/20',
+                          bg: 'bg-cyan-700 border-cyan-500/30',
                           text: 'text-white',
-                          sub: 'text-white/60',
+                          sub: 'text-white/75',
                           logo: 'Ecobank',
-                          chip: 'bg-amber-400/80',
+                          chip: 'bg-amber-400/85',
                           accentColor: '#ffffff',
                         };
                       case 'Stanbic Bank':
                         return {
-                          bg: 'bg-blue-800 border-blue-900/20',
+                          bg: 'bg-blue-800 border-blue-600/30',
                           text: 'text-white',
-                          sub: 'text-white/60',
+                          sub: 'text-white/75',
                           logo: 'Stanbic Bank',
-                          chip: 'bg-amber-400/80',
+                          chip: 'bg-amber-400/85',
                           accentColor: '#ffffff',
                         };
                       case 'ABSA Bank':
                         return {
-                          bg: 'bg-rose-950 border-rose-900/20',
+                          bg: 'bg-rose-950 border-rose-700/30',
                           text: 'text-rose-100',
-                          sub: 'text-rose-300',
+                          sub: 'text-rose-200',
                           logo: 'absa',
-                          chip: 'bg-amber-400/80',
+                          chip: 'bg-amber-400/85',
                           accentColor: '#ffe4e6',
                         };
                       default:
@@ -667,68 +660,86 @@ const AccountsScreen = ({ navigation }: any) => {
                           bg: isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-[#eef5f0] border-gray-100',
                           text: isDark ? 'text-white' : 'text-charcoal',
                           sub: isDark ? 'text-gray-400' : 'text-gray-500',
-                          logo: item.provider || 'Sovereign Account',
+                          logo: item.provider || 'Account',
                           chip: isDark ? 'bg-white/10' : 'bg-[#0d631b]/10',
                           accentColor: isDark ? '#4ade80' : '#0A6E4A',
                         };
                     }
                   })();
 
-                  // Mask phone/account number visually
-                  const maskedDigits = item.account_number 
-                    ? (item.account_type === 'mobile_money'
-                      ? `${item.account_number.slice(0, 3)} ••• ••• ${item.account_number.slice(-2)}`
-                      : `•••• •••• •••• ${item.account_number.slice(-4)}`)
-                    : `•••• •••• •••• ${item.id.slice(-4)}`;
+                  // Clean numeric mask (never show raw UUID hex characters like "bcbb")
+                  const maskedDigits = (() => {
+                    if (item.account_number) {
+                      const clean = item.account_number.trim();
+                      return item.account_type === 'mobile_money'
+                        ? `${clean.slice(0, 3)} ••• ${clean.slice(-2)}`
+                        : `•••• •••• ${clean.slice(-4)}`;
+                    }
+                    if (item.account_type === 'mobile_money' && user?.phone) {
+                      const localPhone = user.phone.replace(/^\+?233/, '0').replace(/\D/g, '');
+                      if (localPhone.length >= 6) {
+                        return `${localPhone.slice(0, 3)} ••• ${localPhone.slice(-2)}`;
+                      }
+                    }
+                    const numericFallback = (item.id.replace(/\D/g, '') + '4829').slice(0, 4);
+                    return `•••• •••• ${numericFallback}`;
+                  })();
 
                   return (
                     <View 
                       key={item.id} 
-                      className={`relative overflow-hidden w-full h-44 rounded-3xl p-6 mb-6 border shadow-lg ${card.bg}`}
+                      className={`relative overflow-hidden w-full rounded-3xl p-6 mb-6 border shadow-lg ${card.bg}`}
+                      style={{ minHeight: 184, justifyContent: 'space-between' }}
                     >
                       {/* Visual Shimmer Watermarks */}
-                      <View className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-8 -translate-y-8" />
-                      <View className="absolute bottom-0 right-0 w-24 h-24 bg-white/5 rounded-full translate-x-4 translate-y-4" />
+                      <View className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full translate-x-8 -translate-y-8" />
+                      <View className="absolute bottom-0 right-0 w-24 h-24 bg-white/10 rounded-full translate-x-4 translate-y-4" />
 
                       {/* Upper Card Row */}
-                      <View className="flex-row justify-between items-center z-10 w-full">
-                        <View className="flex-row items-center">
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', zIndex: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 12 }}>
                           {renderProviderLogo(item.provider, isDark)}
-                          <View>
-                            <Text className={`font-headline font-black text-sm tracking-wide uppercase ${card.text}`}>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text className={`font-headline font-black text-sm tracking-wide uppercase ${card.text}`} numberOfLines={1}>
                               {card.logo}
                             </Text>
-                            <Text className={`font-body text-[8px] uppercase font-bold tracking-widest ${card.sub}`}>
-                              {item.account_type === 'mobile_money' ? 'MOMO PORTAL' : 'SECURE VAULT'}
+                            <Text className={`font-body text-[9px] uppercase font-bold tracking-widest ${card.sub}`} numberOfLines={1}>
+                              {item.account_type === 'mobile_money' ? 'MOBILE MONEY' : 'BANK ACCOUNT'}
                             </Text>
                           </View>
                         </View>
                         
                         <TouchableOpacity 
                           onPress={() => confirmDisconnect(item.id, item.name)}
-                          className={`p-2.5 rounded-full ${item.provider === 'MTN MoMo' ? 'bg-black/10' : 'bg-white/10'} active:scale-95`}
+                          className={`p-2.5 rounded-full ${item.provider === 'MTN MoMo' ? 'bg-black/10' : 'bg-white/15'} active:scale-95`}
+                          style={{ flexShrink: 0 }}
                         >
                           <Trash2 size={18} color={card.accentColor} />
                         </TouchableOpacity>
                       </View>
 
                       {/* Middle Card Row: Chip & Balance */}
-                      <View className="flex-row items-center justify-between mt-4 z-10">
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 18, zIndex: 10 }}>
                         {/* Chip Graphic */}
-                        <View className={`w-9 h-7 rounded-md ${card.chip} border ${item.provider === 'MTN MoMo' ? 'border-black/20' : 'border-white/20'} flex-row flex-wrap p-1`}>
-                          <View className="w-full h-[1px] bg-white/20 mb-1" />
-                          <View className="w-1/2 h-2 bg-white/20 mr-1" />
-                          <View className="w-1/3 h-2 bg-white/20" />
+                        <View className={`w-9 h-7 rounded-md ${card.chip} border ${item.provider === 'MTN MoMo' ? 'border-black/20' : 'border-white/25'} flex-row flex-wrap p-1`} style={{ flexShrink: 0 }}>
+                          <View className="w-full h-[1px] bg-white/25 mb-1" />
+                          <View className="w-1/2 h-2 bg-white/25 mr-1" />
+                          <View className="w-1/3 h-2 bg-white/25" />
                         </View>
 
                         {/* Balance */}
-                        <View className="flex-row items-center">
-                          <Text className={`font-headline font-black text-2xl tracking-tight ${card.text}`}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1, marginLeft: 12 }}>
+                          <Text
+                            className={`font-headline font-black text-2xl tracking-tight ${card.text}`}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.8}
+                          >
                             {hiddenAccounts[item.id] ? "₵ ••••" : formatGHS(item.balance)}
                           </Text>
                           <TouchableOpacity
                             onPress={() => toggleAccountVisibility(item.id)}
-                            className="ml-2"
+                            style={{ marginLeft: 8 }}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                           >
                             {hiddenAccounts[item.id] ? (
@@ -740,12 +751,21 @@ const AccountsScreen = ({ navigation }: any) => {
                         </View>
                       </View>
 
-                      {/* Bottom Card Row */}
-                      <View className="flex-row justify-between items-end mt-auto z-10">
-                        <Text className={`font-body text-xs font-semibold tracking-widest ${card.sub}`}>
+                      {/* Bottom Card Row — Properly constrained so number & holder name never collide or overflow */}
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', zIndex: 10 }}>
+                        <Text
+                          className={`font-body text-xs font-semibold tracking-wider ${card.sub}`}
+                          style={{ flexShrink: 0, marginRight: 12 }}
+                          numberOfLines={1}
+                        >
                           {maskedDigits}
                         </Text>
-                        <Text className={`font-headline font-black text-[10px] tracking-widest ${card.sub} uppercase`}>
+                        <Text
+                          className={`font-headline font-black text-[10px] tracking-wider ${card.sub} uppercase`}
+                          style={{ flex: 1, minWidth: 0, textAlign: 'right' }}
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
                           {user?.full_name || 'HOLDER'}
                         </Text>
                       </View>
@@ -754,33 +774,52 @@ const AccountsScreen = ({ navigation }: any) => {
                 })}
                 
                 {accounts?.some((acc: any) => acc.account_type === 'mobile_money') && (
-                  <View className={`mt-2 p-5 rounded-3xl border ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-emerald-50/50 border-emerald-100'} mb-6`}>
-                    <View className="flex-row items-center mb-3">
-                      <View className={`p-2 rounded-xl ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'} mr-3`}>
-                        <Zap size={20} color="#10B981" />
+                  <GlassSurface radius={26} elevated style={{ marginTop: 8, marginBottom: 24 }}>
+                    <View style={{ padding: 20, width: '100%' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, width: '100%' }}>
+                        <View
+                          className={`p-2.5 rounded-xl ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}
+                          style={{ marginRight: 12, flexShrink: 0 }}
+                        >
+                          <Zap size={20} color="#10B981" />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text
+                            className={`font-headline font-black text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}
+                            numberOfLines={1}
+                          >
+                            ⚡ Mobile Money SMS Auto-Sync
+                          </Text>
+                          <Text
+                            className={`font-body text-[11px] mt-0.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}
+                            numberOfLines={2}
+                          >
+                            Auto-log transactions from SMS alerts
+                          </Text>
+                        </View>
                       </View>
-                      <View>
-                        <Text className={`font-headline font-black text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>
-                          ⚡ Mobile Money Live Sync
+                      <Text className={`font-body text-xs leading-5 mb-4 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Keep your wallet records updated automatically when you receive MoMo SMS alerts.
+                      </Text>
+                      <TouchableOpacity 
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                          setShowSyncModal(true);
+                        }}
+                        className="bg-primary py-3.5 px-4 rounded-2xl items-center justify-center active:opacity-90"
+                        style={{ width: '100%' }}
+                      >
+                        <Text
+                          className="text-white font-bold text-xs text-center"
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.85}
+                        >
+                          Configure SMS Auto-Sync (iOS / Android)
                         </Text>
-                        <Text className={`font-body text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Auto-log transactions & keep balance updated
-                        </Text>
-                      </View>
+                      </TouchableOpacity>
                     </View>
-                    <Text className={`font-body text-xs leading-5 mb-4 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Keep your wallet records perfectly reconciled in the background using automated SMS parsing.
-                    </Text>
-                    <TouchableOpacity 
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-                        setShowSyncModal(true);
-                      }}
-                      className="bg-primary py-3.5 px-6 rounded-2xl items-center active:scale-[0.98]"
-                    >
-                      <Text className="text-white font-bold text-xs">Configure Auto-Sync (iOS / Android)</Text>
-                    </TouchableOpacity>
-                  </View>
+                  </GlassSurface>
                 )}
               </View>
             )}
@@ -788,20 +827,20 @@ const AccountsScreen = ({ navigation }: any) => {
         )}
       </ScrollView>
 
-      {/* Generic Link Source Bottom Sheet */}
+      {/* Generic Add Account Bottom Sheet */}
       <BottomSheet
         ref={bottomSheetRef}
         index={-1}
         snapPoints={['85%', '100%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
         <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
           <View className="px-5 py-4">
             <View className="flex-row justify-between items-center mb-6">
               <Text className={`text-2xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-                {linkingType === 'momo' ? 'Link Mobile Money' : 'Link Bank Account'}
+                {linkingType === 'momo' ? 'Add MoMo Wallet' : 'Add Bank Account'}
               </Text>
               <TouchableOpacity onPress={() => bottomSheetRef.current?.close()}>
                 <Text className="text-primary font-bold">Cancel</Text>
@@ -899,11 +938,11 @@ const AccountsScreen = ({ navigation }: any) => {
             <View className="space-y-4">
               <View>
                 <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>
-                  {linkingType === 'momo' ? 'Wallet Phone Number' : 'Account Number'}
+                  {linkingType === 'momo' ? 'Wallet Phone Number (Optional)' : 'Account Number (Optional)'}
                 </Text>
                 <TextInput
                   className={`${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10 text-dark-charcoal' : 'bg-white border-gray-100 text-charcoal'} px-4 py-4 rounded-xl border text-base shadow-sm`}
-                  placeholder={linkingType === 'momo' ? 'e.g. 054 123 4567' : 'e.g. 104101002345'}
+                  placeholder={linkingType === 'momo' ? 'e.g. 024 123 4567' : 'e.g. 104101002345'}
                   placeholderTextColor={isDark ? '#4b5563' : '#D1D5DB'}
                   keyboardType={linkingType === 'momo' ? 'phone-pad' : 'number-pad'}
                   value={identifier}
@@ -912,7 +951,10 @@ const AccountsScreen = ({ navigation }: any) => {
               </View>
 
               <View>
-                <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Simulated Current Balance (₵)</Text>
+                <Text className={`text-xs font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-1 ml-1`}>Current / Starting Balance (₵)</Text>
+                <Text className={`text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-2 ml-1`}>
+                  Enter how much is currently in this account so CediSmart can track changes as you log transactions.
+                </Text>
                 <View className={`flex-row items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100'} px-4 py-4 rounded-xl border shadow-sm`}>
                   <Text className={`text-lg font-bold ${isDark ? 'text-[#2e7d32]' : 'text-primary'} mr-2`}>₵</Text>
                   <TextInput
@@ -936,7 +978,7 @@ const AccountsScreen = ({ navigation }: any) => {
                 }`}
               >
                 <Text className="text-white font-bold text-base">
-                  {createMutation.isPending ? 'Linking Portal...' : isAuthorizing ? 'Authorizing Consent Gateway...' : `Link ${linkingType === 'momo' ? 'Wallet' : 'Account'}`}
+                  {createMutation.isPending ? 'Saving Account...' : `Save ${linkingType === 'momo' ? 'MoMo Wallet' : 'Bank Account'}`}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -951,7 +993,7 @@ const AccountsScreen = ({ navigation }: any) => {
         snapPoints={['85%', '100%']}
         backdropComponent={renderBackdrop}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: isDark ? '#181e19' : '#F8F9FA', borderRadius: 32 }}
+        backgroundComponent={GlassSheetBackground}
       >
         <BottomSheetScrollView contentContainerStyle={{ paddingBottom: 40 }}>
           <View className="px-5 py-4">
@@ -1129,22 +1171,36 @@ const AccountsScreen = ({ navigation }: any) => {
         onRequestClose={() => setShowSyncModal(false)}
       >
         <View className="flex-1 justify-end bg-black/60">
-          <View className={`w-full max-h-[85%] rounded-t-[32px] p-6 pb-10 ${isDark ? 'bg-dark-surface-container-lowest' : 'bg-white'}`}>
+          <GlassSurface
+            variant="thick"
+            elevated
+            radius={32}
+            style={{ width: '100%', maxHeight: '86%', padding: 24, paddingBottom: 40 }}
+          >
             {/* Header */}
-            <View className="flex-row justify-between items-center mb-6">
-              <View>
-                <Text className={`font-headline font-black text-xl ${isDark ? 'text-white' : 'text-charcoal'}`}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, width: '100%' }}>
+              <View style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+                <Text
+                  className={`font-headline font-black text-lg ${isDark ? 'text-white' : 'text-charcoal'}`}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                >
                   ⚡ Mobile Money Auto-Sync
                 </Text>
-                <Text className={`font-body text-[11px] mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                <Text
+                  className={`font-body text-[11px] mt-0.5 ${isDark ? 'text-gray-300' : 'text-gray-500'}`}
+                  numberOfLines={1}
+                >
                   Real-time transaction tracking setup
                 </Text>
               </View>
               <TouchableOpacity 
                 onPress={() => setShowSyncModal(false)}
-                className="bg-primary/10 px-4 py-2 rounded-full active:scale-95"
+                className={`${isDark ? 'bg-primary/25 border border-primary/40' : 'bg-primary/10'} px-4 py-2 rounded-full active:scale-95`}
+                style={{ flexShrink: 0 }}
               >
-                <Text className="text-primary font-bold text-xs">Done</Text>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-xs`}>Done</Text>
               </TouchableOpacity>
             </View>
 
@@ -1218,12 +1274,12 @@ const AccountsScreen = ({ navigation }: any) => {
 
                       {/* Step 1 */}
                       <View className="flex-row items-start">
-                        <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                          <Text className="text-primary font-bold text-xs">1</Text>
+                        <View className={`w-6 h-6 rounded-full ${isDark ? 'bg-primary/30' : 'bg-primary/20'} items-center justify-center mr-3 mt-0.5`}>
+                          <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-xs`}>1</Text>
                         </View>
                         <View className="flex-1">
                           <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure Automation Trigger</Text>
-                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                          <Text className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
                             Open the native Apple <Text className="font-bold">Shortcuts</Text> app ➔ Go to the <Text className="font-bold">Automation</Text> tab ➔ Tap <Text className="font-bold">+</Text> ➔ Select <Text className="font-bold">Message</Text> as trigger. Set the Sender to your MoMo sender (e.g., <Text className="font-mono">MobileMoney</Text> or <Text className="font-mono">T-CASH</Text>). Choose <Text className="font-bold">Run Immediately</Text> to sync in the background.
                           </Text>
                           <TouchableOpacity
@@ -1233,25 +1289,25 @@ const AccountsScreen = ({ navigation }: any) => {
                                 Alert.alert('Error', 'Could not open Apple Shortcuts app. Please ensure it is installed.');
                               });
                             }}
-                            className="bg-primary/10 mt-3 py-3 px-4 rounded-xl flex-row items-center justify-center self-start"
+                            className={`${isDark ? 'bg-primary/25 border border-primary/40' : 'bg-primary/10'} mt-3 py-3 px-4 rounded-xl flex-row items-center justify-center self-start`}
                           >
-                            <Text className="text-primary font-bold text-xs mr-2">Open Shortcuts App</Text>
-                            <ExternalLink size={14} color="#0A6E4A" />
+                            <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-xs mr-2`}>Open Shortcuts App</Text>
+                            <ExternalLink size={14} color={isDark ? '#4ade80' : '#0A6E4A'} />
                           </TouchableOpacity>
                         </View>
                       </View>
 
                       {/* Step 2 */}
                       <View className="flex-row items-start mt-6">
-                        <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                          <Text className="text-primary font-bold text-xs">2</Text>
+                        <View className={`w-6 h-6 rounded-full ${isDark ? 'bg-primary/30' : 'bg-primary/20'} items-center justify-center mr-3 mt-0.5`}>
+                          <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-xs`}>2</Text>
                         </View>
                         <View className="flex-1">
                           <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Add Contents URL Action</Text>
-                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                          <Text className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
                             Add the <Text className="font-bold">Get Contents of URL</Text> action. Set the URL to:
                           </Text>
-                          <View className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-gray-50 border-gray-100'}`}>
+                          <View className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-black/25 border-white/15' : 'bg-gray-50 border-gray-100'}`}>
                             <Text className={`font-mono text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'} flex-1`} numberOfLines={1}>
                               https://api.cedismart.com/api/v1/transactions/sms-webhook
                             </Text>
@@ -1263,10 +1319,10 @@ const AccountsScreen = ({ navigation }: any) => {
                               }}
                               className="ml-2"
                             >
-                              <Copy size={16} color="#0A6E4A" />
+                              <Copy size={16} color={isDark ? '#4ade80' : '#0A6E4A'} />
                             </TouchableOpacity>
                           </View>
-                          <Text className={`${isDark ? 'text-gray-500' : 'text-gray-400'} text-[10px] mt-1`}>
+                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-400'} text-[10px] mt-1`}>
                             Tap the URL in Shortcuts to change the method from GET to <Text className="font-bold">POST</Text>.
                           </Text>
                         </View>
@@ -1274,12 +1330,12 @@ const AccountsScreen = ({ navigation }: any) => {
 
                       {/* Step 3 */}
                       <View className="flex-row items-start mt-6">
-                        <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                          <Text className="text-primary font-bold text-xs">3</Text>
+                        <View className={`w-6 h-6 rounded-full ${isDark ? 'bg-primary/30' : 'bg-primary/20'} items-center justify-center mr-3 mt-0.5`}>
+                          <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-xs`}>3</Text>
                         </View>
                         <View className="flex-1">
                           <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Copy Authentication Key</Text>
-                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                          <Text className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
                             In the headers section of the action, add a header:
                             {"\n"}• Key: <Text className="font-mono font-bold">Authorization</Text>
                             {"\n"}• Value: <Text className="font-mono font-bold">Bearer &lt;your key&gt;</Text>
@@ -1300,24 +1356,24 @@ const AccountsScreen = ({ navigation }: any) => {
                                 Alert.alert('Error', 'Failed to retrieve auth token.');
                               }
                             }}
-                            className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-gray-50 border-gray-100'}`}
+                            className={`mt-3 p-3.5 rounded-xl border flex-row justify-between items-center ${isDark ? 'bg-black/25 border-white/15' : 'bg-gray-50 border-gray-100'}`}
                           >
-                            <Text className={`font-mono text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'} flex-1`} numberOfLines={1}>
+                            <Text className={`font-mono text-xs ${isDark ? 'text-gray-300' : 'text-gray-500'} flex-1`} numberOfLines={1}>
                               ••••••••••••••••••••••••••••••••
                             </Text>
-                            <Copy size={16} color="#0A6E4A" className="ml-2" />
+                            <Copy size={16} color={isDark ? '#4ade80' : '#0A6E4A'} className="ml-2" />
                           </TouchableOpacity>
                         </View>
                       </View>
 
                       {/* Step 4 */}
                       <View className="flex-row items-start mt-6">
-                        <View className="w-6 h-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                          <Text className="text-primary font-bold text-xs">4</Text>
+                        <View className={`w-6 h-6 rounded-full ${isDark ? 'bg-primary/30' : 'bg-primary/20'} items-center justify-center mr-3 mt-0.5`}>
+                          <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-xs`}>4</Text>
                         </View>
                         <View className="flex-1">
                           <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>Configure JSON Payload</Text>
-                          <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
+                          <Text className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-xs mt-1 leading-relaxed`}>
                             Change the Request Body to <Text className="font-bold">JSON</Text> and add these fields:
                             {"\n"}• <Text className="font-mono font-bold">sender</Text> ➔ Select <Text className="font-bold">Sender</Text> (from message variable)
                             {"\n"}• <Text className="font-mono font-bold">message_body</Text> ➔ Select <Text className="font-bold">Message</Text> or <Text className="font-bold">Shortcut Input</Text>
@@ -1376,7 +1432,7 @@ const AccountsScreen = ({ navigation }: any) => {
                 </ScrollView>
               </>
             )}
-          </View>
+          </GlassSurface>
         </View>
       </Modal>
     </SafeAreaView>

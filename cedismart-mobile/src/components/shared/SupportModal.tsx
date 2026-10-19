@@ -1,26 +1,189 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, Clipboard } from 'react-native';
+import {
+  View,
+  Text,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Alert,
+  Clipboard,
+  Image,
+  Linking,
+  PermissionsAndroid,
+} from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useMutation } from '@tanstack/react-query';
-import { X, Send, Bot, User, Sparkles, Github, AlertCircle, CheckCircle, Trash2, Plus } from 'lucide-react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  X,
+  Send,
+  Bot,
+  User,
+  Sparkles,
+  AlertCircle,
+  Plus,
+  Camera,
+  Key,
+  ExternalLink,
+  RefreshCw,
+  Stethoscope,
+  Zap,
+  CheckCircle2,
+  BookOpen,
+  ArrowUpRight,
+  PieChart,
+  MessageSquare,
+  RotateCcw,
+  History,
+  Clock,
+  Trash2,
+} from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
+import { useOfflineStore } from '../../stores/offlineStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { GlassSurface } from '../glass/GlassSurface';
+import { CoinBackground } from './CoinBackground';
 
-interface Message {
+export type ActionTag =
+  | 'GENERATE_MOMO_KEY'
+  | 'OPEN_SHORTCUTS'
+  | 'SYNC_OFFLINE_QUEUE'
+  | 'HEAL_APP'
+  | 'NAV_ADD_EXPENSE'
+  | 'NAV_BUDGETS'
+  | 'NAV_TRANSACTIONS'
+  | 'REPORT_PROBLEM'
+  | 'PROBLEM_RESOLVED';
+
+export interface Message {
+  id: string;
   role: 'user' | 'model';
   content: string;
+  imageUri?: string;
+  image_base64?: string;
+  image_mime_type?: string;
+  actions?: ActionTag[];
+  status?: 'sending' | 'sent' | 'failed';
 }
 
-interface SupportModalProps {
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: Message[];
+}
+
+interface TicketStatusData {
+  issue_number: number;
+  state: string;
+  title: string;
+  issue_url: string;
+  labels: string[];
+  user_status?: string;
+  status_label?: string;
+  status_description?: string;
+  stage_step?: number;
+}
+
+export interface SupportModalProps {
   visible: boolean;
   onClose: () => void;
   phone?: string;
   userName?: string;
   supportType?: 'auth' | 'general';
+  screenContext?: 'dashboard' | 'budgets' | 'transactions' | 'settings' | 'auth';
+  navigation?: any;
 }
+
+export const OFFLINE_HELP_GUIDES = [
+  {
+    title: 'How to Record an Expense',
+    summary: 'Tap "+ Add Expense" from Home. Enter the amount, choose Cash, MoMo, or Bank, and select a category.',
+  },
+  {
+    title: 'Understanding Tracked Balance',
+    summary: 'Your Tracked Balance reflects your starting balance plus income minus recorded expenses across all active accounts.',
+  },
+  {
+    title: 'Mobile Money Auto-Sync',
+    summary: 'On Android, grant SMS reading permission in Accounts. On iPhone, configure an Apple Shortcuts message automation.',
+  },
+  {
+    title: 'Offline Mode & Queue',
+    summary: 'Transactions recorded without internet are stored safely on your phone and automatically upload when reconnected.',
+  },
+  {
+    title: 'Reconciling Cash Balances',
+    summary: 'Count your physical cash, go to Settings > Accounts, and enter your exact cash on hand to reconcile.',
+  },
+];
+
+export const getScreenQuickPrompts = (ctx?: string, type?: string) => {
+  if (type === 'auth') {
+    return [
+      'My verification code did not arrive',
+      'I forgot my 6-digit PIN',
+      'How does phone verification work?',
+      'Check for problems',
+    ];
+  }
+  switch (ctx) {
+    case 'budgets':
+      return [
+        'How to set a monthly budget',
+        'My spending looks wrong',
+        'Check for problems',
+        'Help Guides (Offline)',
+      ];
+    case 'transactions':
+      return [
+        'Find a missing transaction',
+        'How to edit or delete a transaction',
+        'What are pending uploads?',
+        'Check for problems',
+        'Help Guides (Offline)',
+      ];
+    case 'settings':
+      return [
+        'How to setup MoMo Auto-Sync',
+        'Reconcile my cash balance',
+        'Check for problems',
+        'Help Guides (Offline)',
+      ];
+    case 'dashboard':
+    default:
+      return [
+        'Paste MoMo SMS to Auto-Log',
+        'Explain my tracked balance',
+        'Record an expense',
+        'Check for problems',
+        'Help Guides (Offline)',
+      ];
+  }
+};
+
+const ACTION_TAG_REGEX = /\[ACTION:(GENERATE_MOMO_KEY|OPEN_SHORTCUTS|SYNC_OFFLINE_QUEUE|HEAL_APP|NAV_ADD_EXPENSE|NAV_BUDGETS|NAV_TRANSACTIONS|REPORT_PROBLEM|PROBLEM_RESOLVED)\]/g;
+
+const extractActionsAndCleanText = (rawText: string): { cleanText: string; actions: ActionTag[] } => {
+  const found = new Set<ActionTag>();
+  let match: RegExpExecArray | null;
+  const regex = new RegExp(ACTION_TAG_REGEX.source, 'g');
+  while ((match = regex.exec(rawText)) !== null) {
+    found.add(match[1] as ActionTag);
+  }
+  const cleanText = rawText.replace(ACTION_TAG_REGEX, '').trim();
+  return { cleanText, actions: Array.from(found) };
+};
 
 const parseInlineStyles = (text: string) => {
   const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
@@ -108,20 +271,190 @@ const parseMarkdown = (text: string, isDark: boolean) => {
   });
 };
 
-export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, phone = 'Anonymous', userName, supportType = 'general' }) => {
+export const SupportModal: React.FC<SupportModalProps> = ({
+  visible,
+  onClose,
+  phone = 'Anonymous',
+  userName,
+  supportType = 'general',
+  screenContext = 'dashboard',
+  navigation,
+}) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const navProp = useNavigation<any>();
+  const nav = navigation || navProp;
+  const offlineQueue = useOfflineStore((state) => state.queue);
+  const removeOfflineTransactions = useOfflineStore((state) => state.removeTransactions);
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
   const [showEscalate, setShowEscalate] = useState(false);
   const [escalatedTicket, setEscalatedTicket] = useState<{ number: number; url: string } | null>(null);
+  const [ticketStatus, setTicketStatus] = useState<TicketStatusData | null>(null);
+  const [isCheckingTicket, setIsCheckingTicket] = useState(false);
+  const [isRunningDoctor, setIsRunningDoctor] = useState(false);
+  const [showOfflineGuides, setShowOfflineGuides] = useState(false);
+
+  // Screenshot / Receipt Vision attachment state
+  const [attachedImage, setAttachedImage] = useState<{
+    uri: string;
+    base64: string;
+    mimeType: string;
+  } | null>(null);
 
   const textInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  const handleMessagePress = (msg: Message, index: number) => {
+  const sessionsStorageKey = `cedismart_chat_sessions_${phone.replace(/[^\d+]/g, '') || 'anonymous'}_${supportType}`;
+  const legacyStorageKey = `cedismart_chat_history_${phone.replace(/[^\d+]/g, '') || 'anonymous'}_${supportType}`;
+
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  const defaultGreeting: Message = {
+    id: 'default_greeting',
+    role: 'model',
+    content:
+      supportType === 'auth'
+        ? "Hello! I am your CediSmart Onboarding Assistant. How can I help you with your account, SMS code, or login PIN today?"
+        : "Hello! I am your CediSmart Assistant. How can I help you with your accounts, budgets, or Mobile Money today?",
+    actions: supportType === 'auth' ? [] : ['HEAL_APP'],
+    status: 'sent',
+  };
+
+  const buildClientDiagnostics = async () => {
+    let hasSyncToken = false;
+    try {
+      const tok = await SecureStore.getItemAsync('access_token');
+      hasSyncToken = !!tok;
+    } catch {}
+    const appVer = Constants.expoConfig?.version || '1.0.0';
+    return {
+      os: Platform.OS,
+      os_version: String(Platform.Version),
+      app_version: appVer,
+      offline_queue_count: offlineQueue.length,
+      has_momo_sync_token: hasSyncToken,
+    };
+  };
+
+  // Load chat sessions when modal becomes visible or profile changes
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const storedSessions = await AsyncStorage.getItem(sessionsStorageKey);
+        if (storedSessions) {
+          const parsed = JSON.parse(storedSessions) as ChatSession[];
+          if (parsed && parsed.length > 0) {
+            setSessions(parsed);
+            setActiveSessionId(parsed[0].id);
+            setMessages(parsed[0].messages || [defaultGreeting]);
+            setIsHistoryLoaded(true);
+            return;
+          }
+        }
+
+        // Migrate from legacy single-session storage if present
+        const legacyStored = await AsyncStorage.getItem(legacyStorageKey);
+        if (legacyStored) {
+          const legacyMsgs = JSON.parse(legacyStored) as Message[];
+          if (legacyMsgs && legacyMsgs.length > 0) {
+            const firstUserMsg = legacyMsgs.find((m) => m.role === 'user');
+            const migratedSession: ChatSession = {
+              id: `sess_${Date.now()}`,
+              title: firstUserMsg
+                ? firstUserMsg.content.slice(0, 32) + (firstUserMsg.content.length > 32 ? '...' : '')
+                : 'Previous Conversation',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              messages: legacyMsgs,
+            };
+            setSessions([migratedSession]);
+            setActiveSessionId(migratedSession.id);
+            setMessages(legacyMsgs);
+            setIsHistoryLoaded(true);
+            AsyncStorage.setItem(sessionsStorageKey, JSON.stringify([migratedSession])).catch(() => {});
+            return;
+          }
+        }
+
+        const freshSession: ChatSession = {
+          id: `sess_${Date.now()}`,
+          title: 'New Conversation',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages: [defaultGreeting],
+        };
+        setSessions([freshSession]);
+        setActiveSessionId(freshSession.id);
+        setMessages([defaultGreeting]);
+        setIsHistoryLoaded(true);
+      } catch (err) {
+        console.warn('[AI Support] Error loading sessions:', err);
+        const fallbackSession: ChatSession = {
+          id: `sess_${Date.now()}`,
+          title: 'New Conversation',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          messages: [defaultGreeting],
+        };
+        setSessions([fallbackSession]);
+        setActiveSessionId(fallbackSession.id);
+        setMessages([defaultGreeting]);
+        setIsHistoryLoaded(true);
+      }
+    };
+
+    if (visible) {
+      setIsHistoryLoaded(false);
+      loadSessions();
+    }
+  }, [visible, phone, supportType]);
+
+  // Save active session & messages
+  useEffect(() => {
+    if (!isHistoryLoaded || !activeSessionId || messages.length === 0) return;
+    setSessions((prevSessions) => {
+      const updated = prevSessions.map((s) => {
+        if (s.id !== activeSessionId) return s;
+        const firstUserMsg = messages.find((m) => m.role === 'user');
+        const title =
+          s.title === 'New Conversation' && firstUserMsg
+            ? firstUserMsg.content.slice(0, 32) + (firstUserMsg.content.length > 32 ? '...' : '')
+            : s.title;
+        return {
+          ...s,
+          title,
+          updatedAt: Date.now(),
+          messages,
+        };
+      });
+
+      const lightweight = updated.map((s) => ({
+        ...s,
+        messages: s.messages.map(({ image_base64, ...rest }) => rest),
+      }));
+      AsyncStorage.setItem(sessionsStorageKey, JSON.stringify(lightweight)).catch(() => {});
+      return updated;
+    });
+  }, [messages, isHistoryLoaded, activeSessionId]);
+
+  useEffect(() => {
+    if (visible) {
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    scrollViewRef.current?.scrollToEnd({ animated: true });
+  }, [messages]);
+
+  const handleMessagePress = (msg: Message) => {
     const isUser = msg.role === 'user';
     const actions: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [
       {
@@ -129,8 +462,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
         onPress: () => {
           Clipboard.setString(msg.content);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        }
-      }
+        },
+      },
     ];
 
     if (isUser) {
@@ -140,13 +473,13 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
           setInput(msg.content);
           textInputRef.current?.focus();
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-        }
+        },
       });
     }
 
     actions.push({
       text: 'Cancel',
-      style: 'cancel' as const
+      style: 'cancel' as const,
     });
 
     Alert.alert(
@@ -156,189 +489,574 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
     );
   };
 
-  const storageKey = `cedismart_chat_history_${phone.replace(/[^\d+]/g, '') || 'anonymous'}_${supportType}`;
-
-  const defaultGreeting: Message = {
-    role: 'model',
-    content: supportType === 'auth'
-      ? "Hi! I'm your CediSmart Onboarding Assistant. How can I help you today? (e.g., issues with OTP, registering, or PIN setup)."
-      : "Hi! I'm your CediSmart AI Support Assistant. How can I help you today? (e.g., ledgers, budgeting, transactions, or general settings)."
+  const handleSelectSession = (session: ChatSession) => {
+    setActiveSessionId(session.id);
+    setMessages(session.messages && session.messages.length > 0 ? session.messages : [defaultGreeting]);
+    setShowHistoryModal(false);
+    setAttachedImage(null);
+    setShowEscalate(false);
+    setEscalatedTicket(null);
+    Haptics.selectionAsync().catch(() => {});
   };
 
-  // Load chat history when modal becomes visible or phone changes
-  useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(storageKey);
-        if (stored) {
-          const parsed = JSON.parse(stored) as Message[];
-          if (parsed && parsed.length > 0) {
-            setMessages(parsed);
-            setIsHistoryLoaded(true);
-            return;
-          }
-        }
-        setMessages([defaultGreeting]);
-        setIsHistoryLoaded(true);
-      } catch (err) {
-        console.warn('[AI Support] Error loading chat history:', err);
-        setMessages([defaultGreeting]);
-        setIsHistoryLoaded(true);
-      }
+  const handleNewChat = () => {
+    const newSession: ChatSession = {
+      id: `sess_${Date.now()}`,
+      title: 'New Conversation',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      messages: [defaultGreeting],
     };
+    setSessions((prev) => [newSession, ...prev]);
+    setActiveSessionId(newSession.id);
+    setMessages([defaultGreeting]);
+    setShowHistoryModal(false);
+    setAttachedImage(null);
+    setShowEscalate(false);
+    setEscalatedTicket(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  };
 
-    if (visible) {
-      setIsHistoryLoaded(false);
-      loadHistory();
-    }
-  }, [visible, phone]);
-
-  // Save chat history when messages state changes
-  useEffect(() => {
-    const saveHistory = async () => {
-      if (!isHistoryLoaded || messages.length === 0) return;
-      try {
-        await AsyncStorage.setItem(storageKey, JSON.stringify(messages));
-      } catch (err) {
-        console.warn('[AI Support] Error saving chat history:', err);
-      }
-    };
-    saveHistory();
-  }, [messages, isHistoryLoaded]);
-
-  const handleClearChat = () => {
+  const handleDeleteSession = (sessionId: string) => {
     Alert.alert(
-      'New Chat',
-      'Are you sure you want to start a new chat? This will clear your current conversation history.',
+      'Delete Conversation',
+      'Are you sure you want to delete this conversation? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'New Chat',
+          text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await AsyncStorage.removeItem(storageKey);
-              setMessages([defaultGreeting]);
-              setShowEscalate(false);
-              setEscalatedTicket(null);
-            } catch (err) {
-              console.warn('[AI Support] Error clearing chat history:', err);
-            }
-          }
-        }
+          onPress: () => {
+            setSessions((prev) => {
+              const filtered = prev.filter((s) => s.id !== sessionId);
+              const remaining =
+                filtered.length > 0
+                  ? filtered
+                  : [
+                      {
+                        id: `sess_${Date.now()}`,
+                        title: 'New Conversation',
+                        createdAt: Date.now(),
+                        updatedAt: Date.now(),
+                        messages: [defaultGreeting],
+                      },
+                    ];
+              if (activeSessionId === sessionId) {
+                setActiveSessionId(remaining[0].id);
+                setMessages(remaining[0].messages);
+              }
+              const lightweight = remaining.map((s) => ({
+                ...s,
+                messages: s.messages.map(({ image_base64, ...rest }) => rest),
+              }));
+              AsyncStorage.setItem(sessionsStorageKey, JSON.stringify(lightweight)).catch(() => {});
+              return remaining;
+            });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+          },
+        },
       ]
     );
   };
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  // Screenshot & Receipt Vision Picker (Expo SDK 57 ImagePicker API)
+  const handlePickImage = () => {
+    Haptics.selectionAsync().catch(() => {});
+    Alert.alert(
+      'Attach Screenshot or Receipt',
+      'Send a screenshot of an error, a MoMo SMS, or a receipt photo for visual AI diagnosis.',
+      [
+        {
+          text: '🖼️ Choose from Library',
+          onPress: async () => {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) {
+              Alert.alert('Permission Required', 'Please allow photo library access to attach screenshots.');
+              return;
+            }
+            const res = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              allowsEditing: false,
+              quality: 0.65,
+              base64: true,
+            });
+            if (!res.canceled && res.assets[0]?.base64) {
+              setAttachedImage({
+                uri: res.assets[0].uri,
+                base64: res.assets[0].base64,
+                mimeType: res.assets[0].mimeType || 'image/jpeg',
+              });
+            }
+          },
+        },
+        {
+          text: '📷 Take Photo',
+          onPress: async () => {
+            const perm = await ImagePicker.requestCameraPermissionsAsync();
+            if (!perm.granted) {
+              Alert.alert('Permission Required', 'Please allow camera access to snap a receipt or screen photo.');
+              return;
+            }
+            const res = await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              allowsEditing: false,
+              quality: 0.65,
+              base64: true,
+            });
+            if (!res.canceled && res.assets[0]?.base64) {
+              setAttachedImage({
+                uri: res.assets[0].uri,
+                base64: res.assets[0].base64,
+                mimeType: res.assets[0].mimeType || 'image/jpeg',
+              });
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
 
-  useEffect(() => {
-    if (visible) {
-      // Scroll to bottom when modal opens
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+  // Check for Problems Routine (Plain-Language Outcomes)
+  const runSelfHealDoctor = async () => {
+    if (isRunningDoctor) return;
+    setIsRunningDoctor(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
+    try {
+      // 1. Refetch and synchronize data
+      const refreshResults = await Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['budgets'] }),
+        queryClient.invalidateQueries({ queryKey: ['categories'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
+      ]);
+      const anyRefreshSuccess = refreshResults.some((r) => r.status === 'fulfilled');
+
+      // 2. Offline queue reconciliation: only remove succeeded items
+      let queueReport = '• No transactions are waiting to upload.';
+      if (offlineQueue.length > 0) {
+        try {
+          const bulkRes = await apiClient.post('/transactions/bulk', {
+            transactions: offlineQueue,
+          });
+          const failedIds = new Set((bulkRes.data?.errors || []).map((e: any) => e.client_id));
+          const succeededIds = offlineQueue.filter((t) => !failedIds.has(t.client_id)).map((t) => t.client_id);
+          if (succeededIds.length > 0) {
+            removeOfflineTransactions(succeededIds);
+          }
+          if (failedIds.size === 0) {
+            queueReport = `• Uploaded ${succeededIds.length} pending transaction(s) successfully.`;
+          } else {
+            queueReport = `• ${failedIds.size} transaction(s) are still waiting for a stronger connection.`;
+          }
+        } catch {
+          queueReport = `• ${offlineQueue.length} transaction(s) are waiting to upload when your internet reconnects.`;
+        }
+      }
+
+      const reportContent = anyRefreshSuccess
+        ? `✅ **Check complete**\n\n• Your transactions and balances have been refreshed.\n${queueReport}\n\n**Did this solve your problem?**`
+        : `⚠️ **Couldn't refresh your transactions**\n\nPlease check your internet connection and try again.\n\n${queueReport}\n\n**Did this solve your problem?**`;
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `diag_${Date.now()}`,
+          role: 'model',
+          content: reportContent,
+          actions: anyRefreshSuccess ? ['PROBLEM_RESOLVED', 'REPORT_PROBLEM'] : ['HEAL_APP', 'REPORT_PROBLEM'],
+          status: 'sent',
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `diag_err_${Date.now()}`,
+          role: 'model',
+          content: '⚠️ **Check unavailable**\n\nCould not complete the system check right now. Please check your network and try again.',
+          actions: ['HEAL_APP', 'REPORT_PROBLEM'],
+          status: 'sent',
+        },
+      ]);
+    } finally {
+      setIsRunningDoctor(false);
     }
-  }, [visible]);
+  };
 
-  useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
+  // Execute 1-Tap Action Cards & Navigation Shortcuts
+  const handleActionCardPress = async (action: ActionTag) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (action === 'PROBLEM_RESOLVED') {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `resolved_${Date.now()}`,
+          role: 'model',
+          content: 'Glad to hear that solved your issue! Please let us know whenever you need help with CediSmart.',
+          status: 'sent',
+        },
+      ]);
+      return;
+    }
+
+    if (action === 'HEAL_APP') {
+      await runSelfHealDoctor();
+      return;
+    }
+
+    if (action === 'NAV_ADD_EXPENSE') {
+      onClose();
+      try {
+        nav.navigate('AddTransaction');
+      } catch {}
+      return;
+    }
+
+    if (action === 'NAV_BUDGETS') {
+      onClose();
+      try {
+        nav.navigate('BudgetsTab');
+      } catch {}
+      return;
+    }
+
+    if (action === 'NAV_TRANSACTIONS') {
+      onClose();
+      try {
+        nav.navigate('DashboardTab');
+      } catch {}
+      return;
+    }
+
+    if (action === 'REPORT_PROBLEM') {
+      setShowEscalate(true);
+      return;
+    }
+
+    if (action === 'OPEN_SHORTCUTS') {
+      Linking.openURL('shortcuts://').catch(() => {
+        Alert.alert(
+          'Shortcuts App',
+          'Could not open Apple Shortcuts automatically. Please open the built-in Shortcuts app from your Home Screen.'
+        );
+      });
+      return;
+    }
+
+    if (action === 'SYNC_OFFLINE_QUEUE') {
+      if (offlineQueue.length === 0) {
+        Alert.alert('All Synced!', 'Your offline transaction queue is already empty and up to date.');
+        return;
+      }
+      await runSelfHealDoctor();
+      return;
+    }
+
+    if (action === 'GENERATE_MOMO_KEY') {
+      const webhookUrl = 'https://api.cedismart.com/api/v1/transactions/sms-webhook';
+      if (Platform.OS === 'android') {
+        Alert.alert(
+          '⚡ Configure MoMo Auto-Sync',
+          'Would you like to grant Android background SMS permissions now, or copy your Webhook Auth Key?',
+          [
+            {
+              text: '🤖 Grant Android SMS Permission',
+              onPress: async () => {
+                try {
+                  const granted = await PermissionsAndroid.requestMultiple([
+                    PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
+                    PermissionsAndroid.PERMISSIONS.READ_SMS,
+                  ]);
+                  if (
+                    granted['android.permission.RECEIVE_SMS'] === PermissionsAndroid.RESULTS.GRANTED &&
+                    granted['android.permission.READ_SMS'] === PermissionsAndroid.RESULTS.GRANTED
+                  ) {
+                    Alert.alert('Success!', 'Background MoMo SMS Auto-Sync is now active on your Android device.');
+                  }
+                } catch {}
+              },
+            },
+            {
+              text: '🔑 Copy Auth Key',
+              onPress: async () => {
+                const token = await SecureStore.getItemAsync('access_token');
+                if (token) {
+                  Clipboard.setString(`Bearer ${token}`);
+                  Alert.alert('Copied!', 'Your Bearer Auth Key is copied to your clipboard.');
+                } else {
+                  Clipboard.setString(webhookUrl);
+                  Alert.alert('Copied!', 'Webhook URL copied to clipboard.');
+                }
+              },
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      } else {
+        Alert.alert(
+          '🍎 iOS MoMo Auto-Sync Helper',
+          'Copy your Webhook URL or Bearer Auth Key for Apple Shortcuts:',
+          [
+            {
+              text: '🔗 Copy Webhook URL',
+              onPress: () => {
+                Clipboard.setString(webhookUrl);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                Alert.alert('Copied!', 'Webhook URL copied to clipboard.');
+              },
+            },
+            {
+              text: '🔑 Copy Bearer Auth Key',
+              onPress: async () => {
+                const token = await SecureStore.getItemAsync('access_token');
+                if (token) {
+                  Clipboard.setString(`Bearer ${token}`);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                  Alert.alert('Copied!', 'Your Bearer <token> header value has been copied to your clipboard.');
+                } else {
+                  Alert.alert('Sign In Required', 'Please log in first so we can generate your secure Auth Key.');
+                }
+              },
+            },
+            {
+              text: '📲 Open Shortcuts App',
+              onPress: () => {
+                Linking.openURL('shortcuts://').catch(() => {});
+              },
+            },
+            { text: 'Close', style: 'cancel' },
+          ]
+        );
+      }
+    }
+  };
+
+  // Check Live GitHub Ticket & Autonomous ChatGPT PR Status
+  const checkLiveTicketStatus = async (issueNum?: number) => {
+    const targetIssue = issueNum || escalatedTicket?.number;
+    if (!targetIssue || targetIssue <= 0) return;
+    setIsCheckingTicket(true);
+    try {
+      const res = await apiClient.get<TicketStatusData>(`/support/ticket-status/${targetIssue}`);
+      setTicketStatus(res.data);
+      Haptics.selectionAsync().catch(() => {});
+    } catch (err) {
+      console.warn('[AI Support] Failed to fetch ticket status:', err);
+    } finally {
+      setIsCheckingTicket(false);
+    }
+  };
+
+  // Retry failed user message
+  const handleRetryMessage = (failedMsg: Message) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setMessages((prev) =>
+      prev.map((m) => (m.id === failedMsg.id ? { ...m, status: 'sending' } : m))
+    );
+    const msgIdx = messages.findIndex((m) => m.id === failedMsg.id);
+    const historyToSend = msgIdx >= 0 ? messages.slice(0, msgIdx + 1) : messages;
+    chatMutation.mutate({
+      chatHistory: historyToSend,
+      imageBase64: failedMsg.image_base64,
+      imageMimeType: failedMsg.image_mime_type,
+      targetMessageId: failedMsg.id,
+    });
+  };
 
   // Chat Mutation
   const chatMutation = useMutation({
-    mutationFn: async (chatHistory: Message[]) => {
-      const diagnostics = {
-        os: Platform.OS,
-        os_version: String(Platform.Version),
-        app_version: '1.0.0',
-      };
+    mutationFn: async (payload: {
+      chatHistory: Message[];
+      imageBase64?: string;
+      imageMimeType?: string;
+      targetMessageId?: string;
+    }) => {
+      const diagnostics = await buildClientDiagnostics();
+      const apiMessages = payload.chatHistory.map((m) => ({
+        role: m.role,
+        content: m.content,
+        image_base64: m.image_base64,
+        image_mime_type: m.image_mime_type,
+      }));
       const response = await apiClient.post('/support/chat', {
-        messages: chatHistory,
+        messages: apiMessages,
         support_type: supportType,
         device_diagnostics: diagnostics,
-        user_name: userName
+        user_name: userName,
+        phone: phone,
+        image_base64: payload.imageBase64,
+        image_mime_type: payload.imageMimeType,
       });
-      return response.data.response;
+      return {
+        responseText: response.data.response as string,
+        targetMessageId: payload.targetMessageId,
+      };
     },
-    onSuccess: (data: string) => {
-      let cleanResponse = data;
+    onSuccess: ({ responseText, targetMessageId }) => {
+      let workingText = responseText;
       let needsEscalation = false;
 
-      if (data.includes('[ESCALATE_REQUIRED]')) {
-        cleanResponse = data.replace('[ESCALATE_REQUIRED]', '').trim();
+      if (workingText.includes('[ESCALATE_REQUIRED]')) {
+        workingText = workingText.replace('[ESCALATE_REQUIRED]', '').trim();
         needsEscalation = true;
       }
 
-      setMessages((prev) => [...prev, { role: 'model', content: cleanResponse }]);
+      const { cleanText, actions } = extractActionsAndCleanText(workingText);
+
+      // If the backend performed an Instant MoMo SMS Rescue, refresh wallet & transaction caches immediately!
+      if (cleanText.includes('Instant MoMo SMS Rescue') || cleanText.includes('Already Synced:')) {
+        queryClient.invalidateQueries({ queryKey: ['accounts'] });
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      }
+
+      setMessages((prev) => {
+        const updated = prev.map((m) =>
+          m.id === targetMessageId || (m.role === 'user' && m.status === 'sending')
+            ? { ...m, status: 'sent' as const }
+            : m
+        );
+        return [
+          ...updated,
+          {
+            id: `msg_${Date.now()}`,
+            role: 'model',
+            content: cleanText,
+            actions: actions.length > 0 ? actions : undefined,
+            status: 'sent',
+          },
+        ];
+      });
       if (needsEscalation && !escalatedTicket) {
         setShowEscalate(true);
       }
     },
-    onError: (err: any) => {
+    onError: (err: any, variables) => {
       console.warn('[AI Support] Chat error:', err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'model',
-          content: "Sorry, I am having trouble connecting to my brain right now. Please try again or tap Escalate to notify our developers."
-        }
-      ]);
-      setShowEscalate(true);
-    }
+      setMessages((prev) => {
+        const updated = prev.map((m) =>
+          m.id === variables.targetMessageId || (m.role === 'user' && m.status === 'sending')
+            ? { ...m, status: 'failed' as const }
+            : m
+        );
+        return [
+          ...updated,
+          {
+            id: `err_${Date.now()}`,
+            role: 'model',
+            content:
+              'Could not reach the support server. Please check your internet connection or tap Retry above.',
+            actions: ['HEAL_APP'],
+            status: 'sent',
+          },
+        ];
+      });
+    },
   });
 
-  // Escalation Mutation
+  // Problem Reporting Escalation Mutation
   const escalateMutation = useMutation({
     mutationFn: async () => {
       const userQueries = messages.filter((m) => m.role === 'user');
-      const primaryQuery = userQueries.length > 0 ? userQueries[userQueries.length - 1].content : 'General inquiry';
+      const primaryQuery =
+        userQueries.length > 0 ? userQueries[userQueries.length - 1].content : 'General inquiry';
 
-      const diagnostics = {
-        os: Platform.OS,
-        os_version: String(Platform.Version),
-        app_version: '1.0.0',
-      };
+      const diagnostics = await buildClientDiagnostics();
 
       const response = await apiClient.post('/support/escalate', {
         phone: phone,
         user_query: primaryQuery,
-        chat_history: messages,
-        device_diagnostics: diagnostics
+        chat_history: messages.map((m) => ({ role: m.role, content: m.content })),
+        device_diagnostics: diagnostics,
       });
       return response.data;
     },
     onSuccess: (data) => {
       setEscalatedTicket({
-          number: data.issue_number,
-          url: data.issue_url
+        number: data.issue_number,
+        url: data.issue_url,
       });
       setShowEscalate(false);
 
-      const successMsg = data.issue_number > 0
-        ? `I've opened a support ticket (#${data.issue_number}) on GitHub directly for our developer and logged it in our secure database. They've been notified!`
-        : `I've logged a support ticket (ID: ${data.ticket_id.substring(0, 8)}...) directly in our secure database. Our developer has been notified!`;
+      const refNumber = data.issue_number > 0 ? `#${data.issue_number}` : `#${(data.ticket_id || '').substring(0, 8)}`;
+      const successMsg = `✅ **Problem Report Submitted**\n\nThank you! Your report has been delivered to CediSmart Support (Reference: ${refNumber}).\n\nOur team has received your message and diagnostics and will assist you.`;
 
       setMessages((prev) => [
         ...prev,
         {
+          id: `esc_${Date.now()}`,
           role: 'model',
-          content: successMsg
-        }
+          content: successMsg,
+          status: 'sent',
+        },
       ]);
     },
     onError: (err: any) => {
       console.warn('[AI Support] Escalation error:', err);
-    }
+      Alert.alert(
+        'Submission Failed',
+        'Could not submit your report right now. Please check your internet connection and try again.'
+      );
+    },
   });
 
   const handleSend = () => {
-    if (!input.trim() || chatMutation.isPending) return;
+    if ((!input.trim() && !attachedImage) || chatMutation.isPending) return;
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
+    const textContent =
+      input.trim() || 'Please analyze this attached screenshot / receipt and help me resolve or log it.';
+
+    const newMsgId = `user_${Date.now()}`;
+    const userMessage: Message = {
+      id: newMsgId,
+      role: 'user',
+      content: textContent,
+      imageUri: attachedImage?.uri,
+      image_base64: attachedImage?.base64,
+      image_mime_type: attachedImage?.mimeType,
+      status: 'sending',
+    };
     const updatedMessages = [...messages, userMessage];
+
+    const imgBase64 = attachedImage?.base64;
+    const imgMime = attachedImage?.mimeType;
 
     setMessages(updatedMessages);
     setInput('');
-    chatMutation.mutate(updatedMessages);
+    setAttachedImage(null);
+    chatMutation.mutate({
+      chatHistory: updatedMessages,
+      imageBase64: imgBase64,
+      imageMimeType: imgMime,
+      targetMessageId: newMsgId,
+    });
+  };
+
+  const renderActionBadgeLabel = (action: ActionTag) => {
+    switch (action) {
+      case 'PROBLEM_RESOLVED':
+        return { label: 'Yes, Problem Solved', icon: CheckCircle2 };
+      case 'NAV_ADD_EXPENSE':
+        return { label: 'Record an Expense', icon: Plus };
+      case 'NAV_BUDGETS':
+        return { label: 'Open Budgets', icon: PieChart };
+      case 'NAV_TRANSACTIONS':
+        return { label: 'View Transactions', icon: ArrowUpRight };
+      case 'REPORT_PROBLEM':
+        return { label: 'Report a Problem', icon: MessageSquare };
+      case 'GENERATE_MOMO_KEY':
+        return { label: 'Setup MoMo Auto-Sync', icon: Key };
+      case 'OPEN_SHORTCUTS':
+        return { label: 'Open Shortcuts App', icon: ExternalLink };
+      case 'SYNC_OFFLINE_QUEUE':
+        return { label: `Upload Pending (${offlineQueue.length})`, icon: RefreshCw };
+      case 'HEAL_APP':
+        return { label: 'Check for Problems', icon: Stethoscope };
+    }
   };
 
   return (
@@ -349,87 +1067,187 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
       onRequestClose={onClose}
     >
       <View className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
+        <CoinBackground />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           className="flex-1"
         >
-          {/* Premium Gradient Header */}
-          <LinearGradient
-            colors={isDark ? ['#143d1a', '#081c0e'] : ['#2e7d32', '#0d631b']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ paddingTop: Math.max(insets.top, 16) }}
-            className="px-6 pb-5 flex-row items-center justify-between shadow-md"
+          {/* Liquid Glass Header */}
+          <GlassSurface
+            tint="emerald"
+            variant="thick"
+            elevated
+            radius={28}
+            style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
           >
-            <View className="flex-row items-center space-x-3">
-              <View className="w-10 h-10 rounded-full bg-white/20 items-center justify-center border border-white/10">
-                <Sparkles size={20} color="#ffb703" />
+            <View
+              style={{ paddingTop: Math.max(insets.top, 16) }}
+              className="px-6 pb-5 flex-row items-center justify-between"
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 10 }}>
+                <View style={{ flexShrink: 0 }} className="w-10 h-10 rounded-full bg-white/15 items-center justify-center border border-white/15 mr-3">
+                  <Sparkles size={20} color="#ffb703" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    className={`font-headline font-bold text-lg ${isDark ? 'text-white' : 'text-charcoal'}`}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
+                  >
+                    CediSmart AI Support
+                  </Text>
+                  <Text
+                    className={`font-body text-[11px] font-medium ${isDark ? 'text-emerald-300/80' : 'text-emerald-800/80'}`}
+                    numberOfLines={1}
+                  >
+                    Help with CediSmart
+                  </Text>
+                </View>
               </View>
-              <View>
-                <Text className="font-headline font-bold text-lg text-white">CediSmart AI Support</Text>
-                <Text className="font-body text-[10px] text-emerald-200/80">Ghana's Premium Finance Assistant</Text>
-              </View>
-            </View>
-            <View className="flex-row items-center space-x-2">
-              {messages.length > 1 && (
-                <TouchableOpacity 
-                  onPress={handleClearChat} 
-                  className="w-9 h-9 rounded-full bg-white/10 items-center justify-center active:bg-white/20"
-                  accessibilityLabel="New Chat"
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <TouchableOpacity
+                  onPress={runSelfHealDoctor}
+                  disabled={isRunningDoctor}
+                  className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  accessibilityLabel="Check for problems"
                 >
-                  <Plus size={20} color="white" />
+                  {isRunningDoctor ? (
+                    <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
+                  ) : (
+                    <Stethoscope size={18} color={isDark ? '#4ade80' : '#0d631b'} />
+                  )}
                 </TouchableOpacity>
-              )}
-              <TouchableOpacity 
-                onPress={onClose} 
-                className="w-9 h-9 rounded-full bg-white/10 items-center justify-center active:bg-white/20"
-              >
-                <X size={20} color="white" />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowHistoryModal(true)}
+                  className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  accessibilityLabel="Past conversations"
+                >
+                  <History size={18} color={isDark ? 'white' : '#1C1C2E'} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleNewChat}
+                  className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  accessibilityLabel="New Conversation"
+                >
+                  <Plus size={20} color={isDark ? 'white' : '#1C1C2E'} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={onClose}
+                  className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  accessibilityLabel="Close support"
+                >
+                  <X size={20} color={isDark ? 'white' : '#1C1C2E'} />
+                </TouchableOpacity>
+              </View>
             </View>
-          </LinearGradient>
+          </GlassSurface>
 
           {/* Chat Messages */}
           <ScrollView
             ref={scrollViewRef}
-            className="flex-1 p-6"
-            contentContainerStyle={{ paddingBottom: 32 }}
+            className="flex-1 px-4"
+            contentContainerStyle={{ paddingTop: 16, paddingBottom: 28 }}
+            keyboardShouldPersistTaps="handled"
           >
             {messages.map((msg, index) => {
               const isUser = msg.role === 'user';
               return (
-                <View
-                  key={index}
-                  className={`flex-row mb-5 ${isUser ? 'justify-end' : 'justify-start'}`}
-                >
-                  {!isUser && (
-                    <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2 self-end">
-                      <Bot size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    onLongPress={() => handleMessagePress(msg, index)}
-                    delayLongPress={300}
-                    activeOpacity={0.85}
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
-                      isUser
-                        ? 'bg-primary rounded-tr-none'
-                        : `${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-surface-container-low border border-outline-variant/5'} rounded-tl-none`
-                    }`}
-                  >
-                    {isUser ? (
-                      <Text selectable={true} className="font-body text-sm text-white leading-relaxed">
-                        {msg.content}
-                      </Text>
-                    ) : (
-                      <View className="space-y-1">
-                        {parseMarkdown(msg.content, isDark)}
+                <View key={msg.id || index} className="mb-5">
+                  <View className={`flex-row ${isUser ? 'justify-end' : 'justify-start'}`}>
+                    {!isUser && (
+                      <View className="w-8 h-8 rounded-full bg-primary/15 items-center justify-center mr-2 self-end">
+                        <Bot size={16} color={isDark ? '#4ade80' : '#0d631b'} />
                       </View>
                     )}
-                  </TouchableOpacity>
-                  {isUser && (
-                    <View className="w-8 h-8 rounded-full bg-primary/20 items-center justify-center ml-2 self-end">
-                      <User size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
+                    {isUser ? (
+                      <View className="max-w-[82%] items-end">
+                        <TouchableOpacity
+                          onLongPress={() => handleMessagePress(msg)}
+                          delayLongPress={300}
+                          activeOpacity={0.85}
+                          className={`rounded-2xl rounded-tr-none px-4 py-3 shadow-sm ${
+                            msg.status === 'failed' ? 'bg-error/90' : 'bg-primary'
+                          }`}
+                        >
+                          {msg.imageUri && (
+                            <Image
+                              source={{ uri: msg.imageUri }}
+                              style={{ width: 190, height: 130, borderRadius: 12, marginBottom: 8 }}
+                              resizeMode="cover"
+                            />
+                          )}
+                          <Text selectable={true} className="font-body text-sm text-white leading-relaxed">
+                            {msg.content}
+                          </Text>
+                        </TouchableOpacity>
+
+                        {/* Message Delivery Status / 1-Tap Retry */}
+                        {msg.status === 'failed' && (
+                          <TouchableOpacity
+                            onPress={() => handleRetryMessage(msg)}
+                            className="flex-row items-center mt-1.5 bg-error/15 px-3 py-1.5 rounded-full border border-error/30"
+                          >
+                            <RotateCcw size={12} color="#ef4444" />
+                            <Text className="text-error font-headline font-bold text-[11px] ml-1.5">
+                              Couldn't send. Tap to retry
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        {msg.status === 'sending' && (
+                          <Text className={`text-[10px] mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Sending...
+                          </Text>
+                        )}
+                      </View>
+                    ) : (
+                      <GlassSurface radius={20} style={{ maxWidth: '84%' }}>
+                        <TouchableOpacity
+                          onLongPress={() => handleMessagePress(msg)}
+                          delayLongPress={300}
+                          activeOpacity={0.85}
+                          className="px-4 py-3"
+                        >
+                          <View className="space-y-1">
+                            {parseMarkdown(msg.content, isDark)}
+                          </View>
+                        </TouchableOpacity>
+                      </GlassSurface>
+                    )}
+                    {isUser && (
+                      <View className="w-8 h-8 rounded-full bg-primary/20 items-center justify-center ml-2 self-end">
+                        <User size={16} color={isDark ? '#4ade80' : '#0d631b'} />
+                      </View>
+                    )}
+                  </View>
+
+                  {/* 1-Tap Action Cards & Navigation Shortcuts */}
+                  {!isUser && msg.actions && msg.actions.length > 0 && (
+                    <View className="ml-10 mt-2.5 flex-row flex-wrap" style={{ gap: 8 }}>
+                      {msg.actions.map((act) => {
+                        const { label, icon: IconComp } = renderActionBadgeLabel(act);
+                        return (
+                          <TouchableOpacity
+                            key={act}
+                            onPress={() => handleActionCardPress(act)}
+                            activeOpacity={0.85}
+                            className={`flex-row items-center px-3.5 py-2 rounded-xl border ${
+                              isDark
+                                ? 'bg-primary/25 border-primary/40'
+                                : 'bg-primary/10 border-primary/25'
+                            }`}
+                          >
+                            <IconComp size={14} color={isDark ? '#4ade80' : '#0d631b'} />
+                            <Text
+                              className={`font-headline font-bold text-xs ml-2 ${
+                                isDark ? 'text-[#4ade80]' : 'text-primary'
+                              }`}
+                            >
+                              {label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   )}
                 </View>
@@ -439,71 +1257,441 @@ export const SupportModal: React.FC<SupportModalProps> = ({ visible, onClose, ph
             {/* AI thinking state */}
             {chatMutation.isPending && (
               <View className="flex-row mb-5 justify-start items-center">
-                <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mr-2">
-                  <Bot size={16} color={isDark ? '#2e7d32' : '#0d631b'} />
+                <View className="w-8 h-8 rounded-full bg-primary/15 items-center justify-center mr-2">
+                  <Bot size={16} color={isDark ? '#4ade80' : '#0d631b'} />
                 </View>
-                <View className={`rounded-2xl px-4 py-3 ${isDark ? 'bg-dark-surface-container-low border border-dark-outline-variant/10' : 'bg-surface-container-low border border-outline-variant/5'} rounded-tl-none flex-row items-center space-x-2`}>
-                  <ActivityIndicator size="small" color={isDark ? '#2e7d32' : '#0d631b'} />
-                  <Text className={`font-body text-xs ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>Assistant thinking...</Text>
-                </View>
+                <GlassSurface radius={20}>
+                  <View className="px-4 py-3 flex-row items-center">
+                    <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
+                    <Text className={`font-body text-xs ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} ml-2`}>
+                      Checking...
+                    </Text>
+                  </View>
+                </GlassSurface>
               </View>
             )}
 
-            {/* Escalation CTA */}
+            {/* Problem Reporting Card */}
             {showEscalate && !escalatedTicket && (
-              <View className={`p-5 rounded-2xl border ${isDark ? 'bg-dark-surface-container-low border-error/20' : 'bg-error/5 border-error/10'} mb-4 items-center`}>
-                <AlertCircle size={24} color="#BA1A1A" className="mb-2" />
-                <Text className={`font-headline font-bold text-sm text-center mb-1 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>Needs Developer Review</Text>
-                <Text className={`font-body text-xs text-center mb-4 ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>
-                  It looks like this issue needs a developer. Tap below to create a bug report ticket on GitHub.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => escalateMutation.mutate()}
-                  disabled={escalateMutation.isPending}
-                  className="bg-error px-5 py-2.5 rounded-xl flex-row items-center space-x-2 shadow-sm active:opacity-90"
-                >
-                  {escalateMutation.isPending ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <>
-                      <Github size={16} color="white" />
-                      <Text className="text-white font-headline font-bold text-xs">Create Support Ticket</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <GlassSurface radius={22} style={{ marginBottom: 16 }}>
+                <View className="p-5 items-center">
+                  <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center mb-2">
+                    <MessageSquare size={20} color={isDark ? '#4ade80' : '#0d631b'} />
+                  </View>
+                  <Text className={`font-headline font-bold text-sm text-center mb-1 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>
+                    Report a Problem
+                  </Text>
+                  <Text className={`font-body text-xs text-center mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Need assistance from our team? Send your question and device diagnostics directly to CediSmart customer support.
+                  </Text>
+                  <View className="flex-row space-x-3 w-full">
+                    <TouchableOpacity
+                      onPress={() => setShowEscalate(false)}
+                      className={`flex-1 py-3 rounded-xl items-center justify-center border ${isDark ? 'border-white/10' : 'border-gray-200'}`}
+                    >
+                      <Text className={`font-headline font-bold text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Cancel
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => escalateMutation.mutate()}
+                      disabled={escalateMutation.isPending}
+                      className="flex-1 bg-primary py-3 rounded-xl flex-row items-center justify-center shadow-sm"
+                    >
+                      {escalateMutation.isPending ? (
+                        <ActivityIndicator size="small" color="white" />
+                      ) : (
+                        <Text className="text-white font-headline font-bold text-xs">
+                          Send Report
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </GlassSurface>
+            )}
+
+            {/* User-Facing Problem Report Status Tracker */}
+            {escalatedTicket && (
+              <GlassSurface radius={22} style={{ marginBottom: 16 }}>
+                <View className="p-5">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <View className="flex-row items-center">
+                      <MessageSquare size={18} color={isDark ? '#4ade80' : '#0d631b'} />
+                      <Text className={`font-headline font-bold text-sm ml-2 ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                        Report #{escalatedTicket.number}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => checkLiveTicketStatus()}
+                      disabled={isCheckingTicket}
+                      className="flex-row items-center px-3 py-1.5 rounded-full bg-primary/10"
+                    >
+                      {isCheckingTicket ? (
+                        <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
+                      ) : (
+                        <>
+                          <RefreshCw size={12} color={isDark ? '#4ade80' : '#0d631b'} />
+                          <Text className={`font-headline font-bold text-[10px] ml-1.5 ${isDark ? 'text-[#4ade80]' : 'text-primary'}`}>
+                            Check Status
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* 4-Step Progress Indicator: Report received → Investigating → Fix being tested → Update available */}
+                  <View className="flex-row items-center justify-between mb-4 mt-2 px-1">
+                    {[
+                      { step: 1, label: 'Received' },
+                      { step: 2, label: 'Investigating' },
+                      { step: 3, label: 'Fix in QA' },
+                      { step: 4, label: 'Update Ready' },
+                    ].map((st) => {
+                      const currentStage = ticketStatus?.stage_step || 1;
+                      const isDone = currentStage > st.step;
+                      const isCurrent = currentStage === st.step;
+                      return (
+                        <View key={st.step} className="items-center flex-1">
+                          <View
+                            className={`w-7 h-7 rounded-full items-center justify-center mb-1 ${
+                              isDone
+                                ? 'bg-success'
+                                : isCurrent
+                                  ? 'bg-primary'
+                                  : isDark
+                                    ? 'bg-white/10'
+                                    : 'bg-black/10'
+                            }`}
+                          >
+                            {isDone ? (
+                              <CheckCircle2 size={14} color="white" />
+                            ) : isCurrent ? (
+                              <ActivityIndicator size="small" color="white" />
+                            ) : (
+                              <Text className={`font-bold text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {st.step}
+                              </Text>
+                            )}
+                          </View>
+                          <Text
+                            className={`text-[9px] font-headline text-center ${
+                              isCurrent || isDone
+                                ? isDark
+                                  ? 'text-white font-bold'
+                                  : 'text-charcoal font-bold'
+                                : isDark
+                                  ? 'text-gray-400'
+                                  : 'text-gray-500'
+                            }`}
+                            numberOfLines={1}
+                          >
+                            {st.label}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  <Text className={`font-body text-xs leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                    {ticketStatus?.status_description ||
+                      'Your report and device diagnostics have been logged with CediSmart Support. Our team is working on it.'}
+                  </Text>
+                </View>
+              </GlassSurface>
             )}
           </ScrollView>
 
-          {/* Styled Chat Input Bar */}
-          <View 
-            style={{ paddingBottom: Math.max(insets.bottom, 12) }}
-            className={`px-4 pt-3 border-t ${isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/20' : 'bg-white border-outline-variant/10'} flex-row items-center space-x-3`}
+          {/* Styled Chat Input Bar + Swipeable Quick Rescue Strip */}
+          <GlassSurface
+            variant="thick"
+            radius={28}
+            elevated
+            style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
           >
-            <TextInput
-              ref={textInputRef}
-              className={`flex-1 h-12 px-4 rounded-xl font-body text-sm ${
-                isDark ? 'bg-dark-surface-container-low text-dark-on-surface' : 'bg-surface-container-low text-on-surface'
-              } border ${isDark ? 'border-dark-outline-variant/10' : 'border-outline-variant/5'}`}
-              placeholder="Ask CediSmart AI..."
-              placeholderTextColor={isDark ? '#434942' : '#9CA3AF'}
-              value={input}
-              onChangeText={setInput}
-              onSubmitEditing={handleSend}
-              blurOnSubmit={false}
-              editable={!chatMutation.isPending}
-            />
-            <TouchableOpacity
-              onPress={handleSend}
-              disabled={!input.trim() || chatMutation.isPending}
-              className={`w-12 h-12 rounded-xl items-center justify-center ${
-                !input.trim() || chatMutation.isPending ? 'bg-gray-500/10' : 'bg-primary'
-              } shadow-sm`}
+            {/* Attached Screenshot / Receipt Preview */}
+            {attachedImage && (
+              <View className="px-4 pt-3 flex-row items-center">
+                <View className="relative">
+                  <Image
+                    source={{ uri: attachedImage.uri }}
+                    style={{ width: 56, height: 56, borderRadius: 12 }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => setAttachedImage(null)}
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-error items-center justify-center"
+                  >
+                    <X size={12} color="white" />
+                  </TouchableOpacity>
+                </View>
+                <Text
+                  className={`font-body text-xs ml-3 flex-1 ${
+                    isDark ? 'text-emerald-300' : 'text-emerald-800'
+                  }`}
+                >
+                  Screenshot / Receipt attached for visual analysis
+                </Text>
+              </View>
+            )}
+
+            {/* Quick Helper Bar: Screen-aware & fully horizontally swipeable */}
+            {supportType !== 'auth' && !attachedImage && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 8 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {getScreenQuickPrompts(screenContext, supportType).map((promptText, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={async () => {
+                      Haptics.selectionAsync().catch(() => {});
+                      if (promptText === 'Paste MoMo SMS to Auto-Log') {
+                        const clip = await Clipboard.getString();
+                        if (clip && clip.trim().length > 0) {
+                          setInput(clip.trim());
+                          textInputRef.current?.focus();
+                        } else {
+                          Alert.alert('Paste MoMo SMS', 'Copy any MTN, Telecel, or AT Money SMS to your clipboard first, then tap here.');
+                        }
+                      } else if (promptText === 'Check for problems') {
+                        runSelfHealDoctor();
+                      } else if (promptText === 'Help Guides (Offline)') {
+                        setShowOfflineGuides(true);
+                      } else {
+                        setInput(promptText);
+                        textInputRef.current?.focus();
+                      }
+                    }}
+                    className={`px-3.5 py-2 rounded-full flex-row items-center border ${
+                      promptText === 'Paste MoMo SMS to Auto-Log'
+                        ? isDark ? 'bg-primary/20 border-primary/35' : 'bg-primary/10 border-primary/25'
+                        : isDark ? 'bg-white/10 border-white/15' : 'bg-black/5 border-black/10'
+                    }`}
+                  >
+                    {promptText === 'Paste MoMo SMS to Auto-Log' ? (
+                      <Zap size={13} color={isDark ? '#4ade80' : '#0d631b'} />
+                    ) : promptText === 'Check for problems' ? (
+                      <Stethoscope size={13} color={isDark ? '#4ade80' : '#0d631b'} />
+                    ) : promptText === 'Help Guides (Offline)' ? (
+                      <BookOpen size={13} color={isDark ? '#4ade80' : '#0d631b'} />
+                    ) : null}
+                    <Text
+                      className={`font-headline font-bold text-xs ${
+                        promptText === 'Paste MoMo SMS to Auto-Log'
+                          ? isDark ? 'text-[#4ade80]' : 'text-primary'
+                          : isDark ? 'text-gray-200' : 'text-charcoal'
+                      } ${promptText === 'Paste MoMo SMS to Auto-Log' || promptText === 'Check for problems' || promptText === 'Help Guides (Offline)' ? 'ml-1.5' : ''}`}
+                    >
+                      {promptText}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+
+            <View
+              style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+              className="px-4 pt-2.5 flex-row items-center"
             >
-              <Send size={18} color={!input.trim() || chatMutation.isPending ? '#9CA3AF' : 'white'} />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity
+                onPress={handlePickImage}
+                disabled={chatMutation.isPending}
+                className={`w-11 h-12 rounded-xl items-center justify-center mr-2 border ${
+                  isDark
+                    ? 'bg-black/30 border-white/10'
+                    : 'bg-white/60 border-black/10'
+                }`}
+                accessibilityLabel="Attach Screenshot or Receipt"
+              >
+                <Camera size={18} color={isDark ? '#4ade80' : '#0d631b'} />
+              </TouchableOpacity>
+
+              <TextInput
+                ref={textInputRef}
+                className={`flex-1 h-12 px-4 rounded-xl font-body text-sm mr-2.5 ${
+                  isDark
+                    ? 'bg-black/30 text-dark-on-surface border-white/10'
+                    : 'bg-white/60 text-on-surface border-black/10'
+                } border`}
+                placeholder={
+                  attachedImage
+                    ? 'Add a note for this image...'
+                    : 'Describe your problem...'
+                }
+                placeholderTextColor={isDark ? '#6b7280' : '#9CA3AF'}
+                value={input}
+                onChangeText={setInput}
+                onSubmitEditing={handleSend}
+                blurOnSubmit={false}
+                editable={!chatMutation.isPending}
+              />
+              <TouchableOpacity
+                onPress={handleSend}
+                disabled={(!input.trim() && !attachedImage) || chatMutation.isPending}
+                className={`w-12 h-12 rounded-xl items-center justify-center ${
+                  (!input.trim() && !attachedImage) || chatMutation.isPending
+                    ? 'bg-gray-500/15'
+                    : 'bg-primary'
+                } shadow-sm`}
+              >
+                <Send
+                  size={18}
+                  color={
+                    (!input.trim() && !attachedImage) || chatMutation.isPending
+                      ? '#9CA3AF'
+                      : 'white'
+                  }
+                />
+              </TouchableOpacity>
+            </View>
+          </GlassSurface>
         </KeyboardAvoidingView>
+
+        {/* Past Conversations History Modal */}
+        <Modal
+          visible={showHistoryModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowHistoryModal(false)}
+        >
+          <View className="flex-1 justify-end bg-black/60">
+            <GlassSurface
+              variant="thick"
+              elevated
+              radius={32}
+              style={{ width: '100%', maxHeight: 480, padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}
+            >
+              <View className="flex-row justify-between items-center mb-4">
+                <View className="flex-row items-center">
+                  <History size={20} color={isDark ? '#4ade80' : '#0d631b'} />
+                  <Text className={`font-headline font-bold text-lg ml-2 ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                    Past Conversations
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowHistoryModal(false)} className="p-1">
+                  <X size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleNewChat}
+                className="w-full bg-primary py-3 rounded-2xl flex-row items-center justify-center mb-4 shadow-sm"
+              >
+                <Plus size={18} color="white" />
+                <Text className="text-white font-headline font-bold text-xs ml-2">
+                  Start New Conversation
+                </Text>
+              </TouchableOpacity>
+
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {sessions.map((sess) => {
+                  const isActive = sess.id === activeSessionId;
+                  const msgCount = (sess.messages || []).filter((m) => m.role === 'user').length;
+                  const dateStr = new Date(sess.updatedAt).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  });
+
+                  return (
+                    <View
+                      key={sess.id}
+                      className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${
+                        isActive
+                          ? isDark
+                            ? 'bg-primary/20 border-primary/50'
+                            : 'bg-primary/10 border-primary/30'
+                          : isDark
+                            ? 'bg-white/5 border-white/10'
+                            : 'bg-black/5 border-black/5'
+                      }`}
+                    >
+                      <TouchableOpacity
+                        onPress={() => handleSelectSession(sess)}
+                        className="flex-1 mr-3"
+                      >
+                        <Text
+                          numberOfLines={1}
+                          className={`font-headline font-bold text-sm mb-1 ${
+                            isActive
+                              ? isDark
+                                ? 'text-white'
+                                : 'text-primary'
+                              : isDark
+                                ? 'text-gray-200'
+                                : 'text-charcoal'
+                          }`}
+                        >
+                          {sess.title || 'Conversation'}
+                        </Text>
+                        <Text className={`font-body text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {dateStr} • {msgCount} {msgCount === 1 ? 'question' : 'questions'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        onPress={() => handleDeleteSession(sess.id)}
+                        className="p-2 rounded-xl"
+                        accessibilityLabel="Delete conversation"
+                      >
+                        <Trash2 size={16} color={isDark ? '#ef4444' : '#dc2626'} />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </GlassSurface>
+          </View>
+        </Modal>
+
+        {/* Offline Help Guides Modal */}
+        <Modal
+          visible={showOfflineGuides}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowOfflineGuides(false)}
+        >
+          <View className="flex-1 justify-end bg-black/60">
+            <GlassSurface
+              variant="thick"
+              elevated
+              radius={32}
+              style={{ width: '100%', padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}
+            >
+              <View className="flex-row justify-between items-center mb-4">
+                <View className="flex-row items-center">
+                  <BookOpen size={20} color={isDark ? '#4ade80' : '#0d631b'} />
+                  <Text className={`font-headline font-bold text-lg ml-2 ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                    CediSmart Quick Guides
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowOfflineGuides(false)} className="p-1">
+                  <X size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
+                {OFFLINE_HELP_GUIDES.map((guide, idx) => (
+                  <View
+                    key={idx}
+                    className={`p-4 rounded-2xl mb-3 border ${
+                      isDark ? 'bg-white/5 border-white/10' : 'bg-black/5 border-black/5'
+                    }`}
+                  >
+                    <Text className={`font-headline font-bold text-sm mb-1 ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                      {guide.title}
+                    </Text>
+                    <Text className={`font-body text-xs leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                      {guide.summary}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </GlassSurface>
+          </View>
+        </Modal>
       </View>
     </Modal>
   );

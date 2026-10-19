@@ -26,17 +26,28 @@ export const useOfflineSync = () => {
     if (queue.length === 0) return;
 
     try {
+      const cleanTransactions = queue.map((item) => ({
+        amount: item.amount,
+        transaction_type: item.transaction_type,
+        account_id: item.account_id,
+        category_id: item.category_id,
+        description: item.description,
+        transaction_date: item.transaction_date,
+        notes: item.notes,
+        client_id: item.client_id,
+      }));
+
       // The backend expects { transactions: [...] } for the bulk endpoint
       const response = await apiClient.post('/transactions/bulk', {
-        transactions: queue
+        transactions: cleanTransactions
       });
 
-      // Assuming backend returns { created: X, errors: [{client_id, reason}] }
-      // We only remove ones that didn't hard-fail with non-retryable errors
-      // For simplicity in MVP, if the bulk request succeeds (200), we clear everything
-      // In a strict prod environment, we would inspect `response.data.errors`
-      
-      const successfullySyncedIds = queue.map(q => q.client_id);
+      const failedIds = new Set(
+        (response.data?.errors || []).map((errItem: any) => errItem.client_id).filter(Boolean)
+      );
+      const successfullySyncedIds = queue
+        .map((q) => q.client_id)
+        .filter((id) => !failedIds.has(id));
       
       // Force refresh data across the app
       queryClient.invalidateQueries({ queryKey: ['transactions'] });

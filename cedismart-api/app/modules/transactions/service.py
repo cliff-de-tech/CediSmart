@@ -158,6 +158,7 @@ async def list_transactions(
     category_id: uuid.UUID | None = None,
     account_id: uuid.UUID | None = None,
     transaction_type: str | None = None,
+    search: str | None = None,
 ) -> tuple[list[Transaction], int]:
     """Return a paginated, filtered list of transactions for the user.
 
@@ -187,6 +188,15 @@ async def list_transactions(
         base = base.where(Transaction.account_id == account_id)
     if transaction_type is not None:
         base = base.where(Transaction.transaction_type == transaction_type)
+    if search is not None and search.strip():
+        pattern = f"%{search.strip()}%"
+        base = base.outerjoin(Category, Transaction.category_id == Category.id).where(
+            or_(
+                Transaction.description.ilike(pattern),
+                Transaction.notes.ilike(pattern),
+                Category.name.ilike(pattern),
+            )
+        )
 
     # Count total (without pagination)
     count_stmt = select(func.count()).select_from(base.subquery())

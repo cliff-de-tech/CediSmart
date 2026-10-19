@@ -86,6 +86,20 @@ async def register_with_clerk(
     db.add(user)
     await db.flush()  # Populate user.id before commit
 
+    # --- Provision a default Physical Cash account so the first expense never hits a dead end ---
+    from app.modules.accounts.models import FinancialAccount
+
+    default_cash = FinancialAccount(
+        user_id=user.id,
+        name="Physical Cash",
+        account_type="cash",
+        provider="Physical Cash",
+        opening_balance=0,
+        is_active=True,
+    )
+    db.add(default_cash)
+    await db.flush()
+
     # --- Issue tokens ---
     tokens = await _issue_tokens(user.id, redis)
 
