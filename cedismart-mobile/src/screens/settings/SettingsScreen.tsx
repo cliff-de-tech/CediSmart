@@ -13,7 +13,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug, HelpCircle, MessageSquare } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones } from 'lucide-react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -1641,7 +1641,8 @@ const SettingsScreen = ({ navigation, route }: any) => {
               onPress={() => setIsBugModalVisible(true)}
             />
             <SettingItem 
-              icon={HelpCircle} 
+              icon={Headphones} 
+              color={isDark ? '#4ade80' : '#0d631b'}
               title="AI Support Assistant" 
               value="Chat with CediSmart AI helper" 
               onPress={() => setIsSupportModalVisible(true)}

@@ -12,7 +12,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { formatGHS } from '../../utils/currency';
-import { Plus, Tag, Landmark, Smartphone, ShieldCheck, Award, Search, Sparkles, Trash2, Users, SlidersHorizontal, Eye, EyeOff, Clock, RefreshCw, Edit3, X } from 'lucide-react-native';
+import { Plus, Tag, Landmark, Smartphone, ShieldCheck, Award, Search, Sparkles, Trash2, Users, SlidersHorizontal, Eye, EyeOff, Clock, RefreshCw, Edit3, X, Headphones } from 'lucide-react-native';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
@@ -23,7 +23,7 @@ import apiClient, { setActiveTokens, clearActiveSession } from '../../api/client
 import { CoinBackground } from '../../components/shared/CoinBackground';
 import { ConfettiEffect } from '../../components/shared/ConfettiEffect';
 import { SupportModal } from '../../components/shared/SupportModal';
-import { SupportBotCompanion } from '../../components/shared/SupportBotCompanion';
+import { TopBarSupportTooltip } from '../../components/shared/TopBarSupportTooltip';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
@@ -78,6 +78,7 @@ const DashboardScreen = ({ navigation }: any) => {
   const [isViewingPhoto, setIsViewingPhoto] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
   const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
+  const [startFreshSupport, setStartFreshSupport] = useState(false);
 
   // Transaction Detail / Edit / Delete Sheet state
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -776,8 +777,8 @@ const DashboardScreen = ({ navigation }: any) => {
           <GlassButton accessibilityLabel="Open accounts" onPress={() => navigation.navigate('Accounts')} style={{ marginRight: 10 }}>
             <Landmark size={20} color={isDark ? '#a4f3b9' : '#0d631b'} />
           </GlassButton>
-          <GlassButton accessibilityLabel="AI Support" onPress={() => setIsSupportModalVisible(true)} style={{ marginRight: 10 }}>
-            <Sparkles size={19} color={isDark ? '#ffb703' : '#a05915'} />
+          <GlassButton accessibilityLabel="AI Support" onPress={() => { setStartFreshSupport(false); setIsSupportModalVisible(true); }} style={{ marginRight: 10 }}>
+            <Headphones size={19} color={isDark ? '#4ade80' : '#0d631b'} />
           </GlassButton>
           <TouchableOpacity 
             onPress={() => profileSheetRef.current?.snapToIndex(0)}
@@ -1948,12 +1949,16 @@ const DashboardScreen = ({ navigation }: any) => {
         </View>
       </Modal>
 
-      {/* Fun AI Support Bot Companion */}
-      <SupportBotCompanion
+      {/* Anchored Top-Bar AI Support Speech Bubble Tooltip */}
+      <TopBarSupportTooltip
         userName={user?.full_name}
         screenContext="dashboard"
-        onOpenSupport={() => setIsSupportModalVisible(true)}
-        bottomOffset={tabBarClearance + 16}
+        arrowRightOffset={74}
+        topOffset={74}
+        onOpenSupport={(opts) => {
+          setStartFreshSupport(!!opts?.startNewChat);
+          setIsSupportModalVisible(true);
+        }}
       />
 
       {/* AI Support Modal */}
@@ -1964,6 +1969,7 @@ const DashboardScreen = ({ navigation }: any) => {
         userName={user?.full_name}
         screenContext="dashboard"
         navigation={navigation}
+        startNewChatOnOpen={startFreshSupport}
       />
 
     </SafeAreaView>

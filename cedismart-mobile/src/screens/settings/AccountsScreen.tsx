@@ -7,7 +7,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Alert, TextInput, Scro
 import * as SecureStore from 'expo-secure-store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { ArrowLeft, Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff, Zap, CheckCircle2, Info, ExternalLink, Copy, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff, Zap, CheckCircle2, Info, ExternalLink, Copy, Headphones } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '../../stores/themeStore';
@@ -451,7 +451,7 @@ const AccountsScreen = ({ navigation }: any) => {
           </GlassButton>
           <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`} style={{ flex: 1 }}>My Accounts</Text>
           <GlassButton accessibilityLabel="Accounts AI Support" onPress={() => setIsSupportModalVisible(true)}>
-            <Sparkles size={19} color={isDark ? '#ffb703' : '#a05915'} />
+            <Headphones size={19} color={isDark ? '#4ade80' : '#0d631b'} />
           </GlassButton>
         </View>
         <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-8`}>Add/Track your sources of Income.</Text>

@@ -45,6 +45,7 @@ import {
   History,
   Clock,
   Trash2,
+  Headphones,
 } from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
@@ -103,6 +104,7 @@ export interface SupportModalProps {
   supportType?: 'auth' | 'general';
   screenContext?: 'dashboard' | 'budgets' | 'transactions' | 'settings' | 'auth';
   navigation?: any;
+  startNewChatOnOpen?: boolean;
 }
 
 export const OFFLINE_HELP_GUIDES = [
@@ -279,6 +281,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   supportType = 'general',
   screenContext = 'dashboard',
   navigation,
+  startNewChatOnOpen = false,
 }) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
@@ -347,6 +350,30 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   useEffect(() => {
     const loadSessions = async () => {
       try {
+        if (startNewChatOnOpen) {
+          const freshSession: ChatSession = {
+            id: `sess_${Date.now()}`,
+            title: 'New Conversation',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            messages: [defaultGreeting],
+          };
+          let existingSessions: ChatSession[] = [];
+          const stored = await AsyncStorage.getItem(sessionsStorageKey);
+          if (stored) {
+            try {
+              existingSessions = JSON.parse(stored) as ChatSession[];
+            } catch {}
+          }
+          const merged = [freshSession, ...existingSessions.filter((s) => s.id !== freshSession.id)];
+          setSessions(merged);
+          setActiveSessionId(freshSession.id);
+          setMessages([defaultGreeting]);
+          setIsHistoryLoaded(true);
+          AsyncStorage.setItem(sessionsStorageKey, JSON.stringify(merged)).catch(() => {});
+          return;
+        }
+
         const storedSessions = await AsyncStorage.getItem(sessionsStorageKey);
         if (storedSessions) {
           const parsed = JSON.parse(storedSessions) as ChatSession[];
@@ -414,7 +441,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
       setIsHistoryLoaded(false);
       loadSessions();
     }
-  }, [visible, phone, supportType]);
+  }, [visible, phone, supportType, startNewChatOnOpen]);
 
   // Save active session & messages
   useEffect(() => {
@@ -1096,17 +1123,17 @@ export const SupportModal: React.FC<SupportModalProps> = ({
               style={{ paddingTop: Math.max(insets.top, 16) }}
               className="px-4 pb-4 flex-row items-center justify-between"
             >
-              {/* Left Identity: Amber Sparkles Avatar + Live Green Indicator + Title */}
+              {/* Left Identity: Emerald Headphones Avatar + Live Green Indicator + Title */}
               <View className="flex-row items-center flex-1 min-w-0 mr-3">
                 <View className="relative flex-shrink-0 mr-3">
                   <View
                     className={`w-10 h-10 rounded-2xl items-center justify-center border ${
                       isDark
-                        ? 'bg-amber-400/15 border-amber-400/30'
-                        : 'bg-amber-500/10 border-amber-500/25'
+                        ? 'bg-emerald-500/15 border-emerald-500/30'
+                        : 'bg-emerald-600/10 border-emerald-600/25'
                     }`}
                   >
-                    <Sparkles size={19} color="#ffb703" />
+                    <Headphones size={20} color={isDark ? '#4ade80' : '#0d631b'} />
                   </View>
                   {/* Glowing live status dot */}
                   <View

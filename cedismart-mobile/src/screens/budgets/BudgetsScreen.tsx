@@ -7,14 +7,14 @@ import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetr
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { PieChart, Plus, ChevronDown, Tag, Trash2, Sparkles } from 'lucide-react-native';
+import { PieChart, Plus, ChevronDown, Tag, Trash2, Headphones } from 'lucide-react-native';
 import { useThemeStore } from '../../stores/themeStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import CategoryPicker from '../../components/shared/CategoryPicker';
 import { CoinBackground } from '../../components/shared/CoinBackground';
 import { SupportModal } from '../../components/shared/SupportModal';
-import { SupportBotCompanion } from '../../components/shared/SupportBotCompanion';
+import { TopBarSupportTooltip } from '../../components/shared/TopBarSupportTooltip';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -54,6 +54,7 @@ const BudgetsScreen = () => {
   const [alertAt, setAlertAt] = useState('80');
   const [defaultThreshold, setDefaultThreshold] = useState(80);
   const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
+  const [startFreshSupport, setStartFreshSupport] = useState(false);
 
   // Load user's default budget alert threshold on mount
   useEffect(() => {
@@ -157,8 +158,8 @@ const BudgetsScreen = () => {
             <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2`}>My Budgets</Text>
             <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Control your monthly spending</Text>
           </View>
-          <GlassButton accessibilityLabel="Budget AI Support" onPress={() => setIsSupportModalVisible(true)} style={{ marginLeft: 12 }}>
-            <Sparkles size={19} color={isDark ? '#ffb703' : '#a05915'} />
+          <GlassButton accessibilityLabel="Budget AI Support" onPress={() => { setStartFreshSupport(false); setIsSupportModalVisible(true); }} style={{ marginLeft: 12 }}>
+            <Headphones size={19} color={isDark ? '#4ade80' : '#0d631b'} />
           </GlassButton>
         </View>
 
@@ -386,12 +387,16 @@ const BudgetsScreen = () => {
         }}
       />
 
-      {/* Fun AI Support Bot Companion */}
-      <SupportBotCompanion
+      {/* Anchored Top-Bar AI Support Speech Bubble Tooltip */}
+      <TopBarSupportTooltip
         userName={user?.full_name}
         screenContext="budgets"
-        onOpenSupport={() => setIsSupportModalVisible(true)}
-        bottomOffset={tabBarClearance + 16}
+        arrowRightOffset={24}
+        topOffset={74}
+        onOpenSupport={(opts) => {
+          setStartFreshSupport(!!opts?.startNewChat);
+          setIsSupportModalVisible(true);
+        }}
       />
 
       {/* AI Support Modal */}
@@ -401,6 +406,7 @@ const BudgetsScreen = () => {
         phone={user?.phone}
         userName={user?.full_name}
         screenContext="budgets"
+        startNewChatOnOpen={startFreshSupport}
       />
     </SafeAreaView>
   );
