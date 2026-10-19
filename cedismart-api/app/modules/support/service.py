@@ -6,7 +6,7 @@ from datetime import date
 from typing import Any
 
 import httpx
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -16,29 +16,37 @@ from app.modules.support.schemas import ChatMessage
 logger = logging.getLogger(__name__)
 
 ACTION_TAGS_GUIDE = (
-    "\n\n=== INTERACTIVE 1-TAP ACTION TAGS ('DO IT FOR ME' CARDS) ===\n"
-    "You can embed interactive Liquid Glass action buttons inside your reply by appending one or more of these exact tags at the end of your message when relevant:\n"
-    "- `[ACTION:NAV_ADD_EXPENSE]` — Include this whenever the user asks to log, add, or record an expense or income. It lets them open the Add Transaction screen in 1 tap.\n"
-    "- `[ACTION:NAV_BUDGETS]` — Include this whenever advising the user to check, create, or adjust their monthly category budgets.\n"
-    "- `[ACTION:NAV_TRANSACTIONS]` — Include this whenever the user wants to inspect their full transaction history or search for an entry.\n"
-    "- `[ACTION:GENERATE_MOMO_KEY]` — Include this whenever the user asks about Mobile Money Auto-Sync, SMS sync, iOS Shortcuts setup, or Android background SMS permissions.\n"
-    "- `[ACTION:OPEN_SHORTCUTS]` — Include this when guiding an iOS user through Apple Shortcuts automation so they can jump straight into the Shortcuts app in 1 tap.\n"
-    "- `[ACTION:SYNC_OFFLINE_QUEUE]` — Include this if the user's telemetry shows pending offline transactions waiting to upload.\n"
-    "- `[ACTION:HEAL_APP]` — Include this if the user reports stale balances or needs to check for app problems in 1 tap.\n"
-    "- `[ACTION:REPORT_PROBLEM]` — Include this if an issue cannot be resolved through automated troubleshooting and should be sent to customer support.\n"
+    "\n\n=== INTERACTIVE 1-TAP ACTION TAGS ('DO IT FOR ME' CARDS) ===\nYou can embed interactive"
+    " Liquid Glass action buttons inside your reply by appending one or more of these exact tags at"
+    " the end of your message when relevant:\n- `[ACTION:NAV_ADD_EXPENSE]` — Include this whenever"
+    " the user asks to log, add, or record an expense or income. It lets them open the Add"
+    " Transaction screen in 1 tap.\n- `[ACTION:NAV_BUDGETS]` — Include this whenever advising the"
+    " user to check, create, or adjust their monthly category budgets.\n-"
+    " `[ACTION:NAV_TRANSACTIONS]` — Include this whenever the user wants to inspect their full"
+    " transaction history or search for an entry.\n- `[ACTION:GENERATE_MOMO_KEY]` — Include this"
+    " whenever the user asks about Mobile Money Auto-Sync, SMS sync, iOS Shortcuts setup, or"
+    " Android background SMS permissions.\n- `[ACTION:OPEN_SHORTCUTS]` — Include this when guiding"
+    " an iOS user through Apple Shortcuts automation so they can jump straight into the Shortcuts"
+    " app in 1 tap.\n- `[ACTION:SYNC_OFFLINE_QUEUE]` — Include this if the user's telemetry shows"
+    " pending offline transactions waiting to upload.\n- `[ACTION:HEAL_APP]` — Include this if the"
+    " user reports stale balances or needs to check for app problems in 1 tap.\n-"
+    " `[ACTION:REPORT_PROBLEM]` — Include this if an issue cannot be resolved through automated"
+    " troubleshooting and should be sent to customer support.\n"
 )
 
 CRITICAL_TRUTH_AND_INTEGRITY_RULES = (
-    "\n\n=== CRITICAL TRUTH & TRANSACTION INTEGRITY RULES (ZERO HALLUCINATIONS) ===\n"
-    "1. You CANNOT directly create, edit, delete, or categorize transactions in the database from chat messages unless "
-    "the system explicitly attached a verified '=== INSTANT SMS RESCUE EXECUTED ===' block in your context.\n"
-    "2. NEVER claim, pretend, or tell the user that you 'logged', 'saved', 'recorded', or 'categorized' a transaction unless you see "
-    "the explicit '=== INSTANT SMS RESCUE EXECUTED ===' banner in this prompt!\n"
-    "3. If the user asks 'Did you do it?', 'Did you log it?', or asks you verbally to record an expense (e.g. 'log 51 cedi for chop money'), "
-    "truthfully and politely explain that you cannot record manual transactions directly from chat messages. Advise them to use the "
-    "'Add Expense' button on the Home screen or paste the exact MoMo SMS alert. Provide `[ACTION:NAV_ADD_EXPENSE]`.\n"
-    "4. Always verify facts against the 'LIVE X-RAY ACCOUNT & DEVICE TELEMETRY' provided below. "
-    "If the telemetry lists their recent transactions or wallets, cite the actual data accurately rather than inventing amounts.\n"
+    "\n\n=== CRITICAL TRUTH & TRANSACTION INTEGRITY RULES (ZERO HALLUCINATIONS) ===\n1. You CANNOT"
+    " directly create, edit, delete, or categorize transactions in the database from chat messages"
+    " unless the system explicitly attached a verified '=== INSTANT SMS RESCUE EXECUTED ===' block"
+    " in your context.\n2. NEVER claim, pretend, or tell the user that you 'logged', 'saved',"
+    " 'recorded', or 'categorized' a transaction unless you see the explicit '=== INSTANT SMS"
+    " RESCUE EXECUTED ===' banner in this prompt!\n3. If the user asks 'Did you do it?', 'Did you"
+    " log it?', or asks you verbally to record an expense (e.g. 'log 51 cedi for chop money'),"
+    " truthfully and politely explain that you cannot record manual transactions directly from chat"
+    " messages. Advise them to use the 'Add Expense' button on the Home screen or paste the exact"
+    " MoMo SMS alert. Provide `[ACTION:NAV_ADD_EXPENSE]`.\n4. Always verify facts against the 'LIVE"
+    " X-RAY ACCOUNT & DEVICE TELEMETRY' provided below. If the telemetry lists their recent"
+    " transactions or wallets, cite the actual data accurately rather than inventing amounts.\n"
 )
 
 VOICE_MODE_INSTRUCTIONS = (
@@ -51,25 +59,25 @@ VOICE_MODE_INSTRUCTIONS = (
 )
 
 AUTH_SYSTEM_PROMPT = (
-    "You are the CediSmart Onboarding & Authentication Troubleshooter. CediSmart is a digital ledger "
-    "and budgeting mobile application built for the Ghanaian market.\n\n"
-    "Your tone should be professional, polite, helpful, and direct.\n\n"
-    "Your sole focus is helping users resolve registration, SMS verification OTP, sign-in, and 6-digit Secure PIN reset issues.\n"
-    "- SMS Verification OTP: SMS verification is handled via Clerk. If they aren't receiving OTPs, "
-    "suggest they check cellular signal, ensure they didn't prefix the number with another 0 "
-    "(Ghana numbers are 9 digits, e.g., 24XXXXXXX, excluding the leading 0), or check if they have "
-    "MTN Do Not Disturb (DND) active which blocks transaction SMS. "
-    "Also note that reviewers can use pre-configured Test Phone Numbers.\n"
-    "- PIN & Login: Security PINs are 6 digits and stored securely. PIN resets require a Clerk "
-    "phone re-verification step.\n"
-    "- Screenshot Vision: If the user attaches a screenshot of an error screen or OTP issue, inspect the visual details carefully and give exact step-by-step guidance.\n"
-    "- Important restriction: Since you are the Onboarding Troubleshooter, if users ask about general ledger usage, "
-    "adding transactions, or setting budgets, politely advise them that you are specialized in login/registration issues, "
-    "but once they are logged in, the General Support assistant in Settings will happily help them with budgeting.\n\n"
-    "IMPORTANT ESCALATION PROTOCOL:\n"
-    "If the user describes a bug, a server crash, asks for human support, or if the issue is complex "
-    "and you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your response. "
-    "This lets the system know it needs to offer the user a direct problem report."
+    "You are the CediSmart Onboarding & Authentication Troubleshooter. CediSmart is a digital"
+    " ledger and budgeting mobile application built for the Ghanaian market.\n\nYour tone should be"
+    " professional, polite, helpful, and direct.\n\nYour sole focus is helping users resolve"
+    " registration, SMS verification OTP, sign-in, and 6-digit Secure PIN reset issues.\n- SMS"
+    " Verification OTP: SMS verification is handled via Clerk. If they aren't receiving OTPs,"
+    " suggest they check cellular signal, ensure they didn't prefix the number with another 0"
+    " (Ghana numbers are 9 digits, e.g., 24XXXXXXX, excluding the leading 0), or check if they have"
+    " MTN Do Not Disturb (DND) active which blocks transaction SMS. Also note that reviewers can"
+    " use pre-configured Test Phone Numbers.\n- PIN & Login: Security PINs are 6 digits and stored"
+    " securely. PIN resets require a Clerk phone re-verification step.\n- Screenshot Vision: If the"
+    " user attaches a screenshot of an error screen or OTP issue, inspect the visual details"
+    " carefully and give exact step-by-step guidance.\n- Important restriction: Since you are the"
+    " Onboarding Troubleshooter, if users ask about general ledger usage, adding transactions, or"
+    " setting budgets, politely advise them that you are specialized in login/registration issues,"
+    " but once they are logged in, the General Support assistant in Settings will happily help them"
+    " with budgeting.\n\nIMPORTANT ESCALATION PROTOCOL:\nIf the user describes a bug, a server"
+    " crash, asks for human support, or if the issue is complex and you cannot solve it, add the"
+    " exact tag '[ESCALATE_REQUIRED]' at the end of your response. This lets the system know it"
+    " needs to offer the user a direct problem report."
     + ACTION_TAGS_GUIDE
     + CRITICAL_TRUTH_AND_INTEGRITY_RULES
     + VOICE_MODE_INSTRUCTIONS
@@ -109,7 +117,7 @@ class SupportService:
     async def build_xray_telemetry(
         db: AsyncSession | None,
         phone: str | None,
-        device_diagnostics: dict | None,
+        device_diagnostics: dict[str, Any] | None,
     ) -> tuple[str, Any]:
         """Build a live X-Ray diagnostic snapshot from Postgres + client telemetry."""
         lines: list[str] = []
@@ -156,8 +164,9 @@ class SupportService:
                         )
                     )
                     lines.append(
-                        f"- Account Profile: Phone={user_obj.phone}, Name={user_obj.full_name or 'N/A'}, "
-                        f"Tier={tier}, KYC Verified={user_obj.kyc_verified}"
+                        f"- Account Profile: Phone={user_obj.phone},"
+                        f" Name={user_obj.full_name or 'N/A'}, Tier={tier}, KYC"
+                        f" Verified={user_obj.kyc_verified}"
                     )
 
                     acc_stmt = select(FinancialAccount).where(
@@ -177,10 +186,21 @@ class SupportService:
                                 has_momo = True
                             bal = balances.get(a.id, a.opening_balance)
                             acc_summaries.append(
-                                f"{a.name} ({a.account_type}/{a.provider or 'N/A'} #{a.account_number or 'N/A'}: GH₵ {bal})"
+                                f"{a.name} ({a.account_type}/{a.provider or 'N/A'}"
+                                f" #{a.account_number or 'N/A'}: GH₵ {bal})"
                             )
-                        lines.append(f"- Active Wallets ({len(accounts)}): " + "; ".join(acc_summaries))
-                        lines.append(f"- Mobile Money Wallet Linked: {'YES' if has_momo else 'NO (User must link a MoMo wallet in Accounts tab before SMS Auto-Sync can log transactions)'}")
+                        lines.append(
+                            f"- Active Wallets ({len(accounts)}): " + "; ".join(acc_summaries)
+                        )
+                        momo_status = (
+                            "YES"
+                            if has_momo
+                            else (
+                                "NO (User must link a MoMo wallet in Accounts tab before "
+                                "SMS Auto-Sync can log transactions)"
+                            )
+                        )
+                        lines.append(f"- Mobile Money Wallet Linked: {momo_status}")
                     else:
                         lines.append("- Active Wallets: 0 linked accounts.")
 
@@ -190,21 +210,26 @@ class SupportService:
                             Transaction.user_id == user_obj.id,
                             Transaction.is_deleted.is_(False),
                         )
-                        .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+                        .order_by(
+                            Transaction.transaction_date.desc(), Transaction.created_at.desc()
+                        )
                         .limit(3)
                     )
                     tx_res = await db.execute(tx_stmt)
                     recent_txs = list(tx_res.scalars().all())
                     if recent_txs:
                         tx_strs = [
-                            f"{t.transaction_type.upper()} GH₵ {t.amount} ({t.description or 'No desc'} on {t.transaction_date})"
+                            f"{t.transaction_type.upper()} GH₵"
+                            f" {t.amount} ({t.description or 'No desc'} on {t.transaction_date})"
                             for t in recent_txs
                         ]
                         lines.append("- Latest 3 Ledger Transactions: " + " | ".join(tx_strs))
                     else:
                         lines.append("- Latest Ledger Transactions: None recorded yet.")
                 else:
-                    lines.append(f"- Database Lookup: No registered user found matching phone '{phone}'.")
+                    lines.append(
+                        f"- Database Lookup: No registered user found matching phone '{phone}'."
+                    )
             except Exception as exc:
                 logger.warning("X-Ray telemetry lookup non-fatal error: %s", str(exc))
 
@@ -212,9 +237,9 @@ class SupportService:
             return "", None
 
         telemetry_block = (
-            "\n\n=== LIVE X-RAY ACCOUNT & DEVICE TELEMETRY (SILENT DIAGNOSTICS) ===\n"
-            "Use this real-time telemetry to diagnose the user's issue immediately without asking redundant questions:\n"
-            + "\n".join(lines)
+            "\n\n=== LIVE X-RAY ACCOUNT & DEVICE TELEMETRY (SILENT DIAGNOSTICS) ===\nUse this"
+            " real-time telemetry to diagnose the user's issue immediately without asking redundant"
+            " questions:\n" + "\n".join(lines)
         )
         return telemetry_block, user_obj
 
@@ -437,13 +462,35 @@ class SupportService:
         (e.g., 'Mr. Cliff' -> first_name='Cliff', full_name='Cliff').
         """
         source = (raw_name or "").strip()
-        if (not source or source.lower() in {"mr.", "mr", "mrs.", "mrs", "ms.", "ms", "miss", "anonymous"}) and db_user and getattr(db_user, "full_name", None):
+        if (
+            (
+                not source
+                or source.lower() in {"mr.", "mr", "mrs.", "mrs", "ms.", "ms", "miss", "anonymous"}
+            )
+            and db_user
+            and getattr(db_user, "full_name", None)
+        ):
             source = str(db_user.full_name).strip()
 
         if not source:
             return "there", "Friend"
 
-        titles = {"mr", "mr.", "mrs", "mrs.", "ms", "ms.", "miss", "dr", "dr.", "prof", "prof.", "pastor", "rev", "rev."}
+        titles = {
+            "mr",
+            "mr.",
+            "mrs",
+            "mrs.",
+            "ms",
+            "ms.",
+            "miss",
+            "dr",
+            "dr.",
+            "prof",
+            "prof.",
+            "pastor",
+            "rev",
+            "rev.",
+        }
         words = source.split()
         filtered = [w for w in words if w.lower() not in titles]
 
@@ -463,11 +510,11 @@ class SupportService:
         user_name: str | None = None,
         db: AsyncSession | None = None,
         phone: str | None = None,
-        device_diagnostics: dict | None = None,
+        device_diagnostics: dict[str, Any] | None = None,
         image_base64: str | None = None,
         image_mime_type: str | None = "image/jpeg",
     ) -> str:
-        """Generate a supportive assistant response using Gemini 2.5 Flash with automatic ChatGPT (gpt-4o-mini) fallback."""
+        """Generate support responses with Gemini and automatic ChatGPT fallback."""
         xray_block, user_obj = await SupportService.build_xray_telemetry(
             db=db,
             phone=phone,
@@ -521,7 +568,9 @@ class SupportService:
         # Resolve any image attached either on the request or on the last message
         effective_img_b64 = image_base64 or (messages[-1].image_base64 if messages else None)
         effective_img_mime = image_mime_type or (
-            messages[-1].image_mime_type if messages and messages[-1].image_mime_type else "image/jpeg"
+            messages[-1].image_mime_type
+            if messages and messages[-1].image_mime_type
+            else "image/jpeg"
         )
 
         # 1. Primary Engine: High-Speed Gemini Flash-Lite Models
@@ -529,7 +578,9 @@ class SupportService:
             contents: list[dict[str, Any]] = []
             for idx, msg in enumerate(messages):
                 parts_list: list[dict[str, Any]] = [{"text": msg.content}]
-                msg_img = msg.image_base64 or (effective_img_b64 if idx == len(messages) - 1 else None)
+                msg_img = msg.image_base64 or (
+                    effective_img_b64 if idx == len(messages) - 1 else None
+                )
                 msg_mime = msg.image_mime_type or effective_img_mime or "image/jpeg"
                 if msg_img:
                     clean_b64 = msg_img.split(",")[-1] if "," in msg_img else msg_img
@@ -561,7 +612,10 @@ class SupportService:
                         if response.status_code == 200:
                             resp_json = response.json()
                             ai_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
-                            return ai_text
+                            if isinstance(ai_text, str):
+                                return ai_text
+                            logger.warning("Gemini Support API returned non-text content")
+                            continue
                         logger.warning(
                             "Gemini Chat API error (%s status %d): %s",
                             model_name,
@@ -595,7 +649,7 @@ class SupportService:
         image_base64: str | None = None,
         image_mime_type: str | None = "image/jpeg",
     ) -> str | None:
-        """Fallback to ChatGPT (`gpt-4o-mini`) via OPENAI_API_KEY or free GitHub Models (`GITHUB_ACCESS_TOKEN`)."""
+        """Call ChatGPT with the configured OpenAI key or GitHub Models token."""
         api_key = settings.OPENAI_API_KEY or settings.GITHUB_ACCESS_TOKEN
         if not api_key:
             return None
@@ -643,7 +697,8 @@ class SupportService:
                 resp = await client.post(url, headers=headers, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()
-                    return data["choices"][0]["message"]["content"]
+                    reply = data["choices"][0]["message"]["content"]
+                    return reply if isinstance(reply, str) else None
                 logger.warning(
                     "ChatGPT fallback returned status %d: %s",
                     resp.status_code,
@@ -665,32 +720,44 @@ class SupportService:
         if support_type == "auth":
             if "otp" in last_msg or "code" in last_msg or "sms" in last_msg:
                 return (
-                    f"Chale {first_name}, it looks like you're having trouble receiving your verification OTP. Please check:\n"
-                    "1. That your phone has active cellular reception.\n"
-                    "2. That the number was entered correctly (9 digits, e.g. 24XXXXXXX, excluding the leading 0).\n"
-                    "If the issue persists, tap 'Escalate' to report this bug to our developers."
+                    f"Chale {first_name}, it looks like you're having trouble receiving your"
+                    " verification OTP. Please check:\n1. That your phone has active cellular"
+                    " reception.\n2. That the number was entered correctly (9 digits, e.g."
+                    " 24XXXXXXX, excluding the leading 0).\nIf the issue persists, tap 'Escalate'"
+                    " to report this bug to our developers."
                 )
             return (
-                f"Hi {first_name}! I am the CediSmart Onboarding Assistant. I can help you with OTP codes, "
-                "registration, and PIN resets. (If you have a complicated issue, please let me know and I will raise a developer ticket)."
+                f"Hi {first_name}! I am the CediSmart Onboarding Assistant. I can help you with OTP"
+                " codes, registration, and PIN resets. (If you have a complicated issue, please"
+                " let me know and I will raise a developer ticket)."
             )
 
         if "pin" in last_msg or "password" in last_msg or "reset" in last_msg:
             return (
-                f"Chale {first_name}, to reset your PIN, please use the 'Forgot PIN?' link on the Login screen. "
-                "This will verify your identity via SMS before prompting you to choose a new 6-digit PIN."
+                f"Chale {first_name}, to reset your PIN, please use the 'Forgot PIN?' link on the"
+                " Login screen. This will verify your identity via SMS before prompting you to"
+                " choose a new 6-digit PIN."
             )
-        if "sync" in last_msg or "shortcut" in last_msg or "sms" in last_msg or "automation" in last_msg:
+        if (
+            "sync" in last_msg
+            or "shortcut" in last_msg
+            or "sms" in last_msg
+            or "automation" in last_msg
+        ):
             return (
-                f"Chale {first_name}, here is how to configure Mobile Money Live Sync:\n"
-                "1. Go to Settings ➔ Accounts and look for the 'Mobile Money Live Sync' panel under your linked accounts.\n"
-                "2. Tap 'Configure Auto-Sync (iOS / Android)'.\n"
-                "3. For Google Android: Tap 'Grant SMS Permissions' to enable automated background listening.\n"
-                "4. For Apple iOS: Copy your Webhook URL and Auth Key, then open the native Apple Shortcuts app and configure a new 'Message' Personal Automation (set request to POST, add Authorization header, and send the message details as JSON). [ACTION:GENERATE_MOMO_KEY] [ACTION:OPEN_SHORTCUTS]"
+                f"Chale {first_name}, here is how to configure Mobile Money Live Sync:\n1. Go to"
+                " Settings ➔ Accounts and look for the 'Mobile Money Live Sync' panel under your"
+                " linked accounts.\n2. Tap 'Configure Auto-Sync (iOS / Android)'.\n3. For Google"
+                " Android: Tap 'Grant SMS Permissions' to enable automated background"
+                " listening.\n4. For Apple iOS: Copy your Webhook URL and Auth Key, then open the"
+                " native Apple Shortcuts app and configure a new 'Message' Personal Automation"
+                " (set request to POST, add Authorization header, and send the message details as"
+                " JSON). [ACTION:GENERATE_MOMO_KEY] [ACTION:OPEN_SHORTCUTS]"
             )
         return (
-            f"Hi {first_name}! I am the CediSmart Support Assistant. I can help you set budgets, "
-            "create ledgers, log transactions, and configure background MoMo message sync. What can I help you with today? [ACTION:HEAL_APP]"
+            f"Hi {first_name}! I am the CediSmart Support Assistant. I can help you set budgets,"
+            " create ledgers, log transactions, and configure background MoMo message sync. What"
+            " can I help you with today? [ACTION:HEAL_APP]"
         )
 
     @staticmethod
@@ -699,9 +766,9 @@ class SupportService:
         phone: str,
         user_query: str,
         chat_history: list[ChatMessage],
-        device_diagnostics: dict | None = None,
+        device_diagnostics: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Save ticket to local database, escalate to GitHub (triggering ChatGPT Code Agent), and notify Discord."""
+        """Save a ticket and send configured GitHub and Discord escalations."""
         ticket = SupportTicket(
             phone=phone,
             user_query=user_query,
@@ -746,10 +813,10 @@ class SupportService:
         phone: str,
         user_query: str,
         chat_history: list[ChatMessage],
-        device_diagnostics: dict | None,
+        device_diagnostics: dict[str, Any] | None,
         ticket_id: str,
     ) -> tuple[int, str]:
-        """Call GitHub API to open a developer issue ticket labeled with `ai-autofix` for the ChatGPT Code Agent."""
+        """Open a GitHub issue labeled with `ai-autofix` for the ChatGPT Code Agent."""
         url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues"
         headers = {
             "Authorization": f"token {settings.GITHUB_ACCESS_TOKEN}",
@@ -765,19 +832,16 @@ class SupportService:
 
         diagnostics_str = "None provided"
         if device_diagnostics:
-            diagnostics_str = "\n".join([f"- **{k}**: `{v}`" for k, v in device_diagnostics.items()])
+            diagnostics_str = "\n".join(
+                [f"- **{k}**: `{v}`" for k, v in device_diagnostics.items()]
+            )
 
         body_content = (
-            f"## 📱 CediSmart Support Escalation\n\n"
-            f"**Ticket Database ID:** `{ticket_id}`\n"
-            f"**Phone Number:** `{phone}`\n"
-            f"**Primary Query:** {user_query}\n\n"
-            f"### ⚙️ Diagnostics\n"
-            f"{diagnostics_str}\n\n"
-            f"### 💬 Chat History\n"
-            f"{transcript_str}\n\n"
-            f"---  \n"
-            f"*Issue generated automatically by CediSmart AI Support Service (`@chatgpt` auto-triage enabled).*"
+            f"## 📱 CediSmart Support Escalation\n\n**Ticket Database ID:** `{ticket_id}`\n**Phone"
+            f" Number:** `{phone}`\n**Primary Query:** {user_query}\n\n### ⚙️"
+            f" Diagnostics\n{diagnostics_str}\n\n### 💬 Chat History\n{transcript_str}\n\n--- "
+            " \n*Issue generated automatically by CediSmart AI Support Service (`@chatgpt`"
+            " auto-triage enabled).*"
         )
 
         payload = {
@@ -808,18 +872,24 @@ class SupportService:
         user_query: str,
         ticket_id: str,
         issue_url: str,
-        device_diagnostics: dict | None,
+        device_diagnostics: dict[str, Any] | None,
     ) -> None:
         """Trigger Discord Webhook message to notify the team instantly of a ticket creation."""
+        webhook_url = settings.DISCORD_WEBHOOK_URL
+        if not webhook_url:
+            return
         diag_lines = []
         if device_diagnostics:
             for k, v in device_diagnostics.items():
                 diag_lines.append(f"{k}: {v}")
         diag_str = "\n".join(diag_lines) if diag_lines else "No diagnostics provided."
 
-        embed = {
+        embed: dict[str, Any] = {
             "title": "🚨 CediSmart Support Ticket Created",
-            "description": "A user has escalated a support issue to the developers (ChatGPT Code Agent dispatched).",
+            "description": (
+                "A user has escalated a support issue to the developers (ChatGPT Code Agent"
+                " dispatched)."
+            ),
             "color": 14034714,
             "fields": [
                 {"name": "📞 User Phone", "value": f"`{phone}`", "inline": True},
@@ -845,7 +915,7 @@ class SupportService:
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                res = await client.post(settings.DISCORD_WEBHOOK_URL, json=payload)
+                res = await client.post(webhook_url, json=payload)
                 if res.status_code < 300:
                     logger.info("Discord support webhook successfully notified.")
                 else:
@@ -863,7 +933,7 @@ class SupportService:
         user_name: str,
         feedback_type: str,
         description: str,
-        device_info: dict | None,
+        device_info: dict[str, str] | None,
     ) -> dict[str, Any]:
         """Open a GitHub Issue with `ai-autofix` for the ChatGPT Code Agent and post to Discord."""
         diag_lines = []
@@ -875,7 +945,7 @@ class SupportService:
         issue_number = 0
         issue_url = ""
 
-        # 1. Create GitHub Issue so the Autonomous ChatGPT Code Agent can implement the feature or fix the bug
+        # 1. Open an issue so the ChatGPT Code Agent can implement the request.
         if settings.GITHUB_ACCESS_TOKEN:
             gh_url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues"
             headers = {
@@ -884,7 +954,11 @@ class SupportService:
                 "Content-Type": "application/json",
             }
             is_bug = "bug" in feedback_type.lower()
-            labels = ["bug", "ai-autofix"] if is_bug else ["enhancement", "feature-request", "ai-autofix"]
+            labels = (
+                ["bug", "ai-autofix"]
+                if is_bug
+                else ["enhancement", "feature-request", "ai-autofix"]
+            )
             prefix = "Bug Report" if is_bug else "Feature Request"
             gh_body = (
                 f"## 💡 CediSmart User {prefix}\n\n"
@@ -892,7 +966,7 @@ class SupportService:
                 f"**Category:** `{feedback_type}`\n\n"
                 f"### 📝 Description\n{description}\n\n"
                 f"### ⚙️ Device Info\n```\n{diag_str}\n```\n\n"
-                f"---\n*Automatically dispatched to `@chatgpt` Autonomous Code Agent.*"
+                "---\n*Automatically dispatched to `@chatgpt` Autonomous Code Agent.*"
             )
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -992,7 +1066,9 @@ class SupportService:
             "Accept": "application/vnd.github.v3+json",
         }
         issue_api_url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues/{issue_number}"
-        comments_api_url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues/{issue_number}/comments"
+        comments_api_url = (
+            f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues/{issue_number}/comments"
+        )
         owner = settings.GITHUB_REPO.split("/")[0]
         branch_head = f"{owner}:chatgpt/issue-{issue_number}"
         pulls_api_url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/pulls?head={branch_head}&state=all"
@@ -1005,18 +1081,26 @@ class SupportService:
                         "issue_number": issue_number,
                         "state": "unknown",
                         "title": f"Ticket #{issue_number}",
-                        "issue_url": f"https://github.com/{settings.GITHUB_REPO}/issues/{issue_number}",
+                        "issue_url": (
+                            f"https://github.com/{settings.GITHUB_REPO}/issues/{issue_number}"
+                        ),
                         "labels": [],
                         "pr_url": None,
                         "pr_state": None,
                         "latest_agent_comment": None,
                         "user_status": "received",
                         "status_label": "Report Received",
-                        "status_description": "Your issue report has been logged with CediSmart Support.",
+                        "status_description": (
+                            "Your issue report has been logged with CediSmart Support."
+                        ),
                         "stage_step": 1,
                     }
                 issue_data = issue_resp.json()
-                labels = [lbl.get("name", "") for lbl in issue_data.get("labels", []) if isinstance(lbl, dict)]
+                labels = [
+                    lbl.get("name", "")
+                    for lbl in issue_data.get("labels", [])
+                    if isinstance(lbl, dict)
+                ]
 
                 pr_url = None
                 pr_state = None
@@ -1041,22 +1125,34 @@ class SupportService:
                 if pr_state == "merged":
                     user_status = "update_available"
                     status_label = "Update Available"
-                    status_description = "A verified fix has been merged into CediSmart and will be included in the next app update."
+                    status_description = (
+                        "A verified fix has been merged into CediSmart and will be included in the"
+                        " next app update."
+                    )
                     stage_step = 4
                 elif pr_url or any("pr" in lbl.lower() or "fix" in lbl.lower() for lbl in labels):
                     user_status = "testing"
                     status_label = "Fix Being Tested"
-                    status_description = "A proposed solution has been prepared and is currently being tested by our quality assurance pipeline."
+                    status_description = (
+                        "A proposed solution has been prepared and is currently being tested by our"
+                        " quality assurance pipeline."
+                    )
                     stage_step = 3
                 elif issue_data.get("state") == "open":
                     user_status = "investigating"
                     status_label = "Investigating"
-                    status_description = "Our engineering team has received your diagnostic report and is actively investigating the root cause."
+                    status_description = (
+                        "Our engineering team has received your diagnostic report and is actively"
+                        " investigating the root cause."
+                    )
                     stage_step = 2
                 else:
                     user_status = "received"
                     status_label = "Report Received"
-                    status_description = "Your issue report and device diagnostics have been logged with CediSmart Support."
+                    status_description = (
+                        "Your issue report and device diagnostics have been logged with CediSmart"
+                        " Support."
+                    )
                     stage_step = 1
 
                 return {

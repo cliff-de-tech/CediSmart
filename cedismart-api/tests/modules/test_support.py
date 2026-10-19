@@ -96,7 +96,9 @@ async def test_support_feedback(client: AsyncClient, make_user) -> None:
 
 @pytest.mark.asyncio
 async def test_support_ticket_status_mock(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock) as mock_status:
+    with patch(
+        "app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock
+    ) as mock_status:
         mock_status.return_value = {
             "issue_number": 42,
             "state": "open",
@@ -105,7 +107,7 @@ async def test_support_ticket_status_mock(client: AsyncClient) -> None:
             "labels": ["support", "escalated", "ai-autofix"],
             "pr_url": "https://github.com/cliff-de-tech/CediSmart/pull/43",
             "pr_state": "open",
-            "latest_agent_comment": "ChatGPT (gpt-4o) Code Agent opened PR #43."
+            "latest_agent_comment": "ChatGPT (gpt-4o) Code Agent opened PR #43.",
         }
 
         resp = await client.get("/api/v1/support/ticket-status/42")
@@ -129,8 +131,9 @@ def test_looks_like_momo_sms() -> None:
 
 
 def test_extract_display_name_honorifics() -> None:
-    from app.modules.support.service import SupportService
     from collections import namedtuple
+
+    from app.modules.support.service import SupportService
 
     MockUser = namedtuple("MockUser", ["full_name"])
 
@@ -158,7 +161,9 @@ def test_extract_display_name_honorifics() -> None:
 
 @pytest.mark.asyncio
 async def test_ticket_status_user_facing_stages(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock) as mock_status:
+    with patch(
+        "app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock
+    ) as mock_status:
         mock_status.return_value = {
             "issue_number": 42,
             "state": "open",
@@ -170,7 +175,10 @@ async def test_ticket_status_user_facing_stages(client: AsyncClient) -> None:
             "latest_agent_comment": "Fix has been merged.",
             "user_status": "update_available",
             "status_label": "Update Available",
-            "status_description": "A verified fix has been merged into CediSmart and will be included in the next app update.",
+            "status_description": (
+                "A verified fix has been merged into CediSmart and will be included in the next app"
+                " update."
+            ),
             "stage_step": 4,
         }
 
