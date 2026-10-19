@@ -63,6 +63,7 @@ async def register_with_clerk(
         Dict with ``access_token``, ``refresh_token``, ``token_type``, and ``user``.
     """
     from app.core.clerk import verify_clerk_user
+
     await verify_clerk_user(clerk_user_id, phone)
 
     # --- Check for existing user ---
@@ -116,7 +117,7 @@ async def login(
     pin: str,
     db: AsyncSession,
     redis: aioredis.Redis,
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Authenticate a user with phone + PIN and issue JWT tokens.
 
     Args:
@@ -256,6 +257,7 @@ async def confirm_pin_reset(
         AppException 400: If session is invalid or user does not exist.
     """
     from app.core.clerk import verify_clerk_user
+
     await verify_clerk_user(clerk_user_id, phone)
 
     result = await db.execute(select(User).where(User.phone == phone))

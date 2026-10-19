@@ -1,11 +1,8 @@
 """Auth module integration tests — Clerk registration, login, tokens, PIN reset."""
 
-from unittest.mock import AsyncMock
-import pytest
 from httpx import AsyncClient
 
-from tests.conftest import FakeRedis, assert_error_response, make_auth_headers
-
+from tests.conftest import assert_error_response, make_auth_headers
 
 # ---------------------------------------------------------------------------
 # POST /api/v1/auth/register/clerk

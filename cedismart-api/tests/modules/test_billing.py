@@ -3,27 +3,27 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tests.conftest import make_auth_headers
 from app.modules.auth.models import User
+from tests.conftest import make_auth_headers
+
 
 @pytest.mark.asyncio
 async def test_initialize_payment(client: AsyncClient, make_user) -> None:
     user = await make_user(phone="+233241234567", is_premium=False)
     headers = make_auth_headers(user.id)
 
-    resp = await client.post(
-        "/api/v1/billing/initialize",
-        json={"plan": "pro"},
-        headers=headers
-    )
+    resp = await client.post("/api/v1/billing/initialize", json={"plan": "pro"}, headers=headers)
     assert resp.status_code == 200
     body = resp.json()
     assert "authorization_url" in body
     assert "reference" in body
     assert body["reference"].startswith("cedi_")
 
+
 @pytest.mark.asyncio
-async def test_paystack_webhook_success(client: AsyncClient, make_user, db_session: AsyncSession) -> None:
+async def test_paystack_webhook_success(
+    client: AsyncClient, make_user, db_session: AsyncSession
+) -> None:
     user = await make_user(phone="+233241112222", is_premium=False)
     assert user.is_premium is False
 
@@ -31,18 +31,12 @@ async def test_paystack_webhook_success(client: AsyncClient, make_user, db_sessi
         "event": "charge.success",
         "data": {
             "reference": "test_ref_123456",
-            "metadata": {
-                "user_id": str(user.id),
-                "plan": "pro"
-            }
-        }
+            "metadata": {"user_id": str(user.id), "plan": "pro"},
+        },
     }
 
     # Call Webhook
-    resp = await client.post(
-        "/api/v1/billing/paystack-webhook",
-        json=payload
-    )
+    resp = await client.post("/api/v1/billing/paystack-webhook", json=payload)
     assert resp.status_code == 200
     assert resp.json() == {"status": "processed"}
 
@@ -50,6 +44,7 @@ async def test_paystack_webhook_success(client: AsyncClient, make_user, db_sessi
     result = await db_session.execute(select(User).where(User.id == user.id))
     user_db = result.scalar_one()
     assert user_db.is_premium is True
+
 
 @pytest.mark.asyncio
 async def test_start_trial(client: AsyncClient, make_user) -> None:
@@ -68,6 +63,7 @@ async def test_start_trial(client: AsyncClient, make_user) -> None:
     resp_dup = await client.post("/api/v1/billing/start-trial", headers=headers)
     assert resp_dup.status_code == 400
     assert resp_dup.json()["error"]["code"] == "TRIAL_ALREADY_USED"
+
 
 @pytest.mark.asyncio
 async def test_trial_countdown_progression(client: AsyncClient, make_user, db_session: AsyncSession) -> None:
@@ -117,5 +113,3 @@ async def test_cancel_trial_and_premium(client: AsyncClient, make_user, db_sessi
     assert resp_paid.status_code == 200
     assert resp_paid.json()["is_premium"] is False
     assert resp_paid.json()["has_premium_access"] is False
-
-

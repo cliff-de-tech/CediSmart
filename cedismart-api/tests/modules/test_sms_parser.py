@@ -1,5 +1,6 @@
 from app.modules.transactions.sms_parser import parse_sms
 
+
 def test_parse_mtn_momo_received() -> None:
     body = (
         "You have received GHS 50.00 from Kojo Mensah (0241234567). "
@@ -13,6 +14,7 @@ def test_parse_mtn_momo_received() -> None:
     assert "Kojo Mensah" in res["description"]
     assert res["reference_id"] == "194827189"
     assert res["new_balance"] == 124.50
+
 
 def test_parse_mtn_momo_sent() -> None:
     body = (
@@ -29,6 +31,7 @@ def test_parse_mtn_momo_sent() -> None:
     assert res["reference_id"] == "194827190"
     assert res["new_balance"] == 80.00
 
+
 def test_parse_mtn_momo_payment() -> None:
     body = (
         "Payment of GHS 15.00 made to ECG. "
@@ -44,6 +47,7 @@ def test_parse_mtn_momo_payment() -> None:
     assert res["reference_id"] == "194827191"
     assert res["new_balance"] == 65.00
 
+
 def test_parse_telecel_received() -> None:
     body = (
         "You have received GHS 100.00 from 0201234567. "
@@ -57,6 +61,7 @@ def test_parse_telecel_received() -> None:
     assert "0201234567" in res["description"]
     assert res["reference_id"] == "123456"
     assert res["new_balance"] == 150.0
+
 
 def test_parse_telecel_sent() -> None:
     body = (
@@ -73,6 +78,7 @@ def test_parse_telecel_sent() -> None:
     assert res["reference_id"] == "123457"
     assert res["new_balance"] == 120.0
 
+
 def test_parse_tcash_received() -> None:
     body = (
         "You have received GHS 100.00 from 0201234567. "
@@ -86,6 +92,7 @@ def test_parse_tcash_received() -> None:
     assert "0201234567" in res["description"]
     assert res["reference_id"] == "123456"
     assert res["new_balance"] == 150.0
+
 
 def test_parse_invalid_format() -> None:
     res = parse_sms("MobileMoney", "Hello World. This is a random text message.")

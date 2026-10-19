@@ -15,13 +15,13 @@ from app.core.dependencies import CurrentUser
 from app.core.redis import get_redis
 from app.modules.users import service
 from app.modules.users.schemas import (
-    UserResponse,
-    UserUpdateRequest,
-    KYCVerifyRequest,
     BugReportRequest,
     BugReportResponse,
     DeviceTokenRegisterRequest,
     DeviceTokenRemoveRequest,
+    KYCVerifyRequest,
+    UserResponse,
+    UserUpdateRequest,
 )
 
 router = APIRouter()
@@ -120,7 +120,7 @@ async def verify_kyc(
     db: DBSession,
 ) -> UserResponse:
     """Verify current user identity using their Ghana Card.
-    
+
     Verifies that the provided card number exists in the National Identification
     Authority (NIA) database via Smile ID, and that the name and DOB match.
     """
@@ -163,7 +163,7 @@ async def register_device_token(
     body: DeviceTokenRegisterRequest,
     user_id: CurrentUser,
     db: DBSession,
-):
+) -> dict[str, str]:
     """Register or update an Expo push token for the authenticated user."""
     await service.register_device_token(user_id=user_id, payload=body, db=db)
     return {"status": "success", "message": "Device token registered successfully."}
@@ -183,9 +183,7 @@ async def remove_device_token(
     body: DeviceTokenRemoveRequest,
     user_id: CurrentUser,
     db: DBSession,
-):
+) -> dict[str, str]:
     """Deregister an Expo push token from the authenticated user (e.g. on logout)."""
     await service.remove_device_token(user_id=user_id, payload=body, db=db)
     return {"status": "success", "message": "Device token removed successfully."}
-
-

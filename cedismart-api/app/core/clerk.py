@@ -5,6 +5,7 @@ Verifies Clerk user IDs against the Clerk Backend API using HTTPX.
 
 import logging
 from typing import Any
+
 import httpx
 
 from app.core.config import settings
@@ -71,7 +72,7 @@ async def verify_clerk_user(clerk_user_id: str, expected_phone: str) -> dict[str
             message="Your authentication session is invalid or has expired.",
         )
 
-    user_data = response.json()
+    user_data: dict[str, Any] = response.json()
 
     # Verify matching verified phone number
     phone_records = user_data.get("phone_numbers", [])
