@@ -350,66 +350,43 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        if (startNewChatOnOpen) {
-          const freshSession: ChatSession = {
-            id: `sess_${Date.now()}`,
-            title: 'New Conversation',
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            messages: [defaultGreeting],
-          };
-          let existingSessions: ChatSession[] = [];
-          const stored = await AsyncStorage.getItem(sessionsStorageKey);
-          if (stored) {
-            try {
-              existingSessions = JSON.parse(stored) as ChatSession[];
-            } catch {}
-          }
-          const merged = [freshSession, ...existingSessions.filter((s) => s.id !== freshSession.id)];
-          setSessions(merged);
-          setActiveSessionId(freshSession.id);
-          setMessages([defaultGreeting]);
-          setIsHistoryLoaded(true);
-          AsyncStorage.setItem(sessionsStorageKey, JSON.stringify(merged)).catch(() => {});
-          return;
-        }
-
+        let savedSessions: ChatSession[] = [];
         const storedSessions = await AsyncStorage.getItem(sessionsStorageKey);
         if (storedSessions) {
-          const parsed = JSON.parse(storedSessions) as ChatSession[];
-          if (parsed && parsed.length > 0) {
-            setSessions(parsed);
-            setActiveSessionId(parsed[0].id);
-            setMessages(parsed[0].messages || [defaultGreeting]);
-            setIsHistoryLoaded(true);
-            return;
-          }
+          try {
+            const parsed = JSON.parse(storedSessions) as ChatSession[];
+            if (Array.isArray(parsed)) {
+              // Only keep past sessions that had actual user interactions
+              savedSessions = parsed.filter((s) => (s.messages || []).some((m) => m.role === 'user'));
+            }
+          } catch {}
         }
 
         // Migrate from legacy single-session storage if present
-        const legacyStored = await AsyncStorage.getItem(legacyStorageKey);
-        if (legacyStored) {
-          const legacyMsgs = JSON.parse(legacyStored) as Message[];
-          if (legacyMsgs && legacyMsgs.length > 0) {
-            const firstUserMsg = legacyMsgs.find((m) => m.role === 'user');
-            const migratedSession: ChatSession = {
-              id: `sess_${Date.now()}`,
-              title: firstUserMsg
-                ? firstUserMsg.content.slice(0, 32) + (firstUserMsg.content.length > 32 ? '...' : '')
-                : 'Previous Conversation',
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              messages: legacyMsgs,
-            };
-            setSessions([migratedSession]);
-            setActiveSessionId(migratedSession.id);
-            setMessages(legacyMsgs);
-            setIsHistoryLoaded(true);
-            AsyncStorage.setItem(sessionsStorageKey, JSON.stringify([migratedSession])).catch(() => {});
-            return;
-          }
+        if (savedSessions.length === 0) {
+          try {
+            const legacyStored = await AsyncStorage.getItem(legacyStorageKey);
+            if (legacyStored) {
+              const legacyMsgs = JSON.parse(legacyStored) as Message[];
+              if (legacyMsgs && legacyMsgs.some((m) => m.role === 'user')) {
+                const firstUserMsg = legacyMsgs.find((m) => m.role === 'user');
+                const migratedSession: ChatSession = {
+                  id: `sess_${Date.now() - 1000}`,
+                  title: firstUserMsg
+                    ? firstUserMsg.content.slice(0, 32) + (firstUserMsg.content.length > 32 ? '...' : '')
+                    : 'Previous Conversation',
+                  createdAt: Date.now() - 1000,
+                  updatedAt: Date.now() - 1000,
+                  messages: legacyMsgs,
+                };
+                savedSessions = [migratedSession];
+                AsyncStorage.setItem(sessionsStorageKey, JSON.stringify([migratedSession])).catch(() => {});
+              }
+            }
+          } catch {}
         }
 
+        // ALWAYS open with a clean, fresh new chat session!
         const freshSession: ChatSession = {
           id: `sess_${Date.now()}`,
           title: 'New Conversation',
@@ -417,7 +394,9 @@ export const SupportModal: React.FC<SupportModalProps> = ({
           updatedAt: Date.now(),
           messages: [defaultGreeting],
         };
-        setSessions([freshSession]);
+
+        const allSessions = [freshSession, ...savedSessions];
+        setSessions(allSessions);
         setActiveSessionId(freshSession.id);
         setMessages([defaultGreeting]);
         setIsHistoryLoaded(true);
@@ -462,11 +441,14 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         };
       });
 
-      const lightweight = updated.map((s) => ({
-        ...s,
-        messages: s.messages.map(({ image_base64, ...rest }) => rest),
-      }));
-      AsyncStorage.setItem(sessionsStorageKey, JSON.stringify(lightweight)).catch(() => {});
+      // Only save conversations with actual user interactions to history storage
+      const persistable = updated
+        .filter((s) => (s.messages || []).some((m) => m.role === 'user'))
+        .map((s) => ({
+          ...s,
+          messages: s.messages.map(({ image_base64, ...rest }) => rest),
+        }));
+      AsyncStorage.setItem(sessionsStorageKey, JSON.stringify(persistable)).catch(() => {});
       return updated;
     });
   }, [messages, isHistoryLoaded, activeSessionId]);
@@ -1679,62 +1661,72 @@ export const SupportModal: React.FC<SupportModalProps> = ({
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false}>
-                {sessions.map((sess) => {
-                  const isActive = sess.id === activeSessionId;
-                  const msgCount = (sess.messages || []).filter((m) => m.role === 'user').length;
-                  const dateStr = new Date(sess.updatedAt).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  });
+                {sessions.filter((sess) => (sess.messages || []).some((m) => m.role === 'user')).length === 0 ? (
+                  <View className="py-8 items-center justify-center">
+                    <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      No past conversations yet.
+                    </Text>
+                  </View>
+                ) : (
+                  sessions
+                    .filter((sess) => (sess.messages || []).some((m) => m.role === 'user'))
+                    .map((sess) => {
+                      const isActive = sess.id === activeSessionId;
+                      const msgCount = (sess.messages || []).filter((m) => m.role === 'user').length;
+                      const dateStr = new Date(sess.updatedAt).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      });
 
-                  return (
-                    <View
-                      key={sess.id}
-                      className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${
-                        isActive
-                          ? isDark
-                            ? 'bg-primary/20 border-primary/50'
-                            : 'bg-primary/10 border-primary/30'
-                          : isDark
-                            ? 'bg-white/5 border-white/10'
-                            : 'bg-black/5 border-black/5'
-                      }`}
-                    >
-                      <TouchableOpacity
-                        onPress={() => handleSelectSession(sess)}
-                        className="flex-1 mr-3"
-                      >
-                        <Text
-                          numberOfLines={1}
-                          className={`font-headline font-bold text-sm mb-1 ${
+                      return (
+                        <View
+                          key={sess.id}
+                          className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${
                             isActive
                               ? isDark
-                                ? 'text-white'
-                                : 'text-primary'
+                                ? 'bg-primary/20 border-primary/50'
+                                : 'bg-primary/10 border-primary/30'
                               : isDark
-                                ? 'text-gray-200'
-                                : 'text-charcoal'
+                                ? 'bg-white/5 border-white/10'
+                                : 'bg-black/5 border-black/5'
                           }`}
                         >
-                          {sess.title || 'Conversation'}
-                        </Text>
-                        <Text className={`font-body text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                          {dateStr} • {msgCount} {msgCount === 1 ? 'question' : 'questions'}
-                        </Text>
-                      </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleSelectSession(sess)}
+                            className="flex-1 mr-3"
+                          >
+                            <Text
+                              numberOfLines={1}
+                              className={`font-headline font-bold text-sm mb-1 ${
+                                isActive
+                                  ? isDark
+                                    ? 'text-white'
+                                    : 'text-primary'
+                                  : isDark
+                                    ? 'text-gray-200'
+                                    : 'text-charcoal'
+                              }`}
+                            >
+                              {sess.title || 'Conversation'}
+                            </Text>
+                            <Text className={`font-body text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {dateStr} • {msgCount} {msgCount === 1 ? 'question' : 'questions'}
+                            </Text>
+                          </TouchableOpacity>
 
-                      <TouchableOpacity
-                        onPress={() => handleDeleteSession(sess.id)}
-                        className="p-2 rounded-xl"
-                        accessibilityLabel="Delete conversation"
-                      >
-                        <Trash2 size={16} color={isDark ? '#ef4444' : '#dc2626'} />
-                      </TouchableOpacity>
-                    </View>
-                  );
-                })}
+                          <TouchableOpacity
+                            onPress={() => handleDeleteSession(sess.id)}
+                            className="p-2 rounded-xl"
+                            accessibilityLabel="Delete conversation"
+                          >
+                            <Trash2 size={16} color={isDark ? '#ef4444' : '#dc2626'} />
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })
+                )}
               </ScrollView>
             </GlassSurface>
           </View>
