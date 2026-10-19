@@ -7,12 +7,14 @@ import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetr
 import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { PieChart, Plus, ChevronDown, Tag, Trash2 } from 'lucide-react-native';
+import { PieChart, Plus, ChevronDown, Tag, Trash2, Sparkles } from 'lucide-react-native';
 import { useThemeStore } from '../../stores/themeStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import CategoryPicker from '../../components/shared/CategoryPicker';
 import { CoinBackground } from '../../components/shared/CoinBackground';
+import { SupportModal } from '../../components/shared/SupportModal';
+import { SupportBotCompanion } from '../../components/shared/SupportBotCompanion';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -51,6 +53,7 @@ const BudgetsScreen = () => {
   const [amount, setAmount] = useState('');
   const [alertAt, setAlertAt] = useState('80');
   const [defaultThreshold, setDefaultThreshold] = useState(80);
+  const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
 
   // Load user's default budget alert threshold on mount
   useEffect(() => {
@@ -149,8 +152,15 @@ const BudgetsScreen = () => {
     <SafeAreaView edges={['top', 'left', 'right']} className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
       <CoinBackground />
       <View className="flex-1 px-6 py-8">
-        <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2`}>My Budgets</Text>
-        <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-8`}>Control your monthly spending</Text>
+        <View className="flex-row justify-between items-start mb-8">
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2`}>My Budgets</Text>
+            <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Control your monthly spending</Text>
+          </View>
+          <GlassButton accessibilityLabel="Budget AI Support" onPress={() => setIsSupportModalVisible(true)} style={{ marginLeft: 12 }}>
+            <Sparkles size={19} color={isDark ? '#ffb703' : '#a05915'} />
+          </GlassButton>
+        </View>
 
         {/* Summary Card */}
         <GlassSurface tint="emerald" elevated radius={28} style={{ marginBottom: 32 }}>
@@ -374,6 +384,23 @@ const BudgetsScreen = () => {
           setCategoryId(id);
           setCategoryName(name);
         }}
+      />
+
+      {/* Fun AI Support Bot Companion */}
+      <SupportBotCompanion
+        userName={user?.full_name}
+        screenContext="budgets"
+        onOpenSupport={() => setIsSupportModalVisible(true)}
+        bottomOffset={tabBarClearance + 16}
+      />
+
+      {/* AI Support Modal */}
+      <SupportModal
+        visible={isSupportModalVisible}
+        onClose={() => setIsSupportModalVisible(false)}
+        phone={user?.phone}
+        userName={user?.full_name}
+        screenContext="budgets"
       />
     </SafeAreaView>
   );

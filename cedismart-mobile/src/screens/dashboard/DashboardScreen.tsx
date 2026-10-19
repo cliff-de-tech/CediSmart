@@ -22,6 +22,8 @@ import PINPad from '../../components/shared/PINPad';
 import apiClient, { setActiveTokens, clearActiveSession } from '../../api/client';
 import { CoinBackground } from '../../components/shared/CoinBackground';
 import { ConfettiEffect } from '../../components/shared/ConfettiEffect';
+import { SupportModal } from '../../components/shared/SupportModal';
+import { SupportBotCompanion } from '../../components/shared/SupportBotCompanion';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
@@ -75,6 +77,7 @@ const DashboardScreen = ({ navigation }: any) => {
   const [avatarUri, setAvatarUri] = useState<string>(DEFAULT_AVATAR_URL);
   const [isViewingPhoto, setIsViewingPhoto] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
+  const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
 
   // Transaction Detail / Edit / Delete Sheet state
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
@@ -773,6 +776,9 @@ const DashboardScreen = ({ navigation }: any) => {
           <GlassButton accessibilityLabel="Open accounts" onPress={() => navigation.navigate('Accounts')} style={{ marginRight: 10 }}>
             <Landmark size={20} color={isDark ? '#a4f3b9' : '#0d631b'} />
           </GlassButton>
+          <GlassButton accessibilityLabel="AI Support" onPress={() => setIsSupportModalVisible(true)} style={{ marginRight: 10 }}>
+            <Sparkles size={19} color={isDark ? '#ffb703' : '#a05915'} />
+          </GlassButton>
           <TouchableOpacity 
             onPress={() => profileSheetRef.current?.snapToIndex(0)}
             className="w-10 h-10 rounded-full bg-primary-container overflow-hidden border border-primary/20 active:scale-95 transition-all"
@@ -1243,6 +1249,29 @@ const DashboardScreen = ({ navigation }: any) => {
                   )}
                 </Text>
               </View>
+            </GlassSurface>
+
+            {/* Quick AI Support Card */}
+            <GlassSurface radius={22} style={{ width: '100%', marginBottom: 20 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  profileSheetRef.current?.close();
+                  setIsSupportModalVisible(true);
+                }}
+                className="flex-row items-center p-4"
+              >
+                <View className="w-10 h-10 rounded-xl bg-primary/15 items-center justify-center mr-3">
+                  <Sparkles size={20} color={isDark ? '#4ade80' : '#0d631b'} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text className={`font-headline font-bold text-sm ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                    AI Support & Diagnostics
+                  </Text>
+                  <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Ask questions, check for problems, or auto-log SMS
+                  </Text>
+                </View>
+              </TouchableOpacity>
             </GlassSurface>
 
             {/* Multi-Profile Switcher Section */}
@@ -1918,6 +1947,24 @@ const DashboardScreen = ({ navigation }: any) => {
           />
         </View>
       </Modal>
+
+      {/* Fun AI Support Bot Companion */}
+      <SupportBotCompanion
+        userName={user?.full_name}
+        screenContext="dashboard"
+        onOpenSupport={() => setIsSupportModalVisible(true)}
+        bottomOffset={tabBarClearance + 16}
+      />
+
+      {/* AI Support Modal */}
+      <SupportModal
+        visible={isSupportModalVisible}
+        onClose={() => setIsSupportModalVisible(false)}
+        phone={user?.phone}
+        userName={user?.full_name}
+        screenContext="dashboard"
+        navigation={navigation}
+      />
 
     </SafeAreaView>
   );

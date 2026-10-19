@@ -7,7 +7,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Alert, TextInput, Scro
 import * as SecureStore from 'expo-secure-store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { ArrowLeft, Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff, Zap, CheckCircle2, Info, ExternalLink, Copy } from 'lucide-react-native';
+import { ArrowLeft, Landmark, Wallet, Smartphone, Trash2, ChevronRight, Shield, Eye, EyeOff, Zap, CheckCircle2, Info, ExternalLink, Copy, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '../../stores/themeStore';
@@ -15,6 +15,7 @@ import { useAuthStore } from '../../stores/authStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import { CoinBackground } from '../../components/shared/CoinBackground';
+import { SupportModal } from '../../components/shared/SupportModal';
 import { useFocusEffect } from '@react-navigation/native';
 
 interface Account {
@@ -119,6 +120,7 @@ const AccountsScreen = ({ navigation }: any) => {
   // Local Cash State
   const [cashInput, setCashInput] = useState('0');
   const [hiddenAccounts, setHiddenAccounts] = useState<Record<string, boolean>>({});
+  const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
   const user = useAuthStore((state) => state.user);
 
   useFocusEffect(
@@ -448,6 +450,9 @@ const AccountsScreen = ({ navigation }: any) => {
             <ArrowLeft size={22} color={isDark ? '#a4f3b9' : '#0d631b'} />
           </GlassButton>
           <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`} style={{ flex: 1 }}>My Accounts</Text>
+          <GlassButton accessibilityLabel="Accounts AI Support" onPress={() => setIsSupportModalVisible(true)}>
+            <Sparkles size={19} color={isDark ? '#ffb703' : '#a05915'} />
+          </GlassButton>
         </View>
         <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mb-8`}>Add/Track your sources of Income.</Text>
 
@@ -1435,6 +1440,15 @@ const AccountsScreen = ({ navigation }: any) => {
           </GlassSurface>
         </View>
       </Modal>
+
+      {/* AI Support Modal */}
+      <SupportModal
+        visible={isSupportModalVisible}
+        onClose={() => setIsSupportModalVisible(false)}
+        phone={user?.phone}
+        userName={user?.full_name}
+        screenContext="settings"
+      />
     </SafeAreaView>
   );
 };
