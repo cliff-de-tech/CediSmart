@@ -44,7 +44,7 @@ const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, onBiometricPress,
                     onBiometricPress();
                   }}
                   disabled={disabled}
-                  className={`w-[30%] aspect-square m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
+                  className={`w-[30%] h-20 m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
                   accessibilityLabel="Biometric Authentication"
                 >
                   {Platform.OS === 'ios' ? (
@@ -55,7 +55,7 @@ const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, onBiometricPress,
                 </TouchableOpacity>
               );
             }
-            return <View key={`empty-${index}`} className="w-[30%] aspect-square m-1" />;
+            return <View key={`empty-${index}`} className="w-[30%] h-20 m-1" />;
           }
 
           if (key.digit === 'backspace') {
@@ -67,7 +67,7 @@ const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, onBiometricPress,
                   onBackspace();
                 }}
                 disabled={disabled}
-                className={`w-[30%] aspect-square m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
+                className={`w-[30%] h-20 m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
                 accessibilityLabel="Backspace"
               >
                 <Delete color={isDark ? '#e1e3e0' : '#1c1b1f'} size={28} />
@@ -83,7 +83,7 @@ const PINPad: React.FC<PINPadProps> = ({ onPress, onBackspace, onBiometricPress,
                 onPress(key.digit!);
               }}
               disabled={disabled}
-              className={`w-[30%] aspect-square m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
+              className={`w-[30%] h-20 m-1 items-center justify-center rounded-2xl ${isDark ? 'active:bg-dark-surface-container-low' : 'active:bg-surface-container-low'} transition-all`}
               accessibilityLabel={key.digit}
             >
               <View className="items-center">

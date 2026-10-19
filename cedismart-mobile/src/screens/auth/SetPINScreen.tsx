@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Animated, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
@@ -142,7 +142,7 @@ const SetPINScreen = ({ route, navigation }: any) => {
   const renderDots = () => {
     const currentPin = step === 'create' ? pin : confirmPin;
     return (
-      <View className="flex-row justify-center space-x-6 mb-12">
+      <View className="flex-row justify-center space-x-6 mb-6">
         {[...Array(6)].map((_, i) => (
           <View
             key={i}
@@ -158,7 +158,11 @@ const SetPINScreen = ({ route, navigation }: any) => {
   return (
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
       <CoinBackground />
-      <View className="flex-1 justify-between py-12 px-6">
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}
+        showsVerticalScrollIndicator={false}
+        className="px-6 py-4"
+      >
         {/* Decoration Layer */}
         <View className="absolute inset-0 -z-10 opacity-[0.03] overflow-hidden">
           <View className="absolute top-10 right-10 w-64 h-64 border-8 border-primary rounded-full blur-3xl" />
@@ -166,11 +170,13 @@ const SetPINScreen = ({ route, navigation }: any) => {
         </View>
 
         {/* Header Section */}
-        <View className="items-center mt-8">
-          <View className={`w-16 h-16 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary-container'} items-center justify-center mb-6`}>
-            <Shield size={32} color={isDark ? '#2e7d32' : '#ffffff'} fill={isDark ? '#2e7d32' : 'white'} />
+        <View className="items-center mt-2">
+          <View className={`w-14 h-14 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary-container'} items-center justify-center mb-4`}>
+            <Shield size={28} color={isDark ? '#2e7d32' : '#ffffff'} fill={isDark ? '#2e7d32' : 'white'} />
           </View>
-          <Text className={`font-headline font-extrabold text-3xl ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} mb-3 tracking-tight`}>Secure Your Account</Text>
+          <Text className={`font-headline font-extrabold text-3xl text-center ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} mb-2 tracking-tight`}>
+            Secure Your Account
+          </Text>
           <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} font-medium text-sm text-center leading-relaxed px-4`}>
             Set up a 6-digit transaction PIN to protect your wealth and authorize transfers safely.
           </Text>
@@ -179,33 +185,33 @@ const SetPINScreen = ({ route, navigation }: any) => {
         {/* PIN Status */}
         <Animated.View 
           style={{ transform: [{ translateX: shakeAnimation }] }}
-          className="items-center"
+          className="items-center my-4"
         >
-          <Text className="font-label text-xs uppercase tracking-widest text-primary font-bold mb-6">
+          <Text className="font-label text-xs uppercase tracking-widest text-primary font-bold mb-4">
             {step === 'create' ? 'Enter PIN' : 'Confirm PIN'}
           </Text>
           {renderDots()}
           
-          <View className={`flex-row items-center space-x-2 transition-opacity ${error ? 'opacity-100' : 'opacity-0'}`}>
+          <View className={`flex-row items-center space-x-2 px-4 transition-opacity ${error ? 'opacity-100' : 'opacity-0'}`}>
             <Info size={14} color="#ba1a1a" />
-            <Text className="font-label text-xs font-semibold text-error">{error}</Text>
+            <Text className="font-label text-xs font-semibold text-error text-center">{error}</Text>
           </View>
         </Animated.View>
 
         {/* PINPad */}
-        <View>
+        <View className="pb-2">
           <PINPad 
             onPress={handlePress} 
             onBackspace={handleBackspace} 
             disabled={verifyMutation.isPending}
           />
-          <View className="mt-12 items-center opacity-30">
+          <View className="mt-4 items-center opacity-30">
             <Text className={`font-headline font-black ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-widest text-[10px] uppercase`}>
               CediSmart Secure Layer
             </Text>
           </View>
         </View>
-      </View>
+      </ScrollView>
 
       {/* Confirmation Overlay (Optional/Future V2) */}
       {verifyMutation.isPending && (

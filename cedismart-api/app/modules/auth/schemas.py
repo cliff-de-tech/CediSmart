@@ -3,6 +3,8 @@
 import re
 
 from pydantic import BaseModel, field_validator
+
+from app.core.config import settings
 from app.modules.users.schemas import UserResponse
 
 # E.164 format for Ghana: +233 followed by 9 digits
@@ -54,7 +56,7 @@ class RegisterClerkRequest(BaseModel):
     @classmethod
     def validate_clerk_user_id(cls, v: str) -> str:
         v = v.strip()
-        if not v.startswith("user_") and not settings.ENVIRONMENT == "testing":
+        if not v.startswith("user_") and settings.ENVIRONMENT != "testing":
             # Allow mock IDs in testing
             pass
         return v
