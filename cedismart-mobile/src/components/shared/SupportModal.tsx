@@ -323,7 +323,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
       supportType === 'auth'
         ? "Hello! I am your CediSmart Onboarding Assistant. How can I help you with your account, SMS code, or login PIN today?"
         : "Hello! I am your CediSmart Assistant. How can I help you with your accounts, budgets, or Mobile Money today?",
-    actions: supportType === 'auth' ? [] : ['HEAL_APP'],
+    actions: [],
     status: 'sent',
   };
 
@@ -719,16 +719,24 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     if (action === 'NAV_BUDGETS') {
       onClose();
       try {
-        nav.navigate('BudgetsTab');
-      } catch {}
+        nav.navigate('MainTabs', { screen: 'BudgetsTab' });
+      } catch {
+        try {
+          nav.navigate('BudgetsTab');
+        } catch {}
+      }
       return;
     }
 
     if (action === 'NAV_TRANSACTIONS') {
       onClose();
       try {
-        nav.navigate('DashboardTab');
-      } catch {}
+        nav.navigate('MainTabs', { screen: 'DashboardTab' });
+      } catch {
+        try {
+          nav.navigate('DashboardTab');
+        } catch {}
+      }
       return;
     }
 
@@ -908,7 +916,11 @@ export const SupportModal: React.FC<SupportModalProps> = ({
       const { cleanText, actions } = extractActionsAndCleanText(workingText);
 
       // If the backend performed an Instant MoMo SMS Rescue, refresh wallet & transaction caches immediately!
-      if (cleanText.includes('Instant MoMo SMS Rescue') || cleanText.includes('Already Synced:')) {
+      if (
+        cleanText.includes('Instant MoMo SMS Rescue') ||
+        cleanText.includes('Already Synced:') ||
+        actions.includes('NAV_TRANSACTIONS')
+      ) {
         queryClient.invalidateQueries({ queryKey: ['accounts'] });
         queryClient.invalidateQueries({ queryKey: ['transactions'] });
         queryClient.invalidateQueries({ queryKey: ['budgets'] });
@@ -1082,62 +1094,85 @@ export const SupportModal: React.FC<SupportModalProps> = ({
           >
             <View
               style={{ paddingTop: Math.max(insets.top, 16) }}
-              className="px-6 pb-5 flex-row items-center justify-between"
+              className="px-4 pb-4 flex-row items-center justify-between"
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 10 }}>
-                <View style={{ flexShrink: 0 }} className="w-10 h-10 rounded-full bg-white/15 items-center justify-center border border-white/15 mr-3">
-                  <Sparkles size={20} color="#ffb703" />
+              {/* Left Identity: Amber Sparkles Avatar + Live Green Indicator + Title */}
+              <View className="flex-row items-center flex-1 min-w-0 mr-3">
+                <View className="relative flex-shrink-0 mr-3">
+                  <View
+                    className={`w-10 h-10 rounded-2xl items-center justify-center border ${
+                      isDark
+                        ? 'bg-amber-400/15 border-amber-400/30'
+                        : 'bg-amber-500/10 border-amber-500/25'
+                    }`}
+                  >
+                    <Sparkles size={19} color="#ffb703" />
+                  </View>
+                  {/* Glowing live status dot */}
+                  <View
+                    className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 ${
+                      isDark ? 'border-[#0a180e]' : 'border-white'
+                    }`}
+                  />
                 </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
+
+                <View className="flex-1 min-w-0 justify-center">
                   <Text
-                    className={`font-headline font-bold text-lg ${isDark ? 'text-white' : 'text-charcoal'}`}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.85}
-                  >
-                    CediSmart AI Support
-                  </Text>
-                  <Text
-                    className={`font-body text-[11px] font-medium ${isDark ? 'text-emerald-300/80' : 'text-emerald-800/80'}`}
+                    className={`font-headline font-bold text-base leading-tight ${
+                      isDark ? 'text-white' : 'text-charcoal'
+                    }`}
                     numberOfLines={1}
                   >
-                    Help with CediSmart
+                    CediSmart Support
                   </Text>
+                  <View className="flex-row items-center mt-1">
+                    <Text
+                      className={`font-body text-[11px] font-medium leading-none ${
+                        isDark ? 'text-emerald-300' : 'text-emerald-700'
+                      }`}
+                      numberOfLines={1}
+                    >
+                      Active • Finance & MoMo Assistant
+                    </Text>
+                  </View>
                 </View>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                <TouchableOpacity
-                  onPress={runSelfHealDoctor}
-                  disabled={isRunningDoctor}
-                  className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
-                  accessibilityLabel="Check for problems"
-                >
-                  {isRunningDoctor ? (
-                    <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
-                  ) : (
-                    <Stethoscope size={18} color={isDark ? '#4ade80' : '#0d631b'} />
-                  )}
-                </TouchableOpacity>
+
+              {/* Right Action Suite: History, New Chat, Close */}
+              <View className="flex-row items-center flex-shrink-0" style={{ gap: 8 }}>
                 <TouchableOpacity
                   onPress={() => setShowHistoryModal(true)}
-                  className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                  className={`w-9 h-9 rounded-full ${
+                    isDark ? 'bg-white/10 border border-white/10' : 'bg-black/5 border border-black/5'
+                  } items-center justify-center`}
                   accessibilityLabel="Past conversations"
                 >
-                  <History size={18} color={isDark ? 'white' : '#1C1C2E'} />
+                  <History size={17} color={isDark ? 'white' : '#1C1C2E'} />
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={handleNewChat}
-                  className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                  className={`w-9 h-9 rounded-full ${
+                    isDark
+                      ? 'bg-primary/25 border border-primary/40'
+                      : 'bg-primary/10 border border-primary/25'
+                  } items-center justify-center`}
                   accessibilityLabel="New Conversation"
                 >
-                  <Plus size={20} color={isDark ? 'white' : '#1C1C2E'} />
+                  <Plus size={18} color={isDark ? '#4ade80' : '#0d631b'} />
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   onPress={onClose}
-                  className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                  className={`w-9 h-9 rounded-full ${
+                    isDark ? 'bg-white/10 border border-white/10' : 'bg-black/5 border border-black/5'
+                  } items-center justify-center`}
                   accessibilityLabel="Close support"
                 >
-                  <X size={20} color={isDark ? 'white' : '#1C1C2E'} />
+                  <X size={18} color={isDark ? 'white' : '#1C1C2E'} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1575,15 +1610,46 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity
-                onPress={handleNewChat}
-                className="w-full bg-primary py-3 rounded-2xl flex-row items-center justify-center mb-4 shadow-sm"
-              >
-                <Plus size={18} color="white" />
-                <Text className="text-white font-headline font-bold text-xs ml-2">
-                  Start New Conversation
-                </Text>
-              </TouchableOpacity>
+              <View className="flex-row items-center mb-4" style={{ gap: 8 }}>
+                <TouchableOpacity
+                  onPress={handleNewChat}
+                  className="flex-1 bg-primary py-3 rounded-2xl flex-row items-center justify-center shadow-sm"
+                >
+                  <Plus size={18} color="white" />
+                  <Text className="text-white font-headline font-bold text-xs ml-2">
+                    New Chat
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowHistoryModal(false);
+                    runSelfHealDoctor();
+                  }}
+                  disabled={isRunningDoctor}
+                  className={`px-4 py-3 rounded-2xl flex-row items-center justify-center border ${
+                    isDark
+                      ? 'bg-primary/20 border-primary/40'
+                      : 'bg-primary/10 border-primary/25'
+                  }`}
+                  accessibilityLabel="Run Diagnostics"
+                >
+                  {isRunningDoctor ? (
+                    <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
+                  ) : (
+                    <>
+                      <Stethoscope size={16} color={isDark ? '#4ade80' : '#0d631b'} />
+                      <Text
+                        className={`font-headline font-bold text-xs ml-1.5 ${
+                          isDark ? 'text-[#4ade80]' : 'text-primary'
+                        }`}
+                      >
+                        Diagnostics
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
 
               <ScrollView showsVerticalScrollIndicator={false}>
                 {sessions.map((sess) => {

@@ -305,7 +305,7 @@ class SupportService:
                 if dup_res.scalars().first():
                     return (
                         f"✅ **Already Synced:** That MoMo transaction (**GH₵ {parsed['amount']:.2f}** — Ref `{ref_id}`) "
-                        f"is already recorded in your **{account.name}** wallet! [ACTION:HEAL_APP]"
+                        f"is already recorded in your **{account.name}** wallet! [ACTION:NAV_TRANSACTIONS]"
                     )
 
             cat_stmt = select(Category).where(
@@ -345,7 +345,7 @@ class SupportService:
                 f"- **Amount:** **GH₵ {parsed['amount']:.2f}**\n"
                 f"- **Wallet:** **{account.name}**\n"
                 f"- **Details:** {parsed['description']} (Ref: `{ref_id}`)\n\n"
-                f"I have logged this transaction directly into your ledger! Tap below to refresh your app cache. [ACTION:HEAL_APP]"
+                f"I have logged this transaction directly into your ledger. Your wallet balance has been updated automatically! [ACTION:NAV_TRANSACTIONS]"
             )
         except Exception as exc:
             logger.warning("Instant SMS rescue DB log failed: %s", str(exc))
@@ -405,8 +405,9 @@ class SupportService:
             f"- Tone: Professional, reassuring, calm, and trustworthy. CediSmart is a real personal finance and ledger application. "
             f"Keep all financial information, numbers, dates, and instructions clear and articulate.\n"
             f"- Adaptive Pidgin Rule: Mirror the user's language! If the user writes in Ghanaian Pidgin, you may respond in warm, natural Ghanaian Pidgin. "
-            f"If the user writes in standard English, answer in clean, professional English with light cultural warmth (e.g., 'Akwaaba', 'No problem at all'). "
-            f"Never force slang into financial confirmations, balances, or diagnostics."
+            f"If the user writes in standard English, answer in clean, professional English with light cultural warmth. "
+            f"Never force slang into financial confirmations, balances, or diagnostics.\n"
+            f"- Greeting & Confirmation Rule: Do NOT start every response or ongoing reply with 'Akwaaba' (Welcome). Only use 'Akwaaba' if it is the very beginning of a new conversation or user onboarding. For routine confirmations, pasted SMS messages, and follow-ups, start directly and naturally without welcoming them repeatedly (e.g., 'Got it, {first_name}!', 'All set, {first_name}.', or 'Here are the details:')."
         )
 
         # Check if the user pasted a raw MoMo SMS into chat for instant rescue
@@ -424,7 +425,11 @@ class SupportService:
             system_prompt += (
                 f"\n\n=== INSTANT SMS RESCUE EXECUTED ===\n"
                 f"The system just parsed and logged the user's pasted MoMo SMS with this verified result:\n{sms_rescue_banner}\n"
-                f"Reassure {first_name} warmly and clearly, confirm the exact GH₵ amount and wallet logged, and include `[ACTION:HEAL_APP]` at the end."
+                f"Instructions for your response:\n"
+                f"1. Warmly and clearly confirm the exact GH₵ amount, transaction type (Cash In / Payment / Transfer), and wallet logged.\n"
+                f"2. Explicitly assure {first_name} that CediSmart has already automatically synced their balance and updated their ledger.\n"
+                f"3. Do NOT tell the user to tap any 'refresh button'—the app updates automatically in real-time. If you offer an action button, use `[ACTION:NAV_TRANSACTIONS]` so they can view their transactions.\n"
+                f"4. Do NOT start your message with 'Akwaaba'."
             )
 
         # Resolve any image attached either on the request or on the last message
