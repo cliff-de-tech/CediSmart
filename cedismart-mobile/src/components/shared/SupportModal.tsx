@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,7 @@ import {
   Mic,
 } from 'lucide-react-native';
 import apiClient from '../../api/client';
+import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -293,6 +294,19 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   const nav = navigation || navProp;
   const offlineQueue = useOfflineStore((state) => state.queue);
   const removeOfflineTransactions = useOfflineStore((state) => state.removeTransactions);
+  const { user } = useAuthStore();
+
+  // Clean and resolve user's actual first name (e.g. "Mr. Cliff" -> "Cliff")
+  const rawDisplayName = userName || user?.full_name || '';
+  const firstName = useMemo(() => {
+    if (!rawDisplayName) return '';
+    const titles = new Set(['mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'miss', 'dr', 'dr.', 'prof', 'prof.', 'rev', 'rev.', 'pastor']);
+    const parts = rawDisplayName.trim().split(/\s+/).filter((p) => !titles.has(p.toLowerCase()));
+    if (parts.length > 0) {
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+    }
+    return '';
+  }, [userName, user?.full_name, rawDisplayName]);
 
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -327,8 +341,12 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     role: 'model',
     content:
       supportType === 'auth'
-        ? "Hello! I am your CediSmart Onboarding Assistant. How can I help you with your account, SMS code, or login PIN today?"
-        : "Hello! I am your CediSmart Assistant. How can I help you with your accounts, budgets, or Mobile Money today?",
+        ? (firstName
+            ? `Hello ${firstName}! I am your CediSmart Onboarding Assistant. How can I help you with your account, SMS code, or login PIN today?`
+            : "Hello! I am your CediSmart Onboarding Assistant. How can I help you with your account, SMS code, or login PIN today?")
+        : (firstName
+            ? `Hello ${firstName}! I am your CediSmart Assistant. How can I help you with your accounts, budgets, or Mobile Money today?`
+            : "Hello! I am your CediSmart Assistant. How can I help you with your accounts, budgets, or Mobile Money today?"),
     actions: [],
     status: 'sent',
   };
@@ -915,7 +933,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         messages: apiMessages,
         support_type: supportType,
         device_diagnostics: diagnostics,
-        user_name: userName,
+        user_name: firstName || userName || user?.full_name || 'Friend',
         phone: phone,
         image_base64: payload.imageBase64,
         image_mime_type: payload.imageMimeType,
@@ -1186,26 +1204,6 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                   accessibilityLabel="Past conversations"
                 >
                   <History size={17} color={isDark ? 'white' : '#1C1C2E'} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setShowVoiceModal(true)}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                  className={`px-2.5 h-9 rounded-full ${
-                    isDark
-                      ? 'bg-emerald-500/20 border border-emerald-500/40'
-                      : 'bg-emerald-50 border border-emerald-300'
-                  } flex-row items-center justify-center`}
-                  accessibilityLabel="Live Voice Mode"
-                >
-                  <Headphones size={15} color={isDark ? '#4ade80' : '#0d631b'} />
-                  <Text
-                    className={`font-headline font-bold text-[11px] ml-1 ${
-                      isDark ? 'text-emerald-400' : 'text-emerald-800'
-                    }`}
-                  >
-                    Voice
-                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1600,18 +1598,6 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                 <Camera size={18} color={isDark ? '#4ade80' : '#0d631b'} />
               </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => setShowVoiceModal(true)}
-                className={`w-11 h-12 rounded-xl items-center justify-center mr-2 border ${
-                  isDark
-                    ? 'bg-emerald-500/20 border-emerald-500/30'
-                    : 'bg-emerald-50 border-emerald-200'
-                }`}
-                accessibilityLabel="Open Voice Call Mode"
-              >
-                <Mic size={18} color={isDark ? '#4ade80' : '#0d631b'} />
-              </TouchableOpacity>
-
               <TextInput
                 ref={textInputRef}
                 className={`flex-1 h-12 px-4 rounded-xl font-body text-sm mr-2.5 ${
@@ -1631,24 +1617,30 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                 blurOnSubmit={false}
                 editable={!chatMutation.isPending}
               />
-              <TouchableOpacity
-                onPress={handleSend}
-                disabled={(!input.trim() && !attachedImage) || chatMutation.isPending}
-                className={`w-12 h-12 rounded-xl items-center justify-center ${
-                  (!input.trim() && !attachedImage) || chatMutation.isPending
-                    ? 'bg-gray-500/15'
-                    : 'bg-primary'
-                } shadow-sm`}
-              >
-                <Send
-                  size={18}
-                  color={
-                    (!input.trim() && !attachedImage) || chatMutation.isPending
-                      ? '#9CA3AF'
-                      : 'white'
-                  }
-                />
-              </TouchableOpacity>
+
+              {/* OpenAI-Style Dynamic Action Button: Default is Voice, switches to Send when user types */}
+              {!input.trim() && !attachedImage ? (
+                <TouchableOpacity
+                  onPress={() => setShowVoiceModal(true)}
+                  className="w-12 h-12 rounded-xl items-center justify-center bg-primary shadow-sm active:scale-95"
+                  accessibilityLabel="Open Live Voice Mode"
+                >
+                  <Headphones size={20} color="white" />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={handleSend}
+                  disabled={chatMutation.isPending}
+                  className="w-12 h-12 rounded-xl items-center justify-center bg-primary shadow-sm active:scale-95"
+                  accessibilityLabel="Send message"
+                >
+                  {chatMutation.isPending ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Send size={18} color="white" />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </GlassSurface>
         </KeyboardAvoidingView>

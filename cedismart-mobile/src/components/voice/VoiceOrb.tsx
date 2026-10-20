@@ -337,23 +337,22 @@ const styles = StyleSheet.create({
   },
   ring: {
     position: 'absolute',
-    borderWidth: 1.5,
+    borderWidth: 0,
   },
   coreOrb: {
     overflow: 'hidden',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.85,
-    shadowRadius: 36,
-    elevation: 20,
+    shadowOpacity: 0.9,
+    shadowRadius: 44,
+    elevation: 24,
   },
   gradient: {
     flex: 1,
     alignItems: 'flex-start',
     justifyContent: 'flex-start',
-    padding: 16,
+    padding: 20,
   },
   innerReflection: {
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
-    filter: 'blur(4px)',
+    backgroundColor: 'rgba(255, 255, 255, 0.32)',
   },
 });

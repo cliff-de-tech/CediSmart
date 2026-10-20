@@ -477,8 +477,8 @@ class SupportService:
         personalization = (
             f"=== USER IDENTITY & ADAPTIVE TONE RULES ===\n"
             f"- User's Actual Name: {first_name} (Full Name: {full_name}).\n"
-            f"- Addressing the user: Address them respectfully and naturally as '{first_name}' (e.g. 'Hello {first_name},' or 'Hi {first_name},'). "
-            f"NEVER address them as 'Mr.!', 'boss', 'don', or other forced nicknames.\n"
+            f"- Addressing the user: Address them respectfully and naturally by their actual name '{first_name}' (e.g. 'Hello {first_name},', 'Hi {first_name},', or 'Certainly, {first_name}!'). "
+            f"Always use '{first_name}' to personalize your answer whenever greeting or advising them. NEVER address them as 'Mr.!', 'boss', 'don', 'Friend', or other generic nicknames when their name is known.\n"
             f"- Tone: Professional, reassuring, calm, and trustworthy. CediSmart is a real personal finance and ledger application. "
             f"Keep all financial information, numbers, dates, and instructions clear and articulate.\n"
             f"- Adaptive Pidgin Rule: Mirror the user's language! If the user writes in Ghanaian Pidgin, you may respond in warm, natural Ghanaian Pidgin. "
