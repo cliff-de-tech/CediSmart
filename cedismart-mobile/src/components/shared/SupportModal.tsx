@@ -47,6 +47,7 @@ import {
   Trash2,
   Headphones,
   Mic,
+  AudioLines,
 } from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -1622,16 +1623,16 @@ export const SupportModal: React.FC<SupportModalProps> = ({
               {!input.trim() && !attachedImage ? (
                 <TouchableOpacity
                   onPress={() => setShowVoiceModal(true)}
-                  className="w-12 h-12 rounded-xl items-center justify-center bg-primary shadow-sm active:scale-95"
+                  className="w-12 h-12 rounded-full items-center justify-center bg-primary shadow-sm active:scale-95"
                   accessibilityLabel="Open Live Voice Mode"
                 >
-                  <Headphones size={20} color="white" />
+                  <AudioLines size={20} color="white" />
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity
                   onPress={handleSend}
                   disabled={chatMutation.isPending}
-                  className="w-12 h-12 rounded-xl items-center justify-center bg-primary shadow-sm active:scale-95"
+                  className="w-12 h-12 rounded-full items-center justify-center bg-primary shadow-sm active:scale-95"
                   accessibilityLabel="Send message"
                 >
                   {chatMutation.isPending ? (
