@@ -232,5 +232,25 @@ async def test_support_voice_mock(client: AsyncClient) -> None:
         mock_voice.assert_called_once()
 
 
+@pytest.mark.asyncio
+async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
+    with patch("app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock) as mock_synth:
+        mock_synth.return_value = ("dGVzdC1hdWRpby1ieXRlcw==", "audio/wav")
+
+        resp = await client.post(
+            "/api/v1/support/voice/synthesize",
+            json={
+                "text": "Hi Clifford, I'm listening.",
+                "voice_name": "Kore",
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["audio_base64"] == "dGVzdC1hdWRpby1ieXRlcw=="
+        assert body["audio_mime_type"] == "audio/wav"
+        mock_synth.assert_called_once_with(text="Hi Clifford, I'm listening.", voice_name="Kore")
+
+
+
 
 

@@ -1,5 +1,6 @@
 import * as Speech from 'expo-speech';
-import { useAudioRecorder, RecordingPresets } from 'expo-audio';
+import { createAudioPlayer, AudioPlayer } from 'expo-audio';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export interface VoiceAction {
   type: 'create_transaction' | 'check_balance' | 'check_budget' | 'navigate' | 'general_reply';
@@ -13,6 +14,45 @@ export interface VoiceParseResult {
 
 class VoiceService {
   private isSpeaking = false;
+  private activePlayer: AudioPlayer | null = null;
+
+  /**
+   * Play high-fidelity neural audio (Gemini Neural TTS) natively via expo-audio.
+   */
+  async speakNeural(
+    audioBase64: string,
+    onStart?: () => void,
+    onDone?: () => void,
+    onError?: (error: any) => void
+  ): Promise<void> {
+    try {
+      await this.stop();
+      this.isSpeaking = true;
+      onStart?.();
+
+      const tempUri = `${FileSystem.cacheDirectory}neural_${Date.now()}.wav`;
+      await FileSystem.writeAsStringAsync(tempUri, audioBase64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const player = createAudioPlayer({ uri: tempUri });
+      this.activePlayer = player;
+
+      player.addListener('playbackStatusUpdate', (status) => {
+        if (status.didJustFinish) {
+          this.isSpeaking = false;
+          this.activePlayer = null;
+          onDone?.();
+        }
+      });
+
+      player.play();
+    } catch (err) {
+      this.isSpeaking = false;
+      this.activePlayer = null;
+      onError?.(err);
+    }
+  }
 
   /**
    * Speak a message out loud to the user via Text-to-Speech (TTS).
@@ -73,6 +113,10 @@ class VoiceService {
   async stop(): Promise<void> {
     try {
       this.isSpeaking = false;
+      if (this.activePlayer) {
+        this.activePlayer.pause();
+        this.activePlayer = null;
+      }
       await Speech.stop();
     } catch (e) {
       // Ignore if not speaking

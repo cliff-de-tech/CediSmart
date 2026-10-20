@@ -16,6 +16,8 @@ from app.modules.support.schemas import (
     TicketStatusResponse,
     VoiceRequest,
     VoiceResponse,
+    VoiceSynthesizeRequest,
+    VoiceSynthesizeResponse,
 )
 from app.modules.support.service import SupportService
 
@@ -69,6 +71,22 @@ async def voice_chat_with_support(request: Request, body: VoiceRequest) -> Voice
         initial_context=body.initial_context,
     )
     return VoiceResponse(**result)
+
+
+@router.post(
+    "/voice/synthesize",
+    response_model=VoiceSynthesizeResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Synthesize text to high-fidelity natural neural speech via Gemini TTS",
+)
+@limiter.limit("60/15minutes")
+async def synthesize_voice(request: Request, body: VoiceSynthesizeRequest) -> VoiceSynthesizeResponse:
+    """Returns base64 audio bytes for natural sounding spoken playback."""
+    audio_b64, mime = await SupportService.synthesize_neural_voice(
+        text=body.text,
+        voice_name=body.voice_name,
+    )
+    return VoiceSynthesizeResponse(audio_base64=audio_b64, audio_mime_type=mime or "audio/wav")
 
 
 @router.post(

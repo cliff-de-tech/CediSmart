@@ -59,6 +59,9 @@ import { GlassSurface } from '../glass/GlassSurface';
 import { CoinBackground } from './CoinBackground';
 import { VoiceSupportModal } from '../voice/VoiceSupportModal';
 
+// Height of one quick-action row; the list shows exactly two rows and scrolls for the rest.
+const QUICK_ACTION_ROW_HEIGHT = 44;
+
 export type ActionTag =
   | 'GENERATE_MOMO_KEY'
   | 'OPEN_SHORTCUTS'
@@ -1494,13 +1497,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({
             )}
           </ScrollView>
 
-          {/* Styled Chat Input Bar + Swipeable Quick Rescue Strip */}
-          <GlassSurface
-            variant="thick"
-            radius={28}
-            elevated
-            style={{ borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
-          >
+          {/* Chat Input Bar + Quick Actions (no surrounding container, ChatGPT-style) */}
+          <View>
             {/* Attached Screenshot / Receipt Preview */}
             {attachedImage && (
               <View className="px-4 pt-3 flex-row items-center">
@@ -1529,11 +1527,12 @@ export const SupportModal: React.FC<SupportModalProps> = ({
             {/* Quick Helper Actions: Vertically stacked matching /tmp/131462D0-8DA4-4413-833D-B2F502B60D29.jpeg */}
             {/* Auto-disappears immediately when the user starts typing */}
             {supportType !== 'auth' && !attachedImage && !input.trim() && (
-              <View className="px-4 pt-1.5 pb-1" style={{ maxHeight: 92 }}>
+              <View className="px-5" style={{ height: QUICK_ACTION_ROW_HEIGHT * 2 }}>
                 <ScrollView
                   nestedScrollEnabled
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 6 }}
+                  snapToInterval={QUICK_ACTION_ROW_HEIGHT}
+                  decelerationRate="fast"
                   keyboardShouldPersistTaps="handled"
                 >
                   {getScreenQuickPrompts(screenContext, supportType).map((promptText, idx) => {
@@ -1567,18 +1566,15 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                             textInputRef.current?.focus();
                           }
                         }}
-                        className={`flex-row items-center py-2.5 px-3 rounded-xl border ${
-                          isDark
-                            ? 'bg-white/5 border-white/10 active:bg-white/10'
-                            : 'bg-black/5 border-black/10 active:bg-black/10'
-                        }`}
+                        style={{ height: QUICK_ACTION_ROW_HEIGHT }}
+                        className="flex-row items-center"
                       >
-                        <View className="w-6 h-6 rounded-lg items-center justify-center mr-2.5">
-                          <IconComponent size={15} color={isDark ? '#4ade80' : '#0d631b'} />
+                        <View className="w-7 items-center justify-center mr-3">
+                          <IconComponent size={20} color={isDark ? '#4ade80' : '#0d631b'} />
                         </View>
                         <Text
                           numberOfLines={1}
-                          className={`flex-1 font-body text-xs font-medium ${
+                          className={`flex-1 font-body text-base font-medium ${
                             isDark ? 'text-gray-200' : 'text-charcoal'
                           }`}
                         >
@@ -1597,28 +1593,24 @@ export const SupportModal: React.FC<SupportModalProps> = ({
               className="px-4 pt-1.5"
             >
               <View
-                className={`flex-row items-center h-14 px-3 rounded-full border ${
-                  isDark
-                    ? 'bg-black/40 border-white/15'
-                    : 'bg-white/80 border-black/10'
-                } shadow-sm`}
+                className={`flex-row items-center h-14 pl-2 pr-1.5 rounded-full ${
+                  isDark ? 'bg-[#222222]' : 'bg-[#efefef]'
+                }`}
               >
                 {/* Plus Attach Button matching ChatGPT */}
                 <TouchableOpacity
                   onPress={handlePickImage}
                   disabled={chatMutation.isPending}
-                  className={`w-9 h-9 rounded-full items-center justify-center mr-1.5 ${
-                    isDark ? 'bg-white/10 active:bg-white/20' : 'bg-black/5 active:bg-black/10'
-                  }`}
+                  className="w-10 h-10 rounded-full items-center justify-center"
                   accessibilityLabel="Attach Screenshot or Receipt"
                 >
-                  <Plus size={18} color={isDark ? '#E5E7EB' : '#374151'} />
+                  <Plus size={22} color={isDark ? '#F3F4F6' : '#1F2937'} />
                 </TouchableOpacity>
 
                 {/* Main Text Input: Ask CediSmart... */}
                 <TextInput
                   ref={textInputRef}
-                  className={`flex-1 h-full px-2 font-body text-sm ${
+                  className={`flex-1 h-full px-2 font-body text-base ${
                     isDark ? 'text-dark-on-surface' : 'text-on-surface'
                   }`}
                   placeholder={
@@ -1659,7 +1651,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                 )}
               </View>
             </View>
-          </GlassSurface>
+          </View>
         </KeyboardAvoidingView>
 
         {/* Past Conversations History Modal */}

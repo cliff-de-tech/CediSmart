@@ -26,6 +26,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
   requestRecordingPermissionsAsync,
+  setAudioModeAsync,
   RecordingPresets,
 } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -115,7 +116,15 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     enabled: visible,
   });
 
-  // Welcome greeting on launch
+  // Configure audio mode on mount so iOS allows recording & plays audio in silent mode
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      interruptionMode: 'mixWithOthers',
+    }).catch(() => {});
+  }, []);
+
+  // Welcome greeting on launch with natural neural voice
   useEffect(() => {
     if (visible) {
       setIsCompactView(false);
@@ -134,20 +143,44 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       };
       setConversation([initialGreetingMsg]);
       startStreamingText(greeting);
-
       setVoiceState('speaking');
-      voiceService.speak(
-        greeting,
-        () => setVoiceState('speaking'),
-        () => {
-          setVoiceState('listening');
-          startListeningLoop();
-        },
-        () => {
-          setVoiceState('listening');
-          startListeningLoop();
-        }
-      );
+
+      // Request natural neural audio from Gemini TTS
+      apiClient
+        .post('/support/voice/synthesize', {
+          text: greeting,
+          voice_name: 'Kore',
+        })
+        .then((res) => {
+          if (res.data?.audio_base64) {
+            voiceService.speakNeural(
+              res.data.audio_base64,
+              () => setVoiceState('speaking'),
+              () => {
+                setVoiceState('listening');
+                startListeningLoop();
+              },
+              () => {
+                // Fallback to local TTS if native player has an issue
+                voiceService.speak(greeting, () => setVoiceState('speaking'), () => {
+                  setVoiceState('listening');
+                  startListeningLoop();
+                });
+              }
+            );
+          } else {
+            voiceService.speak(greeting, () => setVoiceState('speaking'), () => {
+              setVoiceState('listening');
+              startListeningLoop();
+            });
+          }
+        })
+        .catch(() => {
+          voiceService.speak(greeting, () => setVoiceState('speaking'), () => {
+            setVoiceState('listening');
+            startListeningLoop();
+          });
+        });
     } else {
       cleanupVoiceSession();
     }
@@ -310,22 +343,50 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       setConversation((prev) => [...prev, aiMsg]);
       startStreamingText(reply);
 
-      // Speak response aloud via TTS
+      // Speak response aloud via natural neural voice or TTS fallback
       setVoiceState('speaking');
-      voiceService.speak(
-        reply,
-        () => setVoiceState('speaking'),
-        () => {
-          isProcessingRef.current = false;
-          setVoiceState('listening');
-          startListeningLoop();
-        },
-        () => {
-          isProcessingRef.current = false;
-          setVoiceState('listening');
-          startListeningLoop();
-        }
-      );
+      if (res.data?.audio_base64) {
+        voiceService.speakNeural(
+          res.data.audio_base64,
+          () => setVoiceState('speaking'),
+          () => {
+            isProcessingRef.current = false;
+            setVoiceState('listening');
+            startListeningLoop();
+          },
+          () => {
+            voiceService.speak(
+              reply,
+              () => setVoiceState('speaking'),
+              () => {
+                isProcessingRef.current = false;
+                setVoiceState('listening');
+                startListeningLoop();
+              },
+              () => {
+                isProcessingRef.current = false;
+                setVoiceState('listening');
+                startListeningLoop();
+              }
+            );
+          }
+        );
+      } else {
+        voiceService.speak(
+          reply,
+          () => setVoiceState('speaking'),
+          () => {
+            isProcessingRef.current = false;
+            setVoiceState('listening');
+            startListeningLoop();
+          },
+          () => {
+            isProcessingRef.current = false;
+            setVoiceState('listening');
+            startListeningLoop();
+          }
+        );
+      }
     } catch (err: any) {
       console.warn('[VoiceSupport] Voice processing error:', err);
       const fallbackReply = "Could you please say that again?";

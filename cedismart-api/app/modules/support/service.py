@@ -1192,10 +1192,19 @@ class SupportService:
                             data = resp.json()
                             candidate_text = data["candidates"][0]["content"]["parts"][0]["text"]
                             parsed = json.loads(candidate_text)
+                            transcript = parsed.get("transcript") or "Voice message"
+                            reply_text = parsed.get("response") or f"I heard you, {first_name}."
+                            action_payload = parsed.get("action")
+
+                            # Synthesize natural neural voice audio via Gemini TTS
+                            audio_b64, audio_mime = await SupportService.synthesize_neural_voice(reply_text)
+
                             return {
-                                "transcript": parsed.get("transcript") or "Voice message",
-                                "response": parsed.get("response") or f"I heard you, {first_name}.",
-                                "action": parsed.get("action"),
+                                "transcript": transcript,
+                                "response": reply_text,
+                                "action": action_payload,
+                                "audio_base64": audio_b64,
+                                "audio_mime_type": audio_mime or "audio/wav",
                             }
                         logger.warning(
                             "Gemini audio recognition error (%s status %d): %s",
@@ -1207,9 +1216,75 @@ class SupportService:
                     logger.warning("Gemini audio request failed (%s): %s", model_name, str(exc))
 
         # 2. Fallback response
+        fallback_text = f"I heard you, {first_name}. Could you please say that again?"
+        fb_audio, fb_mime = await SupportService.synthesize_neural_voice(fallback_text)
         return {
             "transcript": "Voice note received",
-            "response": f"I heard you, {first_name}. Could you please say that again?",
+            "response": fallback_text,
             "action": {"type": "general_reply", "payload": None},
+            "audio_base64": fb_audio,
+            "audio_mime_type": fb_mime or "audio/wav",
         }
+
+    @staticmethod
+    async def synthesize_neural_voice(text: str, voice_name: str = "Kore") -> tuple[str | None, str | None]:
+        """Synthesize natural neural speech using Gemini Flash TTS models. Returns (base64_audio, mime_type)."""
+        if not settings.GEMINI_API_KEY or not text or not text.strip():
+            return None, None
+
+        # Clean tags and markdown from text before audio synthesis
+        clean_text = re.sub(r"\[ACTION:[^\]]+\]", "", text)
+        clean_text = re.sub(r"\[VOICE_ACTION:[^\]]+\]", "", clean_text)
+        clean_text = re.sub(r"[*#_`]", "", clean_text).strip()
+        if not clean_text:
+            return None, None
+
+        tts_models = ["gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]
+        for model in tts_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
+            payload = {
+                "contents": [{"parts": [{"text": clean_text}]}],
+                "generationConfig": {
+                    "responseModalities": ["AUDIO"],
+                    "speechConfig": {
+                        "voiceConfig": {
+                            "prebuiltVoiceConfig": {
+                                "voiceName": voice_name,
+                            }
+                        }
+                    },
+                },
+            }
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        inline_data = data["candidates"][0]["content"]["parts"][0]["inlineData"]
+                        raw_data = inline_data.get("data")
+                        raw_mime = inline_data.get("mimeType", "audio/wav")
+
+                        # If raw L16 PCM without WAV header is returned, wrap into standard WAV so mobile players handle it seamlessly
+                        if "audio/l16" in raw_mime.lower() or "codec=pcm" in raw_mime.lower():
+                            try:
+                                import io
+                                import wave
+                                import base64
+                                pcm_bytes = base64.b64decode(raw_data)
+                                wav_io = io.BytesIO()
+                                with wave.open(wav_io, "wb") as wf:
+                                    wf.setnchannels(1)
+                                    wf.setsampwidth(2)  # 16-bit
+                                    wf.setframerate(24000)
+                                    wf.writeframes(pcm_bytes)
+                                raw_data = base64.b64encode(wav_io.getvalue()).decode("utf-8")
+                                raw_mime = "audio/wav"
+                            except Exception as wav_err:
+                                logger.warning("PCM to WAV packaging error: %s", str(wav_err))
+
+                        return raw_data, raw_mime
+            except Exception as e:
+                logger.warning("Gemini TTS synthesis failed on %s: %s", model, str(e))
+        return None, None
+
 
