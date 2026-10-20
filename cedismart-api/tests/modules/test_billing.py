@@ -70,6 +70,34 @@ async def test_start_trial(client: AsyncClient, make_user) -> None:
     assert resp_dup.json()["error"]["code"] == "TRIAL_ALREADY_USED"
 
 @pytest.mark.asyncio
+async def test_trial_countdown_progression(client: AsyncClient, make_user, db_session: AsyncSession) -> None:
+    from datetime import datetime, timezone, timedelta
+    user = await make_user(is_premium=False, phone="+233201119999")
+    headers = make_auth_headers(user.id)
+
+    # Start trial 2 days ago
+    result = await db_session.execute(select(User).where(User.id == user.id))
+    db_user = result.scalar_one()
+    db_user.trial_started_at = datetime.now(timezone.utc) - timedelta(days=2, hours=3)
+    await db_session.commit()
+
+    resp = await client.get("/api/v1/users/me", headers=headers)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["is_trial_active"] is True
+    assert body["trial_days_remaining"] == 5
+
+    # Simulate 7.5 days passed (trial expired)
+    db_user.trial_started_at = datetime.now(timezone.utc) - timedelta(days=7, hours=12)
+    await db_session.commit()
+
+    resp_expired = await client.get("/api/v1/users/me", headers=headers)
+    assert resp_expired.status_code == 200
+    body_expired = resp_expired.json()
+    assert body_expired["is_trial_active"] is False
+    assert body_expired["trial_days_remaining"] == 0
+
+@pytest.mark.asyncio
 async def test_cancel_trial_and_premium(client: AsyncClient, make_user, db_session) -> None:
     # 1. Test cancel trial
     user = await make_user(is_premium=False)

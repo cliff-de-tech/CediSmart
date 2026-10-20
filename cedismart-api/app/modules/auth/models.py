@@ -95,7 +95,8 @@ class User(TimestampMixin, Base):
                 start = start.replace(tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
             diff = now - start
-            return max(0, 7 - diff.days)
+            days_passed = int(max(0.0, diff.total_seconds()) // 86400)
+            return max(0, 7 - days_passed)
         return 0
 
     def __repr__(self) -> str:

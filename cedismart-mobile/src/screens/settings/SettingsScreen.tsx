@@ -9,11 +9,12 @@ import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones } from 'lucide-react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -212,6 +213,25 @@ const SettingsScreen = ({ navigation, route }: any) => {
     return accounts.some(acc => acc.account_type === 'bank' || acc.account_type === 'mobile_money');
   }, [accounts]);
 
+  // Sync latest user profile on screen focus to keep trial days & subscription fresh
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      apiClient.get('/users/me')
+        .then((res) => {
+          if (isMounted && res.data) {
+            updateUser(res.data);
+          }
+        })
+        .catch(() => {
+          // Offline or network error — silent catch
+        });
+      return () => {
+        isMounted = false;
+      };
+    }, [updateUser])
+  );
+
   // Load KYC state and saved accounts on mount
   useEffect(() => {
     loadSavedAccounts();
@@ -396,9 +416,30 @@ const SettingsScreen = ({ navigation, route }: any) => {
   };
 
   // Theme & Notifications States
-  const { theme, setTheme } = useThemeStore();
+  const { theme, themeMode, setThemeMode, setTheme } = useThemeStore();
   const isDark = theme === 'dark';
-  const isDarkMode = isDark;
+
+  // Dynamic calculation of trial days remaining so countdown is always live & accurate
+  const effectiveTrialDays = useMemo(() => {
+    if (!user?.trial_started_at) {
+      return user?.trial_days_remaining ?? 0;
+    }
+    const start = new Date(user.trial_started_at).getTime();
+    if (isNaN(start)) {
+      return user?.trial_days_remaining ?? 0;
+    }
+    const elapsedMs = Math.max(0, Date.now() - start);
+    const daysPassed = Math.floor(elapsedMs / (1000 * 60 * 60 * 24));
+    return Math.max(0, 7 - daysPassed);
+  }, [user?.trial_started_at, user?.trial_days_remaining]);
+
+  const effectiveTrialActive = useMemo(() => {
+    if (user?.is_premium) return false;
+    if (user?.trial_started_at) {
+      return effectiveTrialDays > 0;
+    }
+    return !!user?.is_trial_active;
+  }, [user?.is_premium, user?.trial_started_at, user?.is_trial_active, effectiveTrialDays]);
 
   const [smsAlerts, setSmsAlerts] = useState(true);
   const [budgetAlerts, setBudgetAlerts] = useState(true);
@@ -1448,10 +1489,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
                     'You are a Pro member! Enjoy unlimited vaults, CSV exports, and priority offline syncing.',
                     [{ text: 'Great!' }]
                   );
-                } else if (user?.is_trial_active) {
+                } else if (effectiveTrialActive) {
                   Alert.alert(
                     'Free Trial Active',
-                    `You are currently enjoying CediSmart Pro for free! You have ${user?.trial_days_remaining || 0} days left. Would you like to subscribe to a paid plan now to avoid interruption?`,
+                    `You are currently enjoying CediSmart Pro for free! You have ${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left. Would you like to subscribe to a paid plan now to avoid interruption?`,
                     [
                       { text: 'Later', style: 'cancel' },
                       { text: 'View Plans', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
@@ -1470,13 +1511,13 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   pricingSheetRef.current?.snapToIndex(0);
                 }
               }}
-              color={user?.is_premium || user?.is_trial_active ? "#4c56af" : undefined}
+              color={user?.is_premium || effectiveTrialActive ? "#4c56af" : undefined}
             >
-              <Text className={`font-bold text-base ${(user?.is_premium || user?.is_trial_active) ? (isDark ? 'text-indigo-400' : 'text-secondary') : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+              <Text className={`font-bold text-base ${(user?.is_premium || effectiveTrialActive) ? (isDark ? 'text-indigo-400' : 'text-secondary') : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
                 {user?.is_premium 
                   ? 'CediSmart Pro' 
-                  : user?.is_trial_active 
-                  ? `Free Trial (${user?.trial_days_remaining} days left)`
+                  : effectiveTrialActive 
+                  ? `Free Trial (${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left)`
                   : !user?.trial_started_at
                   ? 'Free Tier (Redeem Trial)'
                   : 'Free Tier (Tap to upgrade)'}
@@ -1484,7 +1525,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
             </SettingItem>
             
             {/* Conditional Cancel Option */}
-            {(user?.is_premium || user?.is_trial_active) && (
+            {(user?.is_premium || effectiveTrialActive) && (
               <TouchableOpacity
                 onPress={handleCancelPlan}
                 disabled={isCancellingPlan}
@@ -1505,15 +1546,41 @@ const SettingsScreen = ({ navigation, route }: any) => {
           <View className="mt-6">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Appearance</Text>
             <SettingItem 
-              icon={SunMoon} 
-              title="Dark Mode" 
-              value="Enable Dark Theme"
-              onPress={() => setTheme(isDarkMode ? 'light' : 'dark')}
+              icon={Moon} 
+              title="Dark Theme" 
+              value="Always use dark appearance"
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setThemeMode(themeMode === 'dark' ? 'system' : 'dark');
+              }}
               hideChevron
               rightElement={
                 <Switch 
-                  value={isDarkMode} 
-                  onValueChange={(val) => setTheme(val ? 'dark' : 'light')}
+                  value={themeMode === 'dark'} 
+                  onValueChange={(val) => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setThemeMode(val ? 'dark' : 'system');
+                  }}
+                  trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
+                />
+              }
+            />
+            <SettingItem 
+              icon={Smartphone} 
+              title="Device Theme" 
+              value="Match system appearance"
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                setThemeMode(themeMode === 'system' ? 'dark' : 'system');
+              }}
+              hideChevron
+              rightElement={
+                <Switch 
+                  value={themeMode === 'system'} 
+                  onValueChange={(val) => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setThemeMode(val ? 'system' : 'dark');
+                  }}
                   trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
                 />
               }
