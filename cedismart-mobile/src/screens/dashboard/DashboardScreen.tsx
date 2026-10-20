@@ -12,7 +12,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { formatGHS } from '../../utils/currency';
-import { Plus, Tag, Landmark, Smartphone, ShieldCheck, Award, Search, Sparkles, Trash2, Users, SlidersHorizontal, Eye, EyeOff, Clock, RefreshCw, Edit3, X, Headphones } from 'lucide-react-native';
+import { Plus, Tag, Landmark, Smartphone, ShieldCheck, Award, Search, Sparkles, Trash2, Users, SlidersHorizontal, Eye, EyeOff, Clock, RefreshCw, Edit3, X, Headphones, ArrowUpRight, ArrowDownRight } from 'lucide-react-native';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
@@ -864,31 +864,90 @@ const DashboardScreen = ({ navigation }: any) => {
                   )}
                 </View>
 
-                <View className="flex-row justify-between items-end pt-5 border-t border-white/15">
-                  <View>
+                <View className="flex-row items-center pt-5 border-t border-white/15" style={{ gap: 12 }}>
+                  {/* Income Glass Capsule */}
+                  <View
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                      borderColor: 'rgba(255, 255, 255, 0.12)',
+                      borderWidth: 1,
+                      borderRadius: 18,
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                    }}
+                  >
+                    <View className="flex-row items-center mb-1">
+                      <View
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 9,
+                          backgroundColor: 'rgba(74, 222, 128, 0.2)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 6,
+                        }}
+                      >
+                        <ArrowUpRight size={12} color="#4ade80" strokeWidth={2.5} />
+                      </View>
+                      <Text
+                        style={{ color: 'rgba(255, 255, 255, 0.75)' }}
+                        className="font-label text-[10px] font-bold uppercase tracking-wider"
+                      >
+                        INCOME
+                      </Text>
+                    </View>
                     <Text
-                      style={{ color: 'rgba(255, 255, 255, 0.75)' }}
-                      className="font-label text-xs font-bold uppercase tracking-widest mb-1.5"
-                    >
-                      INCOME
-                    </Text>
-                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}
                       style={{ color: '#4ade80' }}
-                      className="text-2xl font-extrabold font-headline"
+                      className="text-lg font-bold font-headline tracking-tight"
                     >
                       {hideBalances ? "₵ ••••" : formatGHS(income)}
                     </Text>
                   </View>
-                  <View className="items-end">
+
+                  {/* Spent Glass Capsule */}
+                  <View
+                    style={{
+                      flex: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                      borderColor: 'rgba(255, 255, 255, 0.12)',
+                      borderWidth: 1,
+                      borderRadius: 18,
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                    }}
+                  >
+                    <View className="flex-row items-center mb-1">
+                      <View
+                        style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 9,
+                          backgroundColor: 'rgba(248, 113, 113, 0.2)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 6,
+                        }}
+                      >
+                        <ArrowDownRight size={12} color="#f87171" strokeWidth={2.5} />
+                      </View>
+                      <Text
+                        style={{ color: 'rgba(255, 255, 255, 0.75)' }}
+                        className="font-label text-[10px] font-bold uppercase tracking-wider"
+                      >
+                        SPENT
+                      </Text>
+                    </View>
                     <Text
-                      style={{ color: 'rgba(255, 255, 255, 0.75)' }}
-                      className="font-label text-xs font-bold uppercase tracking-widest mb-1.5"
-                    >
-                      SPENT
-                    </Text>
-                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.85}
                       style={{ color: '#f87171' }}
-                      className="text-2xl font-extrabold font-headline"
+                      className="text-lg font-bold font-headline tracking-tight"
                     >
                       {hideBalances ? "₵ ••••" : formatGHS(expense)}
                     </Text>
