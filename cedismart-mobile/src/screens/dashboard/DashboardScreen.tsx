@@ -864,38 +864,34 @@ const DashboardScreen = ({ navigation }: any) => {
                   )}
                 </View>
 
-                <View className="flex-row justify-between items-center pt-5 border-t border-white/15">
-                  <View className="flex-1 pr-2">
+                <View className="flex-row justify-between items-end pt-5 border-t border-white/15">
+                  <View>
                     <Text
                       style={{ color: 'rgba(255, 255, 255, 0.75)' }}
-                      className="font-label text-[11px] font-bold uppercase tracking-widest mb-1.5"
+                      className="font-label text-xs font-bold uppercase tracking-widest mb-1.5"
                     >
                       INCOME
                     </Text>
-                    <View className="flex-row items-center">
-                      <Text
-                        style={{ color: '#4ade80' }}
-                        className="text-xl font-bold font-headline tracking-tight"
-                      >
-                        {hideBalances ? "₵ ••••" : formatGHS(income)}
-                      </Text>
-                    </View>
+                    <Text
+                      style={{ color: '#4ade80' }}
+                      className="text-2xl font-extrabold font-headline"
+                    >
+                      {hideBalances ? "₵ ••••" : formatGHS(income)}
+                    </Text>
                   </View>
-                  <View className="flex-1 pl-2 items-end">
+                  <View className="items-end">
                     <Text
                       style={{ color: 'rgba(255, 255, 255, 0.75)' }}
-                      className="font-label text-[11px] font-bold uppercase tracking-widest mb-1.5"
+                      className="font-label text-xs font-bold uppercase tracking-widest mb-1.5"
                     >
                       SPENT
                     </Text>
-                    <View className="flex-row items-center">
-                      <Text
-                        style={{ color: '#f87171' }}
-                        className="text-xl font-bold font-headline tracking-tight"
-                      >
-                        {hideBalances ? "₵ ••••" : formatGHS(expense)}
-                      </Text>
-                    </View>
+                    <Text
+                      style={{ color: '#f87171' }}
+                      className="text-2xl font-extrabold font-headline"
+                    >
+                      {hideBalances ? "₵ ••••" : formatGHS(expense)}
+                    </Text>
                   </View>
                 </View>
               </View>

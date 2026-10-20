@@ -23,7 +23,8 @@ export const formatGHS = (amount: number | string): string => {
     currencyDisplay: 'code',
   })
     .format(value)
-    .replace('GHS', '₵');
+    .replace('GHS', '₵')
+    .replace(/\s+/g, '\u00A0');
 };
 
 /**
