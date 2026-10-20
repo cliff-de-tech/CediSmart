@@ -201,26 +201,36 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
     }
   }, [state]);
 
+  // Dedicated shared value driven by live microphone audio amplitude
+  const liveAudioLevel = useSharedValue(0);
+
+  useEffect(() => {
+    liveAudioLevel.value = withTiming(audioLevel, {
+      duration: 70,
+      easing: Easing.out(Easing.quad),
+    });
+  }, [audioLevel]);
+
   const coreAnimatedStyle = useAnimatedStyle(() => ({
     transform: [
-      { scale: scale.value + audioLevel * 0.25 },
+      { scale: scale.value + liveAudioLevel.value * 0.45 },
       { rotate: `${rotation.value}deg` },
     ],
   }));
 
   const ring1AnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ring1Scale.value + audioLevel * 0.3 }],
-    opacity: ring1Opacity.value,
+    transform: [{ scale: ring1Scale.value + liveAudioLevel.value * 0.65 }],
+    opacity: Math.min(0.9, ring1Opacity.value + liveAudioLevel.value * 0.35),
   }));
 
   const ring2AnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ring2Scale.value + audioLevel * 0.45 }],
-    opacity: ring2Opacity.value,
+    transform: [{ scale: ring2Scale.value + liveAudioLevel.value * 0.9 }],
+    opacity: Math.min(0.7, ring2Opacity.value + liveAudioLevel.value * 0.25),
   }));
 
   const ring3AnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: ring3Scale.value + audioLevel * 0.6 }],
-    opacity: ring3Opacity.value,
+    transform: [{ scale: ring3Scale.value + liveAudioLevel.value * 1.2 }],
+    opacity: Math.min(0.5, ring3Opacity.value + liveAudioLevel.value * 0.2),
   }));
 
   // Gradient themes matching ChatGPT Voice with CediSmart Emerald aesthetic

@@ -39,7 +39,10 @@ class VoiceService {
       this.activePlayer = player;
 
       player.addListener('playbackStatusUpdate', (status) => {
-        if (status.didJustFinish) {
+        if (
+          status.didJustFinish ||
+          (status.duration > 0 && status.currentTime >= status.duration && !status.playing)
+        ) {
           this.isSpeaking = false;
           this.activePlayer = null;
           onDone?.();

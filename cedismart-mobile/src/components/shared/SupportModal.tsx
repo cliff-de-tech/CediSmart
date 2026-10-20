@@ -18,6 +18,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -1626,82 +1627,97 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                 </TouchableWithoutFeedback>
 
                 <View
-                  className={`absolute bottom-20 left-4 z-50 w-52 p-2 rounded-3xl border shadow-2xl ${
-                    isDark ? 'bg-[#212121] border-white/10' : 'bg-[#f4f4f4] border-black/10'
-                  }`}
                   style={{
+                    position: 'absolute',
+                    bottom: 84,
+                    left: 16,
+                    zIndex: 50,
+                    width: 216,
+                    borderRadius: 26,
+                    overflow: 'hidden',
+                    borderWidth: 1,
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.1)',
                     shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.35,
-                    shadowRadius: 16,
-                    elevation: 12,
+                    shadowOffset: { width: 0, height: 10 },
+                    shadowOpacity: 0.4,
+                    shadowRadius: 20,
+                    elevation: 16,
                   }}
                 >
-                  {/* Camera Option */}
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={handleLaunchCamera}
-                    className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
+                  <BlurView
+                    intensity={Platform.OS === 'ios' ? 80 : 100}
+                    tint={isDark ? 'dark' : 'light'}
+                    style={{
+                      padding: 8,
+                      backgroundColor: isDark ? 'rgba(30, 30, 30, 0.72)' : 'rgba(245, 245, 245, 0.82)',
+                    }}
                   >
-                    <View
-                      className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                        isDark ? 'bg-[#333333]' : 'bg-[#E5E7EB]'
-                      }`}
+                    {/* Camera Option */}
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={handleLaunchCamera}
+                      className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
                     >
-                      <Camera size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
-                    </View>
-                    <Text
-                      className={`font-body text-base font-medium ${
-                        isDark ? 'text-white' : 'text-gray-900'
-                      }`}
-                    >
-                      Camera
-                    </Text>
-                  </TouchableOpacity>
+                      <View
+                        className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                          isDark ? 'bg-white/10' : 'bg-black/5'
+                        }`}
+                      >
+                        <Camera size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
+                      </View>
+                      <Text
+                        className={`font-body text-base font-medium ${
+                          isDark ? 'text-white' : 'text-gray-900'
+                        }`}
+                      >
+                        Camera
+                      </Text>
+                    </TouchableOpacity>
 
-                  {/* Photos Option */}
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={handlePickPhotos}
-                    className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
-                  >
-                    <View
-                      className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                        isDark ? 'bg-[#333333]' : 'bg-[#E5E7EB]'
-                      }`}
+                    {/* Photos Option */}
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={handlePickPhotos}
+                      className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
                     >
-                      <ImageIcon size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
-                    </View>
-                    <Text
-                      className={`font-body text-base font-medium ${
-                        isDark ? 'text-white' : 'text-gray-900'
-                      }`}
-                    >
-                      Photos
-                    </Text>
-                  </TouchableOpacity>
+                      <View
+                        className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                          isDark ? 'bg-white/10' : 'bg-black/5'
+                        }`}
+                      >
+                        <ImageIcon size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
+                      </View>
+                      <Text
+                        className={`font-body text-base font-medium ${
+                          isDark ? 'text-white' : 'text-gray-900'
+                        }`}
+                      >
+                        Photos
+                      </Text>
+                    </TouchableOpacity>
 
-                  {/* Files Option */}
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={handlePickDocument}
-                    className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
-                  >
-                    <View
-                      className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                        isDark ? 'bg-[#333333]' : 'bg-[#E5E7EB]'
-                      }`}
+                    {/* Files Option */}
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={handlePickDocument}
+                      className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
                     >
-                      <Paperclip size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
-                    </View>
-                    <Text
-                      className={`font-body text-base font-medium ${
-                        isDark ? 'text-white' : 'text-gray-900'
-                      }`}
-                    >
-                      Files
-                    </Text>
-                  </TouchableOpacity>
+                      <View
+                        className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                          isDark ? 'bg-white/10' : 'bg-black/5'
+                        }`}
+                      >
+                        <Paperclip size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
+                      </View>
+                      <Text
+                        className={`font-body text-base font-medium ${
+                          isDark ? 'text-white' : 'text-gray-900'
+                        }`}
+                      >
+                        Files
+                      </Text>
+                    </TouchableOpacity>
+                  </BlurView>
                 </View>
               </>
             )}

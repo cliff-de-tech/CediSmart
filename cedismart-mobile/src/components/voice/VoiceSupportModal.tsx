@@ -5,14 +5,20 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StyleSheet,
   Dimensions,
   ScrollView,
   Platform,
   KeyboardAvoidingView,
+  Alert,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import { BlurView } from 'expo-blur';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import {
   Mic,
@@ -21,9 +27,9 @@ import {
   Plus,
   Send,
   CheckCircle2,
-  Stethoscope,
-  Zap,
-  Landmark,
+  Camera,
+  ImageIcon,
+  Paperclip,
 } from 'lucide-react-native';
 import {
   useAudioRecorder,
@@ -86,11 +92,108 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     title: string;
     description: string;
   } | null>(null);
-  const [showQuickSheet, setShowQuickSheet] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<{
+    uri: string;
+    base64: string;
+    mimeType: string;
+    name?: string;
+  } | null>(null);
 
   // In-Voice Typing States (allows typing inside voice mode without closing)
   const [isTypingInVoice, setIsTypingInVoice] = useState(false);
   const [voiceInputText, setVoiceInputText] = useState('');
+
+  // Attachment Handlers for ChatGPT-style '+' Menu inside Voice Mode
+  const handleLaunchCamera = async () => {
+    setShowAttachMenu(false);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'Please allow camera access in your device settings.');
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.65,
+        base64: true,
+      });
+      if (!res.canceled && res.assets[0]?.base64) {
+        setAttachedImage({
+          uri: res.assets[0].uri,
+          base64: res.assets[0].base64,
+          mimeType: res.assets[0].mimeType || 'image/jpeg',
+          name: 'Camera Photo',
+        });
+        setIsTypingInVoice(true);
+        setIsCompactView(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[VoiceSupport] Camera error:', e);
+    }
+  };
+
+  const handlePickPhotos = async () => {
+    setShowAttachMenu(false);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'Please allow photo library access in your device settings.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.65,
+        base64: true,
+      });
+      if (!res.canceled && res.assets[0]?.base64) {
+        setAttachedImage({
+          uri: res.assets[0].uri,
+          base64: res.assets[0].base64,
+          mimeType: res.assets[0].mimeType || 'image/jpeg',
+          name: res.assets[0].fileName || 'Photo',
+        });
+        setIsTypingInVoice(true);
+        setIsCompactView(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[VoiceSupport] Photo picker error:', e);
+    }
+  };
+
+  const handlePickDocument = async () => {
+    setShowAttachMenu(false);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf', 'text/plain'],
+        copyToCacheDirectory: true,
+      });
+      if (!res.canceled && res.assets && res.assets[0]) {
+        const file = res.assets[0];
+        const b64 = await FileSystem.readAsStringAsync(file.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        setAttachedImage({
+          uri: file.uri,
+          base64: b64,
+          mimeType: file.mimeType || 'application/octet-stream',
+          name: file.name,
+        });
+        setIsTypingInVoice(true);
+        setIsCompactView(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[VoiceSupport] Document picker error:', e);
+    }
+  };
 
   // Streaming text animation as voice plays
   const [streamingAiText, setStreamingAiText] = useState('');
@@ -120,13 +223,17 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     enabled: visible,
   });
 
-  // Configure audio session so iOS allows recording & plays audio in silent mode
+  // Configure audio session with allowsRecording: true so iOS/Android allow microphone capture
   useEffect(() => {
-    setAudioModeAsync({
-      playsInSilentMode: true,
-      interruptionMode: 'mixWithOthers',
-    }).catch(() => {});
-  }, []);
+    if (visible) {
+      requestRecordingPermissionsAsync().catch(() => {});
+      setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
+        interruptionMode: 'mixWithOthers',
+      }).catch(() => {});
+    }
+  }, [visible]);
 
   // Welcome greeting on launch with natural neural voice
   useEffect(() => {
@@ -228,13 +335,22 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         return;
       }
 
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        allowsRecording: true,
+        interruptionMode: 'mixWithOthers',
+      });
+
       hasSpokenRef.current = false;
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = null;
       }
 
-      await audioRecorder.prepareToRecordAsync();
+      await audioRecorder.prepareToRecordAsync({
+        ...RecordingPresets.HIGH_QUALITY,
+        isMeteringEnabled: true,
+      });
       audioRecorder.record();
       setVoiceState('listening');
     } catch (err) {
@@ -253,12 +369,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
     const metering = recorderState.metering ?? -160;
 
-    // Normalise decibels (-55dB to -10dB) to 0.0 - 1.0 for the Voice Orb
-    const normalized = metering > -55 ? Math.min(1, Math.max(0, (metering + 55) / 45)) : 0;
+    // Normalise decibels (-65dB to -15dB) to 0.0 - 1.0 for the Voice Orb
+    const normalized = metering > -65 ? Math.min(1, Math.max(0, (metering + 65) / 50)) : 0;
     setAudioLevel(normalized);
 
-    // Speech detected
-    if (metering > -40) {
+    // Speech detected: -52 dB captures natural human voice at normal distance
+    if (metering > -52) {
       hasSpokenRef.current = true;
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
@@ -266,12 +382,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       }
     }
 
-    // Silence detection after user spoke: 1.4s of quiet triggers submission
-    if (hasSpokenRef.current && metering <= -44) {
+    // Silence detection after user spoke: 1.2s of quiet triggers submission
+    if (hasSpokenRef.current && metering <= -55) {
       if (!silenceTimerRef.current) {
         silenceTimerRef.current = setTimeout(() => {
           stopAndProcessAudio();
-        }, 1400);
+        }, 1200);
       }
     }
   }, [recorderState.metering, recorderState.isRecording, voiceState, isMuted, isTypingInVoice]);
@@ -308,6 +424,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       const base64Audio = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
+
+      if (!base64Audio || base64Audio.length < 200) {
+        isProcessingRef.current = false;
+        startListeningLoop();
+        return;
+      }
 
       // Send to backend /support/voice endpoint
       const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
@@ -448,13 +570,17 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     setIsTypingInVoice(false);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
+    const currentAttachment = attachedImage;
+    setAttachedImage(null);
+
     // 1. Add user message to shared conversation thread
     const userMsg: Message = {
       id: 'msg-' + Date.now(),
       role: 'user',
-      content: text,
+      content: currentAttachment ? `[Attached: ${currentAttachment.name || 'File'}]\n${text}` : text,
       status: 'sent',
       actions: [],
+      image_base64: currentAttachment?.base64,
     };
     onAddMessage(userMsg);
     setVoiceState('thinking');
@@ -462,12 +588,17 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     try {
       // 2. Query chat response
       const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
-      const chatRes = await apiClient.post('/support/chat', {
+      const chatPayload: any = {
         messages: [{ role: 'user', content: `[VOICE_MODE: Speak concisely in 1-2 short sentences] ${text}` }],
         phone: phone || 'Anonymous',
         user_name: cleanName || userName,
         support_type: 'general',
-      });
+      };
+      if (currentAttachment) {
+        chatPayload.image_base64 = currentAttachment.base64;
+        chatPayload.image_mime_type = currentAttachment.mimeType;
+      }
+      const chatRes = await apiClient.post('/support/chat', chatPayload);
 
       const reply = chatRes.data?.response || "I'm listening, go ahead.";
 
@@ -765,52 +896,57 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
             </View>
           )}
 
-          {/* Quick Action Sheet Modal / Popover when user taps [+] */}
-          {showQuickSheet && (
-            <View style={styles.sheetOverlay}>
-              <GlassSurface variant="thick" radius={24} style={styles.sheetCard}>
-                <View style={styles.sheetHeader}>
-                  <Text style={styles.sheetTitle}>Quick Voice Actions</Text>
-                  <TouchableOpacity onPress={() => setShowQuickSheet(false)}>
-                    <X size={18} color="#9CA3AF" />
+          {/* OpenAI-Style '+' Attachment Popup Menu (Glassy BlurView) */}
+          {showAttachMenu && (
+            <>
+              <TouchableWithoutFeedback onPress={() => setShowAttachMenu(false)}>
+                <View style={StyleSheet.absoluteFill} />
+              </TouchableWithoutFeedback>
+
+              <View style={styles.attachMenuContainer}>
+                <BlurView
+                  intensity={Platform.OS === 'ios' ? 85 : 100}
+                  tint="dark"
+                  style={styles.attachMenuBlur}
+                >
+                  {/* Camera Option */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleLaunchCamera}
+                    style={styles.attachMenuItem}
+                  >
+                    <View style={styles.attachMenuIconBadge}>
+                      <Camera size={19} color="#F3F4F6" />
+                    </View>
+                    <Text style={styles.attachMenuText}>Camera</Text>
                   </TouchableOpacity>
-                </View>
-                <TouchableOpacity
-                  style={styles.sheetItem}
-                  onPress={() => {
-                    setShowQuickSheet(false);
-                    setActionToast({ title: 'System Diagnostics', description: 'Checking ledger & wallet health...' });
-                    voiceService.speak("Running a quick health check on your wallets. All data caches are fully synchronized.");
-                  }}
-                >
-                  <Stethoscope size={18} color="#10B981" />
-                  <Text style={styles.sheetItemText}>Run System Diagnostics</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.sheetItem}
-                  onPress={() => {
-                    setShowQuickSheet(false);
-                    const totalBalance = (accounts || []).reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
-                    setActionToast({ title: `Balance: ${formatGHS(totalBalance)}`, description: 'Active accounts refreshed' });
-                    voiceService.speak(`Your total available balance is ${formatGHS(totalBalance)}.`);
-                  }}
-                >
-                  <Landmark size={18} color="#10B981" />
-                  <Text style={styles.sheetItemText}>Check Wallet Balances</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.sheetItem}
-                  onPress={() => {
-                    setShowQuickSheet(false);
-                    setIsTypingInVoice(true);
-                    setIsCompactView(true);
-                  }}
-                >
-                  <Zap size={18} color="#10B981" />
-                  <Text style={styles.sheetItemText}>Type in Voice Mode</Text>
-                </TouchableOpacity>
-              </GlassSurface>
-            </View>
+
+                  {/* Photos Option */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handlePickPhotos}
+                    style={styles.attachMenuItem}
+                  >
+                    <View style={styles.attachMenuIconBadge}>
+                      <ImageIcon size={19} color="#F3F4F6" />
+                    </View>
+                    <Text style={styles.attachMenuText}>Photos</Text>
+                  </TouchableOpacity>
+
+                  {/* Files Option */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handlePickDocument}
+                    style={styles.attachMenuItem}
+                  >
+                    <View style={styles.attachMenuIconBadge}>
+                      <Paperclip size={19} color="#F3F4F6" />
+                    </View>
+                    <Text style={styles.attachMenuText}>Files</Text>
+                  </TouchableOpacity>
+                </BlurView>
+              </View>
+            </>
           )}
 
           {/* ChatGPT Voice Bottom Bar */}
@@ -821,6 +957,23 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
               keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
             >
               <View style={[styles.inlineTypeBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+                {attachedImage && (
+                  <View style={styles.attachPreviewRow}>
+                    <View style={styles.attachPreviewChip}>
+                      <Paperclip size={13} color="#10B981" />
+                      <Text style={styles.attachPreviewText} numberOfLines={1}>
+                        {attachedImage.name || 'Attached Media'}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setAttachedImage(null)}
+                        hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      >
+                        <X size={13} color="#9CA3AF" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
                 <View style={styles.inlineTypeCapsule}>
                   <TouchableOpacity
                     onPress={() => {
@@ -847,8 +1000,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
                   <TouchableOpacity
                     onPress={handleSendTypedInVoice}
-                    disabled={!voiceInputText.trim()}
-                    style={[styles.inlineSendBtn, !voiceInputText.trim() && { opacity: 0.5 }]}
+                    disabled={!voiceInputText.trim() && !attachedImage}
+                    style={[styles.inlineSendBtn, !voiceInputText.trim() && !attachedImage && { opacity: 0.5 }]}
                     accessibilityLabel="Send query"
                   >
                     <Send size={16} color="white" />
@@ -871,7 +1024,10 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                 accessibilityLabel="Type in voice mode"
               >
                 <TouchableOpacity
-                  onPress={() => setShowQuickSheet((prev) => !prev)}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setShowAttachMenu((prev) => !prev);
+                  }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   <Plus size={18} color="#9CA3AF" />
@@ -1025,40 +1181,69 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#9CA3AF',
   },
-  sheetOverlay: {
+  attachMenuContainer: {
     position: 'absolute',
-    bottom: 96,
+    bottom: 84,
     left: 20,
-    right: 20,
     zIndex: 999,
+    width: 216,
+    borderRadius: 26,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 16,
   },
-  sheetCard: {
-    padding: 18,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
+  attachMenuBlur: {
+    padding: 8,
+    backgroundColor: 'rgba(30, 30, 30, 0.76)',
   },
-  sheetHeader: {
+  attachMenuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 16,
   },
-  sheetTitle: {
+  attachMenuIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  attachMenuText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+    fontFamily: 'Inter_500Medium',
   },
-  sheetItem: {
+  attachPreviewRow: {
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
   },
-  sheetItemText: {
+  attachPreviewChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E1E1E',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    maxWidth: '80%',
+    gap: 6,
+  },
+  attachPreviewText: {
     color: '#E5E7EB',
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    marginLeft: 12,
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    flexShrink: 1,
   },
   bottomBar: {
     flexDirection: 'row',
