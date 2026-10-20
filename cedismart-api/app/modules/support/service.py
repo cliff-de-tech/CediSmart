@@ -1191,8 +1191,20 @@ class SupportService:
                         resp = await client.post(url, json=payload)
                         if resp.status_code == 200:
                             data = resp.json()
-                            candidate_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                            parsed = json.loads(candidate_text)
+                            candidates = data.get("candidates") or []
+                            if not candidates:
+                                continue
+                            parts = (candidates[0].get("content") or {}).get("parts") or []
+                            if not parts or "text" not in parts[0]:
+                                continue
+                            candidate_text = parts[0]["text"].strip()
+                            if candidate_text.startswith("```"):
+                                candidate_text = re.sub(r"^```(?:json)?\s*", "", candidate_text)
+                                candidate_text = re.sub(r"\s*```$", "", candidate_text).strip()
+                            try:
+                                parsed = json.loads(candidate_text)
+                            except Exception:
+                                continue
                             transcript = parsed.get("transcript") or "Voice message"
                             reply_text = parsed.get("response") or f"I heard you, {first_name}."
                             action_payload = parsed.get("action")
@@ -1257,11 +1269,17 @@ class SupportService:
                 },
             }
             try:
-                async with httpx.AsyncClient(timeout=4.5) as client:
+                async with httpx.AsyncClient(timeout=5.5) as client:
                     resp = await client.post(url, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
-                        inline_data = data["candidates"][0]["content"]["parts"][0]["inlineData"]
+                        candidates = data.get("candidates") or []
+                        if not candidates:
+                            continue
+                        parts = (candidates[0].get("content") or {}).get("parts") or []
+                        if not parts or "inlineData" not in parts[0]:
+                            continue
+                        inline_data = parts[0]["inlineData"]
                         raw_data = inline_data.get("data")
                         raw_mime = inline_data.get("mimeType", "audio/wav")
 
