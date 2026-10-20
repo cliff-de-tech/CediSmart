@@ -523,10 +523,8 @@ class SupportService:
             messages[-1].image_mime_type if messages and messages[-1].image_mime_type else "image/jpeg"
         )
 
-        # 1. Primary Engine: Gemini 2.5 Flash
+        # 1. Primary Engine: High-Speed Gemini Flash-Lite Models
         if settings.GEMINI_API_KEY:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
-
             contents: list[dict[str, Any]] = []
             for idx, msg in enumerate(messages):
                 parts_list: list[dict[str, Any]] = [{"text": msg.content}]
@@ -554,20 +552,23 @@ class SupportService:
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
             }
 
-            try:
-                async with httpx.AsyncClient(timeout=12.0) as client:
-                    response = await client.post(url, json=payload)
-                    if response.status_code == 200:
-                        resp_json = response.json()
-                        ai_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
-                        return ai_text
-                    logger.error(
-                        "Gemini Support API error (status %d): %s",
-                        response.status_code,
-                        response.text,
-                    )
-            except httpx.RequestError as exc:
-                logger.error("Failed to connect to Gemini API: %s", str(exc))
+            for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
+                try:
+                    async with httpx.AsyncClient(timeout=6.0) as client:
+                        response = await client.post(url, json=payload)
+                        if response.status_code == 200:
+                            resp_json = response.json()
+                            ai_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+                            return ai_text
+                        logger.warning(
+                            "Gemini Chat API error (%s status %d): %s",
+                            model_name,
+                            response.status_code,
+                            response.text[:200],
+                        )
+                except Exception as exc:
+                    logger.warning("Gemini chat connection failed (%s): %s", model_name, str(exc))
 
         # 2. Secondary Engine: ChatGPT (gpt-4o-mini) via OpenAI API or Free GitHub Models
         chatgpt_reply = await SupportService._call_chatgpt_fallback(
@@ -1159,9 +1160,9 @@ class SupportService:
             "}"
         )
 
-        # 1. Primary: Gemini Multimodal Audio Understanding
+        # 1. Primary: Gemini Multimodal Audio Understanding (Ultra-Fast Flash-Lite Models)
         if settings.GEMINI_API_KEY:
-            for model_name in ["gemini-2.5-flash", "gemini-1.5-flash"]:
+            for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
                 payload = {
                     "contents": [
@@ -1186,7 +1187,7 @@ class SupportService:
                     },
                 }
                 try:
-                    async with httpx.AsyncClient(timeout=15.0) as client:
+                    async with httpx.AsyncClient(timeout=8.0) as client:
                         resp = await client.post(url, json=payload)
                         if resp.status_code == 200:
                             data = resp.json()
@@ -1239,7 +1240,7 @@ class SupportService:
         if not clean_text:
             return None, None
 
-        tts_models = ["gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts"]
+        tts_models = ["gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview"]
         for model in tts_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
             payload = {
@@ -1256,7 +1257,7 @@ class SupportService:
                 },
             }
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=4.5) as client:
                     resp = await client.post(url, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
