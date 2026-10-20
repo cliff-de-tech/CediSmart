@@ -778,6 +778,8 @@ def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
         category_suggestion = "utilities"
 
         recipient_patterns = [
+            r'payment\s+made\s+for\s+(?:ghs|ghc|₵)?\s*[\d\.,]+\s+to\s+([^.]+)',
+            r'cash\s*out\s*(?:made\s+for)?\s*(?:ghs|ghc|₵)?\s*[\d\.,]+\s+(?:at|to|from)\s+([^.]+)',
             r'sent\s+(?:ghs|ghc|₵)?\s*\d+(?:\.\d{2})?\s+to\s+([^.]+)',
             r'sent\s+to\s+([^.]+)',
             r'paid\s+to\s+([^.]+)',
@@ -806,12 +808,16 @@ def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
         elif any(w in desc_lower for w in ["telecel", "mtn", "airtel", "bundle", "credit", "internet"]):
             category_suggestion = "telecom"
 
+    ref_match = re.search(r'(?:transaction\s+id|financial\s+transaction\s+id|id):\s*(\w+)', sms_text, re.IGNORECASE)
+    reference_id = ref_match.group(1).strip() if ref_match else ""
+
     return {
         "amount": amount,
         "transaction_type": transaction_type,
         "description": description,
         "category_suggestion": category_suggestion,
         "notes": notes,
+        "reference_id": reference_id,
     }
 
 

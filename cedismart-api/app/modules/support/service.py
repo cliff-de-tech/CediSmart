@@ -217,6 +217,9 @@ class SupportService:
             "payment made",
             "you have received",
             "you have sent",
+            "you have transferred",
+            "transferred ghs",
+            "payment of ghs",
             "cash out",
             "cash-out",
             "transaction id",
@@ -232,37 +235,74 @@ class SupportService:
         return has_currency and marker_hits >= 1
 
     @staticmethod
+    def _split_sms_blocks(text: str) -> list[str]:
+        """Split pasted text into individual SMS messages if multiple alerts are pasted together."""
+        # Split by separator lines (===, ---, ***, ___) or multiple newlines
+        initial_chunks = re.split(r"(?:\r?\n\s*[-=_*~]{3,}\s*\r?\n|\r?\n\s*\r?\n)+", text.strip())
+        blocks: list[str] = []
+        for chunk in initial_chunks:
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            # Also check if multiple SMS statements are concatenated without delimiter lines
+            sub_chunks = re.split(
+                r"(?<=[.!?\w])\s+(?=(?:payment\s+made\s+for|payment\s+received\s+for|payment\s+of\s+ghs|you\s+have\s+received|you\s+have\s+transferred|you\s+have\s+sent|cash\s*out\s+made\s+for))",
+                chunk,
+                flags=re.IGNORECASE,
+            )
+            for sub in sub_chunks:
+                sub = sub.strip()
+                if sub and SupportService._looks_like_momo_sms(sub):
+                    blocks.append(sub)
+        return blocks if blocks else ([text.strip()] if SupportService._looks_like_momo_sms(text) else [])
+
+    @staticmethod
     async def _try_instant_sms_rescue(
         db: AsyncSession | None,
         user_obj: Any,
         raw_text: str,
     ) -> str | None:
-        """If the user pasted a raw MoMo SMS in Support Chat, parse and log it immediately."""
+        """If the user pasted raw MoMo SMS message(s) in Support Chat, parse and log them immediately."""
         if not SupportService._looks_like_momo_sms(raw_text):
             return None
 
         from app.modules.transactions.service import _parse_sms_fallback
         from app.modules.transactions.sms_parser import parse_sms as fast_parse_sms
 
-        parsed = fast_parse_sms("MobileMoney", raw_text)
-        if not parsed:
-            fb = _parse_sms_fallback(raw_text)
-            if not fb or not fb.get("amount"):
-                return None
-            parsed = {
-                "amount": float(fb["amount"]),
-                "fee": 0.0,
-                "transaction_type": fb["transaction_type"],
-                "description": fb["description"],
-                "reference_id": f"chat_sms_{int(date.today().strftime('%Y%m%d'))}_{ abs(hash(raw_text)) % 100000 }",
-                "new_balance": 0.0,
-            }
+        sms_blocks = SupportService._split_sms_blocks(raw_text)
+        if not sms_blocks:
+            sms_blocks = [raw_text.strip()]
+
+        parsed_items: list[dict[str, Any]] = []
+        for idx, block in enumerate(sms_blocks):
+            parsed = fast_parse_sms("MobileMoney", block)
+            if not parsed:
+                fb = _parse_sms_fallback(block)
+                if fb and fb.get("amount") and float(fb["amount"]) > 0:
+                    ref = fb.get("reference_id") or f"chat_sms_{int(date.today().strftime('%Y%m%d'))}_{abs(hash(block)) % 100000}_{idx}"
+                    parsed = {
+                        "amount": float(fb["amount"]),
+                        "fee": 0.0,
+                        "transaction_type": fb["transaction_type"],
+                        "description": fb["description"],
+                        "reference_id": ref,
+                        "new_balance": 0.0,
+                    }
+            if parsed and parsed.get("amount") and float(parsed["amount"]) > 0:
+                parsed_items.append(parsed)
+
+        if not parsed_items:
+            return None
 
         if db is None or user_obj is None:
+            tx_summaries = [
+                f"`{p['transaction_type'].upper()}` **GH₵ {p['amount']:.2f}** ({p['description']})"
+                for p in parsed_items
+            ]
             return (
-                f"⚡ **Instant SMS Rescue Parsed:** `{parsed['transaction_type'].upper()}` of "
-                f"**GH₵ {parsed['amount']:.2f}** ({parsed['description']}). "
-                f"Log in to an active account with a linked Mobile Money wallet to auto-credit your ledger! [ACTION:GENERATE_MOMO_KEY]"
+                f"⚡ **Instant SMS Rescue Parsed ({len(parsed_items)} transaction{'s' if len(parsed_items) > 1 else ''}):**\n"
+                + "\n".join(f"- {s}" for s in tx_summaries)
+                + "\n\nLog in to an active account with a linked Mobile Money wallet to auto-credit your ledger! [ACTION:GENERATE_MOMO_KEY]"
             )
 
         try:
@@ -285,68 +325,84 @@ class SupportService:
             account = acc_res.scalars().first()
             if not account:
                 return (
-                    f"⚡ **Instant SMS Rescue Parsed:** I detected a **{parsed['transaction_type'].upper()}** of "
-                    f"**GH₵ {parsed['amount']:.2f}** ({parsed['description']}), but you don't have an active wallet linked yet. "
+                    f"⚡ **Instant SMS Rescue Parsed:** I detected {len(parsed_items)} MoMo transaction(s), but you don't have an active wallet linked yet. "
                     f"Create a Mobile Money wallet in the **Accounts** tab first!"
                 )
 
-            ref_id = str(parsed.get("reference_id") or "")
-            if ref_id:
-                dup_stmt = select(Transaction).where(
-                    Transaction.user_id == user_obj.id,
-                    Transaction.account_id == account.id,
-                    Transaction.is_deleted.is_(False),
-                    or_(
-                        Transaction.notes.like(f"%{ref_id}%"),
-                        Transaction.description.like(f"%{ref_id}%"),
-                    ),
-                )
-                dup_res = await db.execute(dup_stmt)
-                if dup_res.scalars().first():
-                    return (
-                        f"✅ **Already Synced:** That MoMo transaction (**GH₵ {parsed['amount']:.2f}** — Ref `{ref_id}`) "
-                        f"is already recorded in your **{account.name}** wallet! [ACTION:NAV_TRANSACTIONS]"
+            newly_logged: list[dict[str, Any]] = []
+            already_synced: list[dict[str, Any]] = []
+
+            for item in parsed_items:
+                ref_id = str(item.get("reference_id") or "")
+                if ref_id:
+                    dup_stmt = select(Transaction).where(
+                        Transaction.user_id == user_obj.id,
+                        Transaction.account_id == account.id,
+                        Transaction.is_deleted.is_(False),
+                        or_(
+                            Transaction.notes.like(f"%{ref_id}%"),
+                            Transaction.description.like(f"%{ref_id}%"),
+                        ),
                     )
+                    dup_res = await db.execute(dup_stmt)
+                    if dup_res.scalars().first():
+                        already_synced.append(item)
+                        continue
 
-            cat_stmt = select(Category).where(
-                or_(Category.user_id == user_obj.id, Category.is_system.is_(True)),
-                Category.category_type == parsed["transaction_type"],
-            )
-            cat_res = await db.execute(cat_stmt)
-            cat_obj = cat_res.scalars().first()
-            if not cat_obj:
-                cat_obj = Category(
-                    user_id=user_obj.id,
-                    name="Mobile Money" if parsed["transaction_type"] == "income" else "MoMo Transfer",
-                    icon="wallet-outline",
-                    color="#10B981",
-                    category_type=parsed["transaction_type"],
-                    is_system=False,
+                cat_stmt = select(Category).where(
+                    or_(Category.user_id == user_obj.id, Category.is_system.is_(True)),
+                    Category.category_type == item["transaction_type"],
                 )
-                db.add(cat_obj)
-                await db.flush()
+                cat_res = await db.execute(cat_stmt)
+                cat_obj = cat_res.scalars().first()
+                if not cat_obj:
+                    cat_obj = Category(
+                        user_id=user_obj.id,
+                        name="Mobile Money" if item["transaction_type"] == "income" else "MoMo Transfer",
+                        icon="wallet-outline",
+                        color="#10B981",
+                        category_type=item["transaction_type"],
+                        is_system=False,
+                    )
+                    db.add(cat_obj)
+                    await db.flush()
 
-            new_tx = Transaction(
-                user_id=user_obj.id,
-                account_id=account.id,
-                category_id=cat_obj.id,
-                amount=parsed["amount"],
-                transaction_type=parsed["transaction_type"],
-                description=parsed["description"][:250],
-                transaction_date=date.today(),
-                notes=f"Rescued via AI Support Chat SMS Paste | Ref: {ref_id}",
-            )
-            db.add(new_tx)
-            await db.commit()
+                new_tx = Transaction(
+                    user_id=user_obj.id,
+                    account_id=account.id,
+                    category_id=cat_obj.id,
+                    amount=item["amount"],
+                    transaction_type=item["transaction_type"],
+                    description=item["description"][:250],
+                    transaction_date=date.today(),
+                    notes=f"Rescued via AI Support Chat SMS Paste | Ref: {ref_id}",
+                )
+                db.add(new_tx)
+                newly_logged.append(item)
 
-            return (
-                f"⚡ **Instant MoMo SMS Rescue Complete!**\n"
-                f"- **Type:** `{parsed['transaction_type'].upper()}`\n"
-                f"- **Amount:** **GH₵ {parsed['amount']:.2f}**\n"
-                f"- **Wallet:** **{account.name}**\n"
-                f"- **Details:** {parsed['description']} (Ref: `{ref_id}`)\n\n"
-                f"I have logged this transaction directly into your ledger. Your wallet balance has been updated automatically! [ACTION:NAV_TRANSACTIONS]"
-            )
+            if newly_logged:
+                await db.commit()
+
+            # Format the verified result banner for Gemini and client confirmation
+            parts = []
+            if newly_logged:
+                header = f"⚡ **Instant MoMo SMS Rescue Complete! ({len(newly_logged)} transaction{'s' if len(newly_logged) > 1 else ''} logged)**"
+                lines = [header]
+                for idx, t in enumerate(newly_logged, start=1):
+                    lines.append(
+                        f"{idx}. `{t['transaction_type'].upper()}` **GH₵ {t['amount']:.2f}** — {t['description']} (Ref: `{t['reference_id']}`)"
+                    )
+                lines.append(f"\nWallet: **{account.name}**\nAll transactions have been logged directly into your ledger. Your wallet balance has been updated automatically! [ACTION:NAV_TRANSACTIONS]")
+                parts.append("\n".join(lines))
+
+            if already_synced:
+                sync_header = f"✅ **Already Recorded in Ledger ({len(already_synced)} item{'s' if len(already_synced) > 1 else ''}):**"
+                sync_lines = [sync_header]
+                for s in already_synced:
+                    sync_lines.append(f"- **GH₵ {s['amount']:.2f}** ({s['description']} — Ref `{s['reference_id']}`)")
+                parts.append("\n".join(sync_lines))
+
+            return "\n\n".join(parts) if parts else None
         except Exception as exc:
             logger.warning("Instant SMS rescue DB log failed: %s", str(exc))
             return None
@@ -426,10 +482,17 @@ class SupportService:
                 f"\n\n=== INSTANT SMS RESCUE EXECUTED ===\n"
                 f"The system just parsed and logged the user's pasted MoMo SMS with this verified result:\n{sms_rescue_banner}\n"
                 f"Instructions for your response:\n"
-                f"1. Warmly and clearly confirm the exact GH₵ amount, transaction type (Cash In / Payment / Transfer), and wallet logged.\n"
-                f"2. Explicitly assure {first_name} that CediSmart has already automatically synced their balance and updated their ledger.\n"
+                f"1. Warmly and clearly confirm the exact GH₵ amount(s), transaction type (Cash In / Payment / Transfer), and wallet logged based strictly on the verified result above.\n"
+                f"2. Explicitly assure {first_name} that CediSmart has already automatically synced their balance and updated their ledger in real-time.\n"
                 f"3. Do NOT tell the user to tap any 'refresh button'—the app updates automatically in real-time. If you offer an action button, use `[ACTION:NAV_TRANSACTIONS]` so they can view their transactions.\n"
                 f"4. Do NOT start your message with 'Akwaaba'."
+            )
+        else:
+            system_prompt += (
+                f"\n\n=== CRITICAL ZERO-HALLUCINATION GUARD (MANDATORY) ===\n"
+                f"NO TRANSACTIONS WERE AUTOMATICALLY LOGGED INTO THE DATABASE FOR THIS MESSAGE.\n"
+                f"Under NO circumstances should you claim, imply, or hallucinate that you or CediSmart logged, recorded, saved, or added any transactions to the user's ledger.\n"
+                f"If the user shared SMS messages or receipts, explain clearly what is required (e.g. linking their Mobile Money wallet in Accounts tab) or invite them to tap [ACTION:NAV_ADD_EXPENSE] to record it manually."
             )
 
         # Resolve any image attached either on the request or on the last message

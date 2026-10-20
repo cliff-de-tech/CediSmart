@@ -177,3 +177,22 @@ async def test_ticket_status_user_facing_stages(client: AsyncClient) -> None:
         assert body["stage_step"] == 4
 
 
+@pytest.mark.asyncio
+async def test_multi_sms_rescue_parsing() -> None:
+    from app.modules.support.service import SupportService
+
+    sms_text = (
+        "Payment made for GHS 20.00 to BENYGLAD VENTURES 1. Current Balance: GHS 27.86. Available Balance: GHS 27.86. Reference: . Transaction ID: 34336043447. E-Levy: GHS 0.00.\n"
+        "==============================\n"
+        "Payment made for GHS 30.00 to SD SAMATECH ENTERPRISE. Current Balance: GHS 57.86. Available Balance: GHS 57.86. Reference: . Transaction ID: 34335805561. E-Levy: GHS 0.00."
+    )
+    banner = await SupportService._try_instant_sms_rescue(db=None, user_obj=None, raw_text=sms_text)
+    assert banner is not None
+    assert "2 transactions" in banner
+    assert "GH₵ 20.00" in banner
+    assert "GH₵ 30.00" in banner
+    assert "BENYGLAD VENTURES 1" in banner
+    assert "SD SAMATECH ENTERPRISE" in banner
+
+
+

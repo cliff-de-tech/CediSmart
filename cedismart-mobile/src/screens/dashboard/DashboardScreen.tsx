@@ -1964,7 +1964,14 @@ const DashboardScreen = ({ navigation }: any) => {
       {/* AI Support Modal */}
       <SupportModal
         visible={isSupportModalVisible}
-        onClose={() => setIsSupportModalVisible(false)}
+        onClose={() => {
+          setIsSupportModalVisible(false);
+          refetchSummary();
+          refetchTransactions();
+          refetchAccounts();
+          refetchBudgets();
+          refetchAllTransactions();
+        }}
         phone={user?.phone}
         userName={user?.full_name}
         screenContext="dashboard"

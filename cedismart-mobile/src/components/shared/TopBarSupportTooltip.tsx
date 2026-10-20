@@ -33,7 +33,7 @@ export const TopBarSupportTooltip: React.FC<TopBarSupportTooltipProps> = ({
   onOpenSupport,
   topOffset = 64,
   arrowRightOffset = 74,
-  delayMs = 9000,
+  delayMs = 20000,
 }) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';

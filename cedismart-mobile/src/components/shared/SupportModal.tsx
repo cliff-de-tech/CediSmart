@@ -738,6 +738,14 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     }
 
     if (action === 'NAV_TRANSACTIONS') {
+      void Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ['accounts'], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ['transactions'], refetchType: 'all' }),
+        queryClient.invalidateQueries({ queryKey: ['budgets'], refetchType: 'all' }),
+        queryClient.refetchQueries({ queryKey: ['accounts'], type: 'all' }),
+        queryClient.refetchQueries({ queryKey: ['transactions'], type: 'all' }),
+        queryClient.refetchQueries({ queryKey: ['budgets'], type: 'all' }),
+      ]);
       onClose();
       try {
         nav.navigate('MainTabs', { screen: 'DashboardTab' });
@@ -924,15 +932,26 @@ export const SupportModal: React.FC<SupportModalProps> = ({
 
       const { cleanText, actions } = extractActionsAndCleanText(workingText);
 
-      // If the backend performed an Instant MoMo SMS Rescue, refresh wallet & transaction caches immediately!
-      if (
+      // If the backend performed an Instant MoMo SMS Rescue or actions involve transactions, refresh all caches immediately!
+      const isTxRescueOrAction =
         cleanText.includes('Instant MoMo SMS Rescue') ||
         cleanText.includes('Already Synced:') ||
-        actions.includes('NAV_TRANSACTIONS')
-      ) {
-        queryClient.invalidateQueries({ queryKey: ['accounts'] });
-        queryClient.invalidateQueries({ queryKey: ['transactions'] });
-        queryClient.invalidateQueries({ queryKey: ['budgets'] });
+        cleanText.includes('Already Recorded') ||
+        cleanText.toLowerCase().includes('successfully logged') ||
+        cleanText.toLowerCase().includes('logged this transaction') ||
+        (cleanText.toLowerCase().includes('ledger') && cleanText.toLowerCase().includes('logged')) ||
+        actions.includes('NAV_TRANSACTIONS') ||
+        actions.includes('NAV_ADD_EXPENSE');
+
+      if (isTxRescueOrAction) {
+        void Promise.allSettled([
+          queryClient.invalidateQueries({ queryKey: ['accounts'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['transactions'], refetchType: 'all' }),
+          queryClient.invalidateQueries({ queryKey: ['budgets'], refetchType: 'all' }),
+          queryClient.refetchQueries({ queryKey: ['accounts'], type: 'all' }),
+          queryClient.refetchQueries({ queryKey: ['transactions'], type: 'all' }),
+          queryClient.refetchQueries({ queryKey: ['budgets'], type: 'all' }),
+        ]);
       }
 
       setMessages((prev) => {
@@ -1125,12 +1144,14 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                   />
                 </View>
 
-                <View className="flex-1 min-w-0 justify-center">
+                <View className="flex-1 min-w-0 justify-center pr-1">
                   <Text
                     className={`font-headline font-bold text-base leading-tight ${
                       isDark ? 'text-white' : 'text-charcoal'
                     }`}
                     numberOfLines={1}
+                    adjustsFontSizeToFit={true}
+                    minimumFontScale={0.8}
                   >
                     CediSmart Support
                   </Text>
@@ -1140,6 +1161,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                         isDark ? 'text-emerald-300' : 'text-emerald-700'
                       }`}
                       numberOfLines={1}
+                      adjustsFontSizeToFit={true}
+                      minimumFontScale={0.8}
                     >
                       Active • Finance & MoMo Assistant
                     </Text>
