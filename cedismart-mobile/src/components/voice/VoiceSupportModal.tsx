@@ -398,8 +398,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       if (hasSpokenRef.current) {
         silenceTicksRef.current += 1;
 
-        // Auto-send immediately after 600ms (6 ticks x 100ms) of quiet after speaking!
-        if (silenceTicksRef.current >= 6) {
+        // Auto-send immediately after 500ms (5 ticks x 100ms) of quiet after speaking!
+        if (silenceTicksRef.current >= 5) {
           silenceTicksRef.current = 0;
           stopAndProcessAudio();
         }
