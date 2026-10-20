@@ -1,7 +1,7 @@
 """User model — the core identity model for CediSmart."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import TIMESTAMP, Boolean, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -24,7 +24,9 @@ class User(TimestampMixin, Base):
         server_default=text("gen_random_uuid()"),
     )
     phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
-    clerk_user_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True, index=True)
+    clerk_user_id: Mapped[str | None] = mapped_column(
+        String(100), unique=True, nullable=True, index=True
+    )
     email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     full_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     pin_hash: Mapped[str] = mapped_column(String(60), nullable=False)
@@ -37,24 +39,46 @@ class User(TimestampMixin, Base):
     trial_started_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
-    kyc_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    kyc_verified: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
     ghana_card: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # --- Relationships ---
     accounts: Mapped[list["FinancialAccount"]] = relationship(
-        "FinancialAccount", back_populates="user", lazy="selectin", cascade="all, delete-orphan", passive_deletes=True
+        "FinancialAccount",
+        back_populates="user",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     transactions: Mapped[list["Transaction"]] = relationship(
-        "Transaction", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
+        "Transaction",
+        back_populates="user",
+        lazy="noload",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     categories: Mapped[list["Category"]] = relationship(
-        "Category", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
+        "Category",
+        back_populates="user",
+        lazy="noload",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     budgets: Mapped[list["Budget"]] = relationship(
-        "Budget", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
+        "Budget",
+        back_populates="user",
+        lazy="noload",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
     device_tokens: Mapped[list["UserDeviceToken"]] = relationship(
-        "UserDeviceToken", back_populates="user", lazy="noload", cascade="all, delete-orphan", passive_deletes=True
+        "UserDeviceToken",
+        back_populates="user",
+        lazy="noload",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     @property
@@ -63,11 +87,12 @@ class User(TimestampMixin, Base):
         if self.is_premium:
             return True
         if self.trial_started_at:
-            from datetime import timezone, timedelta
+            from datetime import timedelta
+
             start = self.trial_started_at
             if start.tzinfo is None:
-                start = start.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
+                start = start.replace(tzinfo=UTC)
+            now = datetime.now(UTC)
             return now - start < timedelta(days=7)
         return False
 
@@ -77,11 +102,12 @@ class User(TimestampMixin, Base):
         if self.is_premium:
             return False
         if self.trial_started_at:
-            from datetime import timezone, timedelta
+            from datetime import timedelta
+
             start = self.trial_started_at
             if start.tzinfo is None:
-                start = start.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
+                start = start.replace(tzinfo=UTC)
+            now = datetime.now(UTC)
             return now - start < timedelta(days=7)
         return False
 
@@ -89,11 +115,10 @@ class User(TimestampMixin, Base):
     def trial_days_remaining(self) -> int:
         """Get remaining days of trial."""
         if self.trial_started_at:
-            from datetime import timezone
             start = self.trial_started_at
             if start.tzinfo is None:
-                start = start.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
+                start = start.replace(tzinfo=UTC)
+            now = datetime.now(UTC)
             diff = now - start
             days_passed = int(max(0.0, diff.total_seconds()) // 86400)
             return max(0, 7 - days_passed)

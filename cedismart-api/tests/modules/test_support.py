@@ -176,8 +176,8 @@ async def test_ticket_status_user_facing_stages(client: AsyncClient) -> None:
             "user_status": "update_available",
             "status_label": "Update Available",
             "status_description": (
-                "A verified fix has been merged into CediSmart and will be included in the next app"
-                " update."
+                "A verified fix has been merged into CediSmart and will be included in the "
+                "next app update."
             ),
             "stage_step": 4,
         }
@@ -195,9 +195,12 @@ async def test_multi_sms_rescue_parsing() -> None:
     from app.modules.support.service import SupportService
 
     sms_text = (
-        "Payment made for GHS 20.00 to BENYGLAD VENTURES 1. Current Balance: GHS 27.86. Available Balance: GHS 27.86. Reference: . Transaction ID: 34336043447. E-Levy: GHS 0.00.\n"
-        "==============================\n"
-        "Payment made for GHS 30.00 to SD SAMATECH ENTERPRISE. Current Balance: GHS 57.86. Available Balance: GHS 57.86. Reference: . Transaction ID: 34335805561. E-Levy: GHS 0.00."
+        "Payment made for GHS 20.00 to BENYGLAD VENTURES 1. Current Balance: GHS 27.86. "
+        "Available Balance: GHS 27.86. Reference: . Transaction ID: 34336043447. E-Levy: GHS "
+        "0.00.\n==============================\nPayment made for GHS 30.00 to SD SAMATECH "
+        "ENTERPRISE. Current Balance: GHS 57.86. Available Balance: GHS 57.86. Reference: . "
+        "Transaction ID: 34335805561. E-Levy: GHS "
+        "0.00."
     )
     banner = await SupportService._try_instant_sms_rescue(db=None, user_obj=None, raw_text=sms_text)
     assert banner is not None

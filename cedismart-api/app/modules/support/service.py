@@ -16,99 +16,124 @@ from app.modules.support.schemas import ChatMessage
 logger = logging.getLogger(__name__)
 
 ACTION_TAGS_GUIDE = (
-    "\n\n=== INTERACTIVE 1-TAP ACTION TAGS ('DO IT FOR ME' CARDS) ===\nYou can embed interactive"
-    " Liquid Glass action buttons inside your reply by appending one or more of these exact tags at"
-    " the end of your message when relevant:\n- `[ACTION:NAV_ADD_EXPENSE]` — Include this whenever"
-    " the user asks to log, add, or record an expense or income. It lets them open the Add"
-    " Transaction screen in 1 tap.\n- `[ACTION:NAV_BUDGETS]` — Include this whenever advising the"
-    " user to check, create, or adjust their monthly category budgets.\n-"
-    " `[ACTION:NAV_TRANSACTIONS]` — Include this whenever the user wants to inspect their full"
-    " transaction history or search for an entry.\n- `[ACTION:GENERATE_MOMO_KEY]` — Include this"
-    " whenever the user asks about Mobile Money Auto-Sync, SMS sync, iOS Shortcuts setup, or"
-    " Android background SMS permissions.\n- `[ACTION:OPEN_SHORTCUTS]` — Include this when guiding"
-    " an iOS user through Apple Shortcuts automation so they can jump straight into the Shortcuts"
-    " app in 1 tap.\n- `[ACTION:SYNC_OFFLINE_QUEUE]` — Include this if the user's telemetry shows"
-    " pending offline transactions waiting to upload.\n- `[ACTION:HEAL_APP]` — Include this if the"
-    " user reports stale balances or needs to check for app problems in 1 tap.\n-"
-    " `[ACTION:REPORT_PROBLEM]` — Include this if an issue cannot be resolved through automated"
-    " troubleshooting and should be sent to customer support.\n"
+    "\n\n=== INTERACTIVE 1-TAP ACTION TAGS ('DO IT FOR ME' CARDS) ===\nYou can embed "
+    "interactive Liquid Glass action buttons inside your reply by appending one or more of "
+    "these exact tags at the end of your message when relevant:\n- "
+    "`[ACTION:NAV_ADD_EXPENSE]` — Include this whenever the user asks to log, add, or record "
+    "an expense or income. It lets them open the Add Transaction screen in 1 tap.\n- "
+    "`[ACTION:NAV_BUDGETS]` — Include this whenever advising the user to check, create, or "
+    "adjust their monthly category budgets.\n- `[ACTION:NAV_TRANSACTIONS]` — Include this "
+    "whenever the user wants to inspect their full transaction history or search for an "
+    "entry.\n- `[ACTION:GENERATE_MOMO_KEY]` — Include this whenever the user asks about "
+    "Mobile Money Auto-Sync, SMS sync, iOS Shortcuts setup, or Android background SMS "
+    "permissions.\n- `[ACTION:OPEN_SHORTCUTS]` — Include this when guiding an iOS user "
+    "through Apple Shortcuts automation so they can jump straight into the Shortcuts app in "
+    "1 tap.\n- `[ACTION:SYNC_OFFLINE_QUEUE]` — Include this if the user's telemetry shows "
+    "pending offline transactions waiting to upload.\n- `[ACTION:HEAL_APP]` — Include this "
+    "if the user reports stale balances or needs to check for app problems in 1 tap.\n- "
+    "`[ACTION:REPORT_PROBLEM]` — Include this if an issue cannot be resolved through "
+    "automated troubleshooting and should be sent to customer "
+    "support.\n"
 )
 
 CRITICAL_TRUTH_AND_INTEGRITY_RULES = (
-    "\n\n=== CRITICAL TRUTH & TRANSACTION INTEGRITY RULES (ZERO HALLUCINATIONS) ===\n1. You CANNOT"
-    " directly create, edit, delete, or categorize transactions in the database from chat messages"
-    " unless the system explicitly attached a verified '=== INSTANT SMS RESCUE EXECUTED ===' block"
-    " in your context.\n2. NEVER claim, pretend, or tell the user that you 'logged', 'saved',"
-    " 'recorded', or 'categorized' a transaction unless you see the explicit '=== INSTANT SMS"
-    " RESCUE EXECUTED ===' banner in this prompt!\n3. If the user asks 'Did you do it?', 'Did you"
-    " log it?', or asks you verbally to record an expense (e.g. 'log 51 cedi for chop money'),"
-    " truthfully and politely explain that you cannot record manual transactions directly from chat"
-    " messages. Advise them to use the 'Add Expense' button on the Home screen or paste the exact"
-    " MoMo SMS alert. Provide `[ACTION:NAV_ADD_EXPENSE]`.\n4. Always verify facts against the 'LIVE"
-    " X-RAY ACCOUNT & DEVICE TELEMETRY' provided below. If the telemetry lists their recent"
-    " transactions or wallets, cite the actual data accurately rather than inventing amounts.\n"
+    "\n\n=== CRITICAL TRUTH & TRANSACTION INTEGRITY RULES (ZERO HALLUCINATIONS) ===\n1. You "
+    "CANNOT directly create, edit, delete, or categorize transactions in the database from "
+    "chat messages unless the system explicitly attached a verified '=== INSTANT SMS RESCUE "
+    "EXECUTED ===' block in your context.\n2. NEVER claim, pretend, or tell the user that "
+    "you 'logged', 'saved', 'recorded', or 'categorized' a transaction unless you see the "
+    "explicit '=== INSTANT SMS RESCUE EXECUTED ===' banner in this prompt!\n3. If the user "
+    "asks 'Did you do it?', 'Did you log it?', or asks you verbally to record an expense "
+    "(e.g. 'log 51 cedi for chop money'), truthfully and politely explain that you cannot "
+    "record manual transactions directly from chat messages. Advise them to use the 'Add "
+    "Expense' button on the Home screen or paste the exact MoMo SMS alert. Provide "
+    "`[ACTION:NAV_ADD_EXPENSE]`.\n4. Always verify facts against the 'LIVE X-RAY ACCOUNT & "
+    "DEVICE TELEMETRY' provided below. If the telemetry lists their recent transactions or "
+    "wallets, cite the actual data accurately rather than inventing "
+    "amounts.\n"
 )
 
 VOICE_MODE_INSTRUCTIONS = (
-    "\n\n=== CHATGPT LIVE VOICE MODE INSTRUCTIONS ===\n"
-    "When a user message begins with `[VOICE_MODE]` or is spoken via hands-free Voice Call Mode:\n"
-    "1. Speak naturally as a friendly, reassuring Ghanaian financial companion (mimicking ChatGPT Voice).\n"
-    "2. Keep your spoken response brief, conversational, and direct (1 to 2 short sentences max).\n"
-    "3. Never include markdown bullet points, asterisks, or raw symbols that sound awkward when read out loud by text-to-speech.\n"
-    "4. Mention currency naturally (e.g. '50 cedis' rather than 'GHS 50.00').\n"
+    "\n\n=== CHATGPT LIVE VOICE MODE INSTRUCTIONS ===\nWhen a user message begins with "
+    "`[VOICE_MODE]` or is spoken via hands-free Voice Call Mode:\n1. Speak naturally as a "
+    "friendly, reassuring Ghanaian financial companion (mimicking ChatGPT Voice).\n2. Keep "
+    "your spoken response brief, conversational, and direct (1 to 2 short sentences "
+    "max).\n3. Never include markdown bullet points, asterisks, or raw symbols that sound "
+    "awkward when read out loud by text-to-speech.\n4. Mention currency naturally (e.g. '50 "
+    "cedis' rather than 'GHS "
+    "50.00').\n"
 )
 
 AUTH_SYSTEM_PROMPT = (
-    "You are the CediSmart Onboarding & Authentication Troubleshooter. CediSmart is a digital"
-    " ledger and budgeting mobile application built for the Ghanaian market.\n\nYour tone should be"
-    " professional, polite, helpful, and direct.\n\nYour sole focus is helping users resolve"
-    " registration, SMS verification OTP, sign-in, and 6-digit Secure PIN reset issues.\n- SMS"
-    " Verification OTP: SMS verification is handled via Clerk. If they aren't receiving OTPs,"
-    " suggest they check cellular signal, ensure they didn't prefix the number with another 0"
-    " (Ghana numbers are 9 digits, e.g., 24XXXXXXX, excluding the leading 0), or check if they have"
-    " MTN Do Not Disturb (DND) active which blocks transaction SMS. Also note that reviewers can"
-    " use pre-configured Test Phone Numbers.\n- PIN & Login: Security PINs are 6 digits and stored"
-    " securely. PIN resets require a Clerk phone re-verification step.\n- Screenshot Vision: If the"
-    " user attaches a screenshot of an error screen or OTP issue, inspect the visual details"
-    " carefully and give exact step-by-step guidance.\n- Important restriction: Since you are the"
-    " Onboarding Troubleshooter, if users ask about general ledger usage, adding transactions, or"
-    " setting budgets, politely advise them that you are specialized in login/registration issues,"
-    " but once they are logged in, the General Support assistant in Settings will happily help them"
-    " with budgeting.\n\nIMPORTANT ESCALATION PROTOCOL:\nIf the user describes a bug, a server"
-    " crash, asks for human support, or if the issue is complex and you cannot solve it, add the"
-    " exact tag '[ESCALATE_REQUIRED]' at the end of your response. This lets the system know it"
-    " needs to offer the user a direct problem report."
+    (
+        "You are the CediSmart Onboarding & Authentication Troubleshooter. CediSmart is a "
+        "digital ledger and budgeting mobile application built for the Ghanaian market.\n\nYour "
+        "tone should be professional, polite, helpful, and direct.\n\nYour sole focus is helping "
+        "users resolve registration, SMS verification OTP, sign-in, and 6-digit Secure PIN reset "
+        "issues.\n- SMS Verification OTP: SMS verification is handled via Clerk. If they aren't "
+        "receiving OTPs, suggest they check cellular signal, ensure they didn't prefix the "
+        "number with another 0 (Ghana numbers are 9 digits, e.g., 24XXXXXXX, excluding the "
+        "leading 0), or check if they have MTN Do Not Disturb (DND) active which blocks "
+        "transaction SMS. Also note that reviewers can use pre-configured Test Phone Numbers.\n- "
+        "PIN & Login: Security PINs are 6 digits and stored securely. PIN resets require a Clerk "
+        "phone re-verification step.\n- Screenshot Vision: If the user attaches a screenshot of "
+        "an error screen or OTP issue, inspect the visual details carefully and give exact "
+        "step-by-step guidance.\n- Important restriction: Since you are the Onboarding "
+        "Troubleshooter, if users ask about general ledger usage, adding transactions, or "
+        "setting budgets, politely advise them that you are specialized in login/registration "
+        "issues, but once they are logged in, the General Support assistant in Settings will "
+        "happily help them with budgeting.\n\nIMPORTANT ESCALATION PROTOCOL:\nIf the user "
+        "describes a bug, a server crash, asks for human support, or if the issue is complex and "
+        "you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your "
+        "response. This lets the system know it needs to offer the user a direct problem "
+        "report."
+    )
     + ACTION_TAGS_GUIDE
     + CRITICAL_TRUTH_AND_INTEGRITY_RULES
     + VOICE_MODE_INSTRUCTIONS
 )
 
-GENERAL_SYSTEM_PROMPT = (
-    "You are the CediSmart Ledger & Budgeting Co-Pilot. CediSmart is a digital ledger and budgeting "
-    "mobile application built for the Ghanaian market, supporting Cash, Mobile Money (MTN, Telecel, AT), "
-    "and Bank accounts.\n\n"
-    "Your tone should be professional, polite, reassuring, and direct. You must provide clear, trustworthy financial advice.\n\n"
-    "Your focus is helping logged-in users understand and use CediSmart's ledger, budgeting, and transaction syncing features:\n"
-    "- Ledgers: Help them understand how to set up accounts, record transactions (categorize expense vs income), and review monthly reports.\n"
-    "- Budgeting: Guide them on setting monthly category budgets and tracking spending limits.\n"
-    "- Mobile Money Live Sync (Background SMS Sync): Guide them on how to configure automated transaction tracking:\n"
-    "  1. 🤖 Google Android: Android supports direct background intercepting. Guide the user to click 'Configure Auto-Sync' in their Accounts tab, select Android, and tap 'Grant SMS Permissions' to allow background SMS reading.\n"
-    "  2. 🍎 Apple iOS: iOS sandboxing blocks direct SMS reading. Explain that they can configure Apple's native Shortcuts app to securely forward messages via webhook:\n"
-    "     * Step 1: Open Shortcuts app ➔ Go to 'Automation' tab ➔ Tap '+' ➔ Select 'Message' as trigger (Sender: 'MobileMoney' or 'T-CASH'). Set 'Run Immediately'.\n"
-    "     * Step 2: Under actions, add 'Get Contents of URL' action, change method to 'POST', and paste the Webhook URL copied from Settings ➔ Accounts.\n"
-    "     * Step 3: Add an Authorization header: Key: 'Authorization', Value: 'Bearer <your key>' (using the copied Auth Key from Accounts tab).\n"
-    "     * Step 4: Change request body to JSON and add fields: 'sender' ➔ select Sender (from message), 'message_body' ➔ select Message/Shortcut Input, 'phone' ➔ type their registered CediSmart phone number.\n"
-    "- Paste-Any-SMS Rescue: Users can also paste any missed MTN MoMo, Telecel Cash, or AT Money SMS directly into this support chat and our system will automatically parse and log it into their wallet!\n"
-    "- Screenshot & Receipt Vision: Users can attach screenshots of UI issues, MoMo SMS alerts, or paper receipts, and you can read and diagnose them visually.\n"
-    "- Important restriction: Since you are post-login support, if the user asks about changing phone numbers or "
-    "re-registering, guide them to the profile/auth settings.\n\n"
-    "IMPORTANT ESCALATION PROTOCOL:\n"
-    "If the user describes a bug, a server crash, asks for human support, or if the issue is complex "
-    "and you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your response. "
-    "This lets the system know it needs to offer the user a direct problem report."
-    + ACTION_TAGS_GUIDE
-    + CRITICAL_TRUTH_AND_INTEGRITY_RULES
-    + VOICE_MODE_INSTRUCTIONS
+_GENERAL_SUPPORT_GUIDANCE = (
+    "You are the CediSmart Ledger & Budgeting Co-Pilot. CediSmart is a digital ledger and "
+    "budgeting mobile application built for the Ghanaian market, supporting Cash, Mobile Money "
+    "(MTN, Telecel, AT), and Bank accounts.\n\nYour tone should be professional, polite, "
+    "reassuring, and direct. You must provide clear, trustworthy financial advice.\n\nYour focus "
+    "is helping logged-in users understand and use CediSmart's ledger, budgeting, and "
+    "transaction syncing features:\n- Ledgers: Help them understand how to set up accounts, "
+    "record transactions (categorize expense vs income), and review monthly reports.\n- "
+    "Budgeting: Guide them on setting monthly category budgets and tracking spending limits.\n- "
+    "Mobile Money Live Sync (Background SMS Sync): Guide them on how to configure automated "
+    "transaction tracking:\n  1. 🤖 Google Android: Android supports direct background "
+    "intercepting. Guide the user to click 'Configure Auto-Sync' in their Accounts tab, select "
+    "Android, and tap 'Grant SMS Permissions' to allow background SMS reading.\n  2. 🍎 Apple "
+    "iOS: iOS sandboxing blocks direct SMS reading. Explain that they can configure Apple's "
+    "native Shortcuts app to securely forward messages via webhook:\n     * Step 1: Open "
+    "Shortcuts app ➔ Go to 'Automation' tab ➔ Tap '+' ➔ Select 'Message' as trigger (Sender: "
+    "'MobileMoney' or 'T-CASH'). Set 'Run Immediately'.\n     * Step 2: Under actions, add 'Get "
+    "Contents of URL' action, change method to 'POST', and paste the Webhook URL copied from "
+    "Settings ➔ Accounts.\n     * Step 3: Add an Authorization header: Key: 'Authorization', "
+    "Value: 'Bearer <your key>' (using the copied Auth Key from Accounts tab).\n     * Step 4: "
+    "Change request body to JSON and add fields: 'sender' ➔ select Sender (from message), "
+    "'message_body' ➔ select Message/Shortcut Input, 'phone' ➔ type their registered CediSmart "
+    "phone number.\n- Paste-Any-SMS Rescue: Users can also paste any missed MTN MoMo, Telecel "
+    "Cash, or AT Money SMS directly into this support chat and our system will automatically "
+    "parse and log it into their wallet!\n- Screenshot & Receipt Vision: Users can attach "
+    "screenshots of UI issues, MoMo SMS alerts, or paper receipts, and you can read and diagnose "
+    "them visually.\n- Important restriction: Since you are post-login support, if the user asks "
+    "about changing phone numbers or re-registering, guide them to the profile/auth "
+    "settings.\n\nIMPORTANT ESCALATION PROTOCOL:\nIf the user describes a bug, a server crash, "
+    "asks for human support, or if the issue is complex and you cannot solve it, add the exact "
+    "tag '[ESCALATE_REQUIRED]' at the end of your response. This lets the system know it needs "
+    "to offer the user a direct problem "
+    "report."
+)
+GENERAL_SYSTEM_PROMPT = "".join(
+    (
+        _GENERAL_SUPPORT_GUIDANCE,
+        ACTION_TAGS_GUIDE,
+        CRITICAL_TRUTH_AND_INTEGRITY_RULES,
+        VOICE_MODE_INSTRUCTIONS,
+    )
 )
 
 
@@ -237,10 +262,11 @@ class SupportService:
             return "", None
 
         telemetry_block = (
-            "\n\n=== LIVE X-RAY ACCOUNT & DEVICE TELEMETRY (SILENT DIAGNOSTICS) ===\nUse this"
-            " real-time telemetry to diagnose the user's issue immediately without asking redundant"
-            " questions:\n" + "\n".join(lines)
-        )
+            "\n\n=== LIVE X-RAY ACCOUNT & DEVICE TELEMETRY (SILENT DIAGNOSTICS) ===\nUse "
+            "this real-time telemetry to diagnose the user's issue immediately without "
+            "asking redundant "
+            "questions:\n"
+        ) + "\n".join(lines)
         return telemetry_block, user_obj
 
     @staticmethod
@@ -274,7 +300,10 @@ class SupportService:
 
     @staticmethod
     def _split_sms_blocks(text: str) -> list[str]:
-        """Split pasted text into individual SMS messages if multiple alerts are pasted together."""
+        (
+            "Split pasted text into individual SMS messages if multiple alerts are pasted "
+            "together."
+        )
         # Split by separator lines (===, ---, ***, ___) or multiple newlines
         initial_chunks = re.split(r"(?:\r?\n\s*[-=_*~]{3,}\s*\r?\n|\r?\n\s*\r?\n)+", text.strip())
         blocks: list[str] = []
@@ -284,7 +313,11 @@ class SupportService:
                 continue
             # Also check if multiple SMS statements are concatenated without delimiter lines
             sub_chunks = re.split(
-                r"(?<=[.!?\w])\s+(?=(?:payment\s+made\s+for|payment\s+received\s+for|payment\s+of\s+ghs|you\s+have\s+received|you\s+have\s+transferred|you\s+have\s+sent|cash\s*out\s+made\s+for))",
+                (
+                    "(?<=[.!?\\w])\\s+(?=(?:payment\\s+made\\s+for|payment\\s+received\\s+for|pay"
+                    "ment\\s+of\\s+ghs|you\\s+have\\s+received|you\\s+have\\s+transferred|you\\s+"
+                    "have\\s+sent|cash\\s*out\\s+made\\s+for))"
+                ),
                 chunk,
                 flags=re.IGNORECASE,
             )
@@ -292,7 +325,11 @@ class SupportService:
                 sub = sub.strip()
                 if sub and SupportService._looks_like_momo_sms(sub):
                     blocks.append(sub)
-        return blocks if blocks else ([text.strip()] if SupportService._looks_like_momo_sms(text) else [])
+        return (
+            blocks
+            if blocks
+            else ([text.strip()] if SupportService._looks_like_momo_sms(text) else [])
+        )
 
     @staticmethod
     async def _try_instant_sms_rescue(
@@ -300,24 +337,35 @@ class SupportService:
         user_obj: Any,
         raw_text: str,
     ) -> str | None:
-        """If the user pasted raw MoMo SMS message(s) in Support Chat, parse and log them immediately."""
+        (
+            "If the user pasted raw MoMo SMS message(s) in Support Chat, parse and log them "
+            "immediately."
+        )
         if not SupportService._looks_like_momo_sms(raw_text):
             return None
 
         from app.modules.transactions.service import _parse_sms_fallback
+        from app.modules.transactions.sms_parser import ParsedSMS
         from app.modules.transactions.sms_parser import parse_sms as fast_parse_sms
 
         sms_blocks = SupportService._split_sms_blocks(raw_text)
         if not sms_blocks:
             sms_blocks = [raw_text.strip()]
 
-        parsed_items: list[dict[str, Any]] = []
+        parsed_items: list[ParsedSMS] = []
         for idx, block in enumerate(sms_blocks):
             parsed = fast_parse_sms("MobileMoney", block)
             if not parsed:
                 fb = _parse_sms_fallback(block)
                 if fb and fb.get("amount") and float(fb["amount"]) > 0:
-                    ref = fb.get("reference_id") or f"chat_sms_{int(date.today().strftime('%Y%m%d'))}_{abs(hash(block)) % 100000}_{idx}"
+                    ref = fb.get("reference_id") or (
+                        "chat_sms_"
+                        f"{int(date.today().strftime('%Y%m%d'))}"
+                        "_"
+                        f"{abs(hash(block)) % 100000}"
+                        "_"
+                        f"{idx}"
+                    )
                     parsed = {
                         "amount": float(fb["amount"]),
                         "fee": 0.0,
@@ -338,9 +386,19 @@ class SupportService:
                 for p in parsed_items
             ]
             return (
-                f"⚡ **Instant SMS Rescue Parsed ({len(parsed_items)} transaction{'s' if len(parsed_items) > 1 else ''}):**\n"
+                (
+                    "⚡ **Instant SMS Rescue Parsed "
+                    "("
+                    f"{len(parsed_items)}"
+                    " transaction"
+                    f"{('s' if len(parsed_items) > 1 else '')}"
+                    "):**\n"
+                )
                 + "\n".join(f"- {s}" for s in tx_summaries)
-                + "\n\nLog in to an active account with a linked Mobile Money wallet to auto-credit your ledger! [ACTION:GENERATE_MOMO_KEY]"
+                + (
+                    "\n\nLog in to an active account with a linked Mobile Money wallet to "
+                    "auto-credit your ledger! [ACTION:GENERATE_MOMO_KEY]"
+                )
             )
 
         try:
@@ -363,12 +421,15 @@ class SupportService:
             account = acc_res.scalars().first()
             if not account:
                 return (
-                    f"⚡ **Instant SMS Rescue Parsed:** I detected {len(parsed_items)} MoMo transaction(s), but you don't have an active wallet linked yet. "
-                    f"Create a Mobile Money wallet in the **Accounts** tab first!"
+                    "⚡ **Instant SMS Rescue Parsed:** I detected "
+                    f"{len(parsed_items)}"
+                    " MoMo transaction(s), but you don't have an active wallet linked yet. "
+                    "Create a Mobile Money wallet in the **Accounts** tab "
+                    "first!"
                 )
 
-            newly_logged: list[dict[str, Any]] = []
-            already_synced: list[dict[str, Any]] = []
+            newly_logged: list[ParsedSMS] = []
+            already_synced: list[ParsedSMS] = []
 
             for item in parsed_items:
                 ref_id = str(item.get("reference_id") or "")
@@ -396,7 +457,11 @@ class SupportService:
                 if not cat_obj:
                     cat_obj = Category(
                         user_id=user_obj.id,
-                        name="Mobile Money" if item["transaction_type"] == "income" else "MoMo Transfer",
+                        name=(
+                            "Mobile Money"
+                            if item["transaction_type"] == "income"
+                            else "MoMo Transfer"
+                        ),
                         icon="wallet-outline",
                         color="#10B981",
                         category_type=item["transaction_type"],
@@ -423,6 +488,7 @@ class SupportService:
                 try:
                     from app.core.redis import init_redis, redis_pool
                     from app.modules.transactions.service import _invalidate_caches
+
                     r_client = redis_pool
                     if r_client is None:
                         r_client = await init_redis()
@@ -434,20 +500,60 @@ class SupportService:
             # Format the verified result banner for Gemini and client confirmation
             parts = []
             if newly_logged:
-                header = f"⚡ **Instant MoMo SMS Rescue Complete! ({len(newly_logged)} transaction{'s' if len(newly_logged) > 1 else ''} logged)**"
+                header = (
+                    "⚡ **Instant MoMo SMS Rescue Complete! "
+                    "("
+                    f"{len(newly_logged)}"
+                    " transaction"
+                    f"{('s' if len(newly_logged) > 1 else '')}"
+                    " logged)**"
+                )
                 lines = [header]
                 for idx, t in enumerate(newly_logged, start=1):
                     lines.append(
-                        f"{idx}. `{t['transaction_type'].upper()}` **GH₵ {t['amount']:.2f}** — {t['description']} (Ref: `{t['reference_id']}`)"
+                        f"{idx}"
+                        ". `"
+                        f"{t['transaction_type'].upper()}"
+                        "` **GH₵ "
+                        f"{t['amount']:.2f}"
+                        "** — "
+                        f"{t['description']}"
+                        " (Ref: "
+                        "`"
+                        f"{t['reference_id']}"
+                        "`)"
                     )
-                lines.append(f"\nWallet: **{account.name}**\nAll transactions have been logged directly into your ledger. Your wallet balance has been updated automatically! [ACTION:NAV_TRANSACTIONS]")
+                lines.append(
+                    "\nWallet: "
+                    "**"
+                    f"{account.name}"
+                    "**\nAll transactions have been logged directly into your ledger. Your "
+                    "wallet balance has been updated automatically! "
+                    "[ACTION:NAV_TRANSACTIONS]"
+                )
                 parts.append("\n".join(lines))
 
             if already_synced:
-                sync_header = f"✅ **Already Recorded in Ledger ({len(already_synced)} item{'s' if len(already_synced) > 1 else ''}):**"
+                sync_header = (
+                    "✅ **Already Recorded in Ledger "
+                    "("
+                    f"{len(already_synced)}"
+                    " item"
+                    f"{('s' if len(already_synced) > 1 else '')}"
+                    "):**"
+                )
                 sync_lines = [sync_header]
                 for s in already_synced:
-                    sync_lines.append(f"- **GH₵ {s['amount']:.2f}** ({s['description']} — Ref `{s['reference_id']}`)")
+                    sync_lines.append(
+                        "- **GH₵ "
+                        f"{s['amount']:.2f}"
+                        "** ("
+                        f"{s['description']}"
+                        " — Ref "
+                        "`"
+                        f"{s['reference_id']}"
+                        "`)"
+                    )
                 parts.append("\n".join(sync_lines))
 
             return "\n\n".join(parts) if parts else None
@@ -524,16 +630,42 @@ class SupportService:
         first_name, full_name = SupportService._extract_display_name(user_name, user_obj)
 
         personalization = (
-            f"=== USER IDENTITY & ADAPTIVE TONE RULES ===\n"
-            f"- User's Actual Name: {first_name} (Full Name: {full_name}).\n"
-            f"- Addressing the user: Address them respectfully and naturally by their actual name '{first_name}' (e.g. 'Hello {first_name},', 'Hi {first_name},', or 'Certainly, {first_name}!'). "
-            f"Always use '{first_name}' to personalize your answer whenever greeting or advising them. NEVER address them as 'Mr.!', 'boss', 'don', 'Friend', or other generic nicknames when their name is known.\n"
-            f"- Tone: Professional, reassuring, calm, and trustworthy. CediSmart is a real personal finance and ledger application. "
-            f"Keep all financial information, numbers, dates, and instructions clear and articulate.\n"
-            f"- Adaptive Pidgin Rule: Mirror the user's language! If the user writes in Ghanaian Pidgin, you may respond in warm, natural Ghanaian Pidgin. "
-            f"If the user writes in standard English, answer in clean, professional English with light cultural warmth. "
-            f"Never force slang into financial confirmations, balances, or diagnostics.\n"
-            f"- Greeting & Confirmation Rule: Do NOT start every response or ongoing reply with 'Akwaaba' (Welcome). Only use 'Akwaaba' if it is the very beginning of a new conversation or user onboarding. For routine confirmations, pasted SMS messages, and follow-ups, start directly and naturally without welcoming them repeatedly (e.g., 'Got it, {first_name}!', 'All set, {first_name}.', or 'Here are the details:')."
+            "=== USER IDENTITY & ADAPTIVE TONE RULES ===\n- User's Actual Name: "
+            f"{first_name}"
+            " (Full Name: "
+            f"{full_name}"
+            ").\n- Addressing the user: Address them respectfully and naturally by their "
+            "actual name "
+            "'"
+            f"{first_name}"
+            "' (e.g. 'Hello "
+            f"{first_name}"
+            ",', 'Hi "
+            f"{first_name}"
+            ",', or 'Certainly, "
+            f"{first_name}"
+            "!'). Always use "
+            "'"
+            f"{first_name}"
+            "' to personalize your answer whenever greeting or advising them. NEVER address "
+            "them as 'Mr.!', 'boss', 'don', 'Friend', or other generic nicknames when their "
+            "name is known.\n- Tone: Professional, reassuring, calm, and trustworthy. "
+            "CediSmart is a real personal finance and ledger application. Keep all financial "
+            "information, numbers, dates, and instructions clear and articulate.\n- Adaptive "
+            "Pidgin Rule: Mirror the user's language! If the user writes in Ghanaian Pidgin, "
+            "you may respond in warm, natural Ghanaian Pidgin. If the user writes in "
+            "standard English, answer in clean, professional English with light cultural "
+            "warmth. Never force slang into financial confirmations, balances, or "
+            "diagnostics.\n- Greeting & Confirmation Rule: Do NOT start every response or "
+            "ongoing reply with 'Akwaaba' (Welcome). Only use 'Akwaaba' if it is the very "
+            "beginning of a new conversation or user onboarding. For routine confirmations, "
+            "pasted SMS messages, and follow-ups, start directly and naturally without "
+            "welcoming them repeatedly (e.g., 'Got it, "
+            f"{first_name}"
+            "!', 'All set, "
+            f"{first_name}"
+            ".', or 'Here are the "
+            "details:')."
         )
 
         # Check if the user pasted a raw MoMo SMS into chat for instant rescue
@@ -549,20 +681,31 @@ class SupportService:
         system_prompt = f"{base_prompt}\n\n{personalization}{xray_block}"
         if sms_rescue_banner:
             system_prompt += (
-                f"\n\n=== INSTANT SMS RESCUE EXECUTED ===\n"
-                f"The system just parsed and logged the user's pasted MoMo SMS with this verified result:\n{sms_rescue_banner}\n"
-                f"Instructions for your response:\n"
-                f"1. Warmly and clearly confirm the exact GH₵ amount(s), transaction type (Cash In / Payment / Transfer), and wallet logged based strictly on the verified result above.\n"
-                f"2. Explicitly assure {first_name} that CediSmart has already automatically synced their balance and updated their ledger in real-time.\n"
-                f"3. Do NOT tell the user to tap any 'refresh button'—the app updates automatically in real-time. If you offer an action button, use `[ACTION:NAV_TRANSACTIONS]` so they can view their transactions.\n"
-                f"4. Do NOT start your message with 'Akwaaba'."
+                "\n\n=== INSTANT SMS RESCUE EXECUTED ===\nThe system just parsed and logged "
+                "the user's pasted MoMo SMS with this verified "
+                "result:\n"
+                f"{sms_rescue_banner}"
+                "\nInstructions for your response:\n1. Warmly and clearly confirm the exact "
+                "GH₵ amount(s), transaction type (Cash In / Payment / Transfer), and wallet "
+                "logged based strictly on the verified result above.\n2. Explicitly assure "
+                f"{first_name}"
+                " that CediSmart has already automatically synced their balance and updated "
+                "their ledger in real-time.\n3. Do NOT tell the user to tap any 'refresh "
+                "button'—the app updates automatically in real-time. If you offer an action "
+                "button, use `[ACTION:NAV_TRANSACTIONS]` so they can view their "
+                "transactions.\n4. Do NOT start your message with "
+                "'Akwaaba'."
             )
         else:
             system_prompt += (
-                f"\n\n=== CRITICAL ZERO-HALLUCINATION GUARD (MANDATORY) ===\n"
-                f"NO TRANSACTIONS WERE AUTOMATICALLY LOGGED INTO THE DATABASE FOR THIS MESSAGE.\n"
-                f"Under NO circumstances should you claim, imply, or hallucinate that you or CediSmart logged, recorded, saved, or added any transactions to the user's ledger.\n"
-                f"If the user shared SMS messages or receipts, explain clearly what is required (e.g. linking their Mobile Money wallet in Accounts tab) or invite them to tap [ACTION:NAV_ADD_EXPENSE] to record it manually."
+                "\n\n=== CRITICAL ZERO-HALLUCINATION GUARD (MANDATORY) ===\nNO TRANSACTIONS "
+                "WERE AUTOMATICALLY LOGGED INTO THE DATABASE FOR THIS MESSAGE.\nUnder NO "
+                "circumstances should you claim, imply, or hallucinate that you or CediSmart "
+                "logged, recorded, saved, or added any transactions to the user's "
+                "ledger.\nIf the user shared SMS messages or receipts, explain clearly what "
+                "is required (e.g. linking their Mobile Money wallet in Accounts tab) or "
+                "invite them to tap [ACTION:NAV_ADD_EXPENSE] to record it "
+                "manually."
             )
 
         # Resolve any image attached either on the request or on the last message
@@ -714,7 +857,10 @@ class SupportService:
         support_type: str | None = None,
         first_name: str = "Chale",
     ) -> str:
-        """Provide a personalized fallback response when neither Gemini nor ChatGPT is reachable."""
+        (
+            "Provide a personalized fallback response when neither Gemini nor ChatGPT is "
+            "reachable."
+        )
         last_msg = messages[-1].content.lower() if messages else ""
 
         if support_type == "auth":
@@ -727,9 +873,12 @@ class SupportService:
                     " to report this bug to our developers."
                 )
             return (
-                f"Hi {first_name}! I am the CediSmart Onboarding Assistant. I can help you with OTP"
-                " codes, registration, and PIN resets. (If you have a complicated issue, please"
-                " let me know and I will raise a developer ticket)."
+                "Hi "
+                f"{first_name}"
+                "! I am the CediSmart Onboarding Assistant. I can help you with OTP codes, "
+                "registration, and PIN resets. (If you have a complicated issue, please let "
+                "me know and I will raise a developer "
+                "ticket)."
             )
 
         if "pin" in last_msg or "password" in last_msg or "reset" in last_msg:
@@ -1071,7 +1220,13 @@ class SupportService:
         )
         owner = settings.GITHUB_REPO.split("/")[0]
         branch_head = f"{owner}:chatgpt/issue-{issue_number}"
-        pulls_api_url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/pulls?head={branch_head}&state=all"
+        pulls_api_url = (
+            "https://api.github.com/repos/"
+            f"{settings.GITHUB_REPO}"
+            "/pulls?head="
+            f"{branch_head}"
+            "&state=all"
+        )
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1134,8 +1289,9 @@ class SupportService:
                     user_status = "testing"
                     status_label = "Fix Being Tested"
                     status_description = (
-                        "A proposed solution has been prepared and is currently being tested by our"
-                        " quality assurance pipeline."
+                        "A proposed solution has been prepared and is currently being tested "
+                        "by our quality assurance "
+                        "pipeline."
                     )
                     stage_step = 3
                 elif issue_data.get("state") == "open":

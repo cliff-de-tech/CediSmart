@@ -1,7 +1,7 @@
 """Exercise support integrations with mocked HTTP and the real test database."""
 
 import json
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from datetime import date
 from decimal import Decimal
 
@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.redis import close_redis
 from app.modules.accounts.models import FinancialAccount
 from app.modules.categories.models import Category
 from app.modules.support.schemas import ChatMessage
@@ -25,7 +26,7 @@ MOMO_SMS = (
 
 
 @pytest.fixture(autouse=True)
-def isolated_support_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+async def isolated_support_settings(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[None]:
     for name in (
         "GEMINI_API_KEY",
         "OPENAI_API_KEY",
@@ -34,6 +35,11 @@ def isolated_support_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "DISCORD_FEEDBACK_WEBHOOK_URL",
     ):
         monkeypatch.setattr(settings, name, None)
+    try:
+        yield
+    finally:
+        # SMS rescue can initialize Redis without the HTTP client fixture.
+        await close_redis()
 
 
 def _mock_http(
@@ -241,7 +247,7 @@ async def test_telemetry_handles_registered_user_without_accounts(
     assert "None recorded yet" in telemetry
 
 
-async def test_sms_rescue_prefers_momo_wallet_and_deduplicates(
+async def test_sms_batch_rescue_prefers_momo_wallet_and_deduplicates(
     db_session: AsyncSession, make_user
 ) -> None:
     user = await make_user()
@@ -249,17 +255,25 @@ async def test_sms_rescue_prefers_momo_wallet_and_deduplicates(
     momo = FinancialAccount(user_id=user.id, name="MoMo", account_type="mobile_money")
     db_session.add_all([cash, momo])
     await db_session.flush()
-    first = await SupportService._try_instant_sms_rescue(db_session, user, MOMO_SMS)
-    second = await SupportService._try_instant_sms_rescue(db_session, user, MOMO_SMS)
-    assert first is not None and "Rescue Complete" in first
-    assert second is not None and "Already Synced" in second
+    batch = (
+        MOMO_SMS + "\n\nYou have transferred GHS 20.00 to Kofi Owusu (0244112233). "
+        "Fee charged: GHS 0.20. Your new balance is GHS 80.00. Transaction ID: 194827190."
+    )
+    first = await SupportService._try_instant_sms_rescue(db_session, user, batch)
+    second = await SupportService._try_instant_sms_rescue(db_session, user, batch)
+    assert first is not None and "2 transactions logged" in first
+    assert second is not None and "Already Recorded in Ledger (2 items)" in second
     assert "[ACTION:NAV_TRANSACTIONS]" in first
-    assert "[ACTION:NAV_TRANSACTIONS]" in second
+    assert "194827189" in second and "GH₵ 50.00" in second
     transactions = list((await db_session.scalars(select(Transaction))).all())
-    assert len(transactions) == 1
-    assert transactions[0].account_id == momo.id
-    assert transactions[0].amount == Decimal("50.00")
-    assert "194827189" in transactions[0].notes
+    assert len(transactions) == 2
+    assert {transaction.account_id for transaction in transactions} == {momo.id}
+    assert {(transaction.transaction_type, transaction.amount) for transaction in transactions} == {
+        ("income", Decimal("50.00")),
+        ("expense", Decimal("20.00")),
+    }
+    for reference in ("194827189", "194827190"):
+        assert sum(reference in transaction.notes for transaction in transactions) == 1
 
 
 async def test_sms_rescue_without_wallet_leaves_ledger_unchanged(
