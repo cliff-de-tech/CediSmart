@@ -20,6 +20,7 @@
     "expo-auth-session": "~57.0.16",
     "expo-blur": "~57.0.3",
     "expo-constants": "~57.0.22",
+    "expo-document-picker": "~57.0.3",
     "expo-file-system": "~57.0.7",
     "expo-glass-effect": "~57.0.4",
     "expo-haptics": "~57.0.3",

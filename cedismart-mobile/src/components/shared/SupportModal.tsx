@@ -14,9 +14,13 @@ import {
   Image,
   Linking,
   PermissionsAndroid,
+  TouchableWithoutFeedback,
+  StyleSheet,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,6 +53,8 @@ import {
   Mic,
   AudioLines,
   Landmark,
+  ImageIcon,
+  Paperclip,
 } from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -323,6 +329,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   const [isRunningDoctor, setIsRunningDoctor] = useState(false);
   const [showOfflineGuides, setShowOfflineGuides] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
 
   // Screenshot / Receipt Vision attachment state
   const [attachedImage, setAttachedImage] = useState<{
@@ -594,62 +601,86 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     );
   };
 
-  // Screenshot & Receipt Vision Picker (Expo SDK 57 ImagePicker API)
-  const handlePickImage = () => {
+  // Attachment Handlers for ChatGPT-style '+' Menu
+  const handleLaunchCamera = async () => {
+    setShowAttachMenu(false);
     Haptics.selectionAsync().catch(() => {});
-    Alert.alert(
-      'Attach Screenshot or Receipt',
-      'Send a screenshot of an error, a MoMo SMS, or a receipt photo for visual AI diagnosis.',
-      [
-        {
-          text: '🖼️ Choose from Library',
-          onPress: async () => {
-            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (!perm.granted) {
-              Alert.alert('Permission Required', 'Please allow photo library access to attach screenshots.');
-              return;
-            }
-            const res = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              allowsEditing: false,
-              quality: 0.65,
-              base64: true,
-            });
-            if (!res.canceled && res.assets[0]?.base64) {
-              setAttachedImage({
-                uri: res.assets[0].uri,
-                base64: res.assets[0].base64,
-                mimeType: res.assets[0].mimeType || 'image/jpeg',
-              });
-            }
-          },
-        },
-        {
-          text: '📷 Take Photo',
-          onPress: async () => {
-            const perm = await ImagePicker.requestCameraPermissionsAsync();
-            if (!perm.granted) {
-              Alert.alert('Permission Required', 'Please allow camera access to snap a receipt or screen photo.');
-              return;
-            }
-            const res = await ImagePicker.launchCameraAsync({
-              mediaTypes: ['images'],
-              allowsEditing: false,
-              quality: 0.65,
-              base64: true,
-            });
-            if (!res.canceled && res.assets[0]?.base64) {
-              setAttachedImage({
-                uri: res.assets[0].uri,
-                base64: res.assets[0].base64,
-                mimeType: res.assets[0].mimeType || 'image/jpeg',
-              });
-            }
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'Please allow camera access in your device settings.');
+        return;
+      }
+      const res = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.65,
+        base64: true,
+      });
+      if (!res.canceled && res.assets[0]?.base64) {
+        setAttachedImage({
+          uri: res.assets[0].uri,
+          base64: res.assets[0].base64,
+          mimeType: res.assets[0].mimeType || 'image/jpeg',
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[AI Support] Camera error:', e);
+    }
+  };
+
+  const handlePickPhotos = async () => {
+    setShowAttachMenu(false);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'Please allow photo library access in your device settings.');
+        return;
+      }
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 0.65,
+        base64: true,
+      });
+      if (!res.canceled && res.assets[0]?.base64) {
+        setAttachedImage({
+          uri: res.assets[0].uri,
+          base64: res.assets[0].base64,
+          mimeType: res.assets[0].mimeType || 'image/jpeg',
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[AI Support] Photo library error:', e);
+    }
+  };
+
+  const handlePickDocument = async () => {
+    setShowAttachMenu(false);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (!res.canceled && res.assets && res.assets[0]) {
+        const asset = res.assets[0];
+        const b64 = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        setAttachedImage({
+          uri: asset.uri,
+          base64: b64,
+          mimeType: asset.mimeType || 'application/octet-stream',
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[AI Support] Document picker error:', e);
+    }
   };
 
   // Check for Problems Routine (Plain-Language Outcomes)
@@ -1587,6 +1618,94 @@ export const SupportModal: React.FC<SupportModalProps> = ({
               </View>
             )}
 
+            {/* OpenAI-Style '+' Attachment Popup Menu matching /tmp/251D00D0-82A9-45A6-BF8C-DF8025F38843.jpeg */}
+            {showAttachMenu && (
+              <>
+                <TouchableWithoutFeedback onPress={() => setShowAttachMenu(false)}>
+                  <View style={StyleSheet.absoluteFill} className="z-40" />
+                </TouchableWithoutFeedback>
+
+                <View
+                  className={`absolute bottom-20 left-4 z-50 w-52 p-2 rounded-3xl border shadow-2xl ${
+                    isDark ? 'bg-[#212121] border-white/10' : 'bg-[#f4f4f4] border-black/10'
+                  }`}
+                  style={{
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 16,
+                    elevation: 12,
+                  }}
+                >
+                  {/* Camera Option */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handleLaunchCamera}
+                    className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
+                  >
+                    <View
+                      className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                        isDark ? 'bg-[#333333]' : 'bg-[#E5E7EB]'
+                      }`}
+                    >
+                      <Camera size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
+                    </View>
+                    <Text
+                      className={`font-body text-base font-medium ${
+                        isDark ? 'text-white' : 'text-gray-900'
+                      }`}
+                    >
+                      Camera
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Photos Option */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handlePickPhotos}
+                    className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
+                  >
+                    <View
+                      className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                        isDark ? 'bg-[#333333]' : 'bg-[#E5E7EB]'
+                      }`}
+                    >
+                      <ImageIcon size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
+                    </View>
+                    <Text
+                      className={`font-body text-base font-medium ${
+                        isDark ? 'text-white' : 'text-gray-900'
+                      }`}
+                    >
+                      Photos
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Files Option */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={handlePickDocument}
+                    className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
+                  >
+                    <View
+                      className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                        isDark ? 'bg-[#333333]' : 'bg-[#E5E7EB]'
+                      }`}
+                    >
+                      <Paperclip size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
+                    </View>
+                    <Text
+                      className={`font-body text-base font-medium ${
+                        isDark ? 'text-white' : 'text-gray-900'
+                      }`}
+                    >
+                      Files
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
             {/* Unified ChatGPT-Style Composer Capsule matching /tmp/131462D0-8DA4-4413-833D-B2F502B60D29.jpeg */}
             <View
               style={{ paddingBottom: Math.max(insets.bottom, 12) }}
@@ -1599,7 +1718,10 @@ export const SupportModal: React.FC<SupportModalProps> = ({
               >
                 {/* Plus Attach Button matching ChatGPT */}
                 <TouchableOpacity
-                  onPress={handlePickImage}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setShowAttachMenu((prev) => !prev);
+                  }}
                   disabled={chatMutation.isPending}
                   className="w-10 h-10 rounded-full items-center justify-center"
                   accessibilityLabel="Attach Screenshot or Receipt"
@@ -1839,15 +1961,16 @@ export const SupportModal: React.FC<SupportModalProps> = ({
           </View>
         </Modal>
 
-        {/* Full-Screen ChatGPT Live Voice Mode */}
+        {/* Full-Screen ChatGPT Live Voice Mode sharing the exact same conversation thread */}
         <VoiceSupportModal
           visible={showVoiceModal}
           onClose={() => setShowVoiceModal(false)}
-          onSwitchToText={() => {
-            setShowVoiceModal(false);
-            setTimeout(() => {
-              textInputRef.current?.focus();
-            }, 350);
+          messages={messages}
+          onAddMessage={(newMsg) => {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
           }}
           userName={userName}
           phone={phone}

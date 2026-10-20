@@ -3,11 +3,13 @@ import {
   View,
   Text,
   Modal,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Dimensions,
   ScrollView,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -17,6 +19,7 @@ import {
   MicOff,
   X,
   Plus,
+  Send,
   CheckCircle2,
   Stethoscope,
   Zap,
@@ -31,22 +34,18 @@ import {
 } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { VoiceOrb, VoiceState } from './VoiceOrb';
-import { voiceService, VoiceAction } from '../../services/voiceService';
+import { voiceService } from '../../services/voiceService';
 import { GlassSurface } from '../glass/GlassSurface';
 import { useThemeStore } from '../../stores/themeStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
+import { Message } from '../shared/SupportModal';
 
-interface VoiceMessage {
-  id: string;
-  role: 'user' | 'model';
-  content: string;
-}
-
-interface VoiceSupportModalProps {
+export interface VoiceSupportModalProps {
   visible: boolean;
   onClose: () => void;
-  onSwitchToText?: () => void;
+  messages: Message[];
+  onAddMessage: (msg: Message) => void;
   userName?: string;
   phone?: string;
   initialContext?: string;
@@ -58,7 +57,8 @@ const { width } = Dimensions.get('window');
 export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   visible,
   onClose,
-  onSwitchToText,
+  messages,
+  onAddMessage,
   userName,
   phone,
   initialContext = 'dashboard',
@@ -68,6 +68,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const scrollViewRef = useRef<ScrollView>(null);
+  const voiceInputRef = useRef<TextInput>(null);
 
   // Audio Recorder from expo-audio (SDK 57)
   const audioRecorder = useAudioRecorder({
@@ -87,8 +88,11 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   } | null>(null);
   const [showQuickSheet, setShowQuickSheet] = useState(false);
 
-  // Conversation history for the live transcript view
-  const [conversation, setConversation] = useState<VoiceMessage[]>([]);
+  // In-Voice Typing States (allows typing inside voice mode without closing)
+  const [isTypingInVoice, setIsTypingInVoice] = useState(false);
+  const [voiceInputText, setVoiceInputText] = useState('');
+
+  // Streaming text animation as voice plays
   const [streamingAiText, setStreamingAiText] = useState('');
   const streamingTimerRef = useRef<any>(null);
 
@@ -116,7 +120,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     enabled: visible,
   });
 
-  // Configure audio mode on mount so iOS allows recording & plays audio in silent mode
+  // Configure audio session so iOS allows recording & plays audio in silent mode
   useEffect(() => {
     setAudioModeAsync({
       playsInSilentMode: true,
@@ -129,6 +133,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     if (visible) {
       setIsCompactView(false);
       setIsMuted(false);
+      setIsTypingInVoice(false);
+      setVoiceInputText('');
       setAudioLevel(0);
       setActionToast(null);
       isProcessingRef.current = false;
@@ -136,12 +142,17 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
       const greeting = cleanName ? `Hi ${cleanName}, I'm listening.` : "Hi, I'm listening.";
 
-      const initialGreetingMsg: VoiceMessage = {
-        id: 'greet-' + Date.now(),
-        role: 'model',
-        content: greeting,
-      };
-      setConversation([initialGreetingMsg]);
+      // Only add greeting if current thread is empty
+      if (messages.length <= 1) {
+        const initialGreetingMsg: Message = {
+          id: 'greet-' + Date.now(),
+          role: 'model',
+          content: greeting,
+          status: 'sent',
+          actions: [],
+        };
+        onAddMessage(initialGreetingMsg);
+      }
       startStreamingText(greeting);
       setVoiceState('speaking');
 
@@ -161,7 +172,6 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                 startListeningLoop();
               },
               () => {
-                // Fallback to local TTS if native player has an issue
                 voiceService.speak(greeting, () => setVoiceState('speaking'), () => {
                   setVoiceState('listening');
                   startListeningLoop();
@@ -209,7 +219,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
    * Start live microphone recording loop
    */
   const startListeningLoop = async () => {
-    if (isMuted || !visible || isProcessingRef.current) return;
+    if (isMuted || !visible || isProcessingRef.current || isTypingInVoice) return;
 
     try {
       const { granted } = await requestRecordingPermissionsAsync();
@@ -237,7 +247,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
    * Voice Activity Detection (VAD) & Live Pulse Effect
    */
   useEffect(() => {
-    if (voiceState !== 'listening' || !recorderState.isRecording || isMuted || isProcessingRef.current) {
+    if (voiceState !== 'listening' || !recorderState.isRecording || isMuted || isProcessingRef.current || isTypingInVoice) {
       return;
     }
 
@@ -264,7 +274,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         }, 1400);
       }
     }
-  }, [recorderState.metering, recorderState.isRecording, voiceState, isMuted]);
+  }, [recorderState.metering, recorderState.isRecording, voiceState, isMuted, isTypingInVoice]);
 
   /**
    * Stop recording and send audio to backend for transcription and action execution
@@ -313,14 +323,16 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       const reply = res.data?.response || "I'm listening, go ahead.";
       const action = res.data?.action;
 
-      // Append user transcription to live conversation history
+      // Append user transcription directly to shared conversation thread
       if (transcript && transcript !== 'Voice note received') {
-        const userMsg: VoiceMessage = {
-          id: 'user-' + Date.now(),
+        const userMsg: Message = {
+          id: 'msg-' + Date.now(),
           role: 'user',
           content: transcript,
+          status: 'sent',
+          actions: [],
         };
-        setConversation((prev) => [...prev, userMsg]);
+        onAddMessage(userMsg);
       }
 
       // Execute detected voice action (e.g. create transaction or check balance)
@@ -334,13 +346,15 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         });
       }
 
-      // Append AI response to live transcript
-      const aiMsg: VoiceMessage = {
+      // Append AI response to shared conversation thread
+      const aiMsg: Message = {
         id: 'ai-' + Date.now(),
         role: 'model',
         content: reply,
+        status: 'sent',
+        actions: [],
       };
-      setConversation((prev) => [...prev, aiMsg]);
+      onAddMessage(aiMsg);
       startStreamingText(reply);
 
       // Speak response aloud via natural neural voice or TTS fallback
@@ -390,12 +404,14 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     } catch (err: any) {
       console.warn('[VoiceSupport] Voice processing error:', err);
       const fallbackReply = "Could you please say that again?";
-      const aiMsg: VoiceMessage = {
+      const aiMsg: Message = {
         id: 'ai-err-' + Date.now(),
         role: 'model',
         content: fallbackReply,
+        status: 'sent',
+        actions: [],
       };
-      setConversation((prev) => [...prev, aiMsg]);
+      onAddMessage(aiMsg);
       startStreamingText(fallbackReply);
 
       setVoiceState('speaking');
@@ -413,6 +429,114 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
           startListeningLoop();
         }
       );
+    } finally {
+      setTimeout(() => {
+        isProcessingRef.current = false;
+      }, 500);
+    }
+  };
+
+  /**
+   * Handle user typing in Voice Mode (remains in Voice Mode and receives vocal response!)
+   */
+  const handleSendTypedInVoice = async () => {
+    const text = voiceInputText.trim();
+    if (!text || isProcessingRef.current) return;
+
+    isProcessingRef.current = true;
+    setVoiceInputText('');
+    setIsTypingInVoice(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+
+    // 1. Add user message to shared conversation thread
+    const userMsg: Message = {
+      id: 'msg-' + Date.now(),
+      role: 'user',
+      content: text,
+      status: 'sent',
+      actions: [],
+    };
+    onAddMessage(userMsg);
+    setVoiceState('thinking');
+
+    try {
+      // 2. Query chat response
+      const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
+      const chatRes = await apiClient.post('/support/chat', {
+        messages: [{ role: 'user', content: `[VOICE_MODE: Speak concisely in 1-2 short sentences] ${text}` }],
+        phone: phone || 'Anonymous',
+        user_name: cleanName || userName,
+        support_type: 'general',
+      });
+
+      const reply = chatRes.data?.response || "I'm listening, go ahead.";
+
+      // 3. Synthesize natural neural voice
+      let neuralAudioB64: string | null = null;
+      try {
+        const synthRes = await apiClient.post('/support/voice/synthesize', {
+          text: reply,
+          voice_name: 'Kore',
+        });
+        neuralAudioB64 = synthRes.data?.audio_base64 || null;
+      } catch {}
+
+      // 4. Add AI response to shared conversation thread
+      const aiMsg: Message = {
+        id: 'ai-' + Date.now(),
+        role: 'model',
+        content: reply,
+        status: 'sent',
+        actions: [],
+      };
+      onAddMessage(aiMsg);
+      startStreamingText(reply);
+
+      // 5. Play neural audio aloud while staying inside Voice Mode
+      setVoiceState('speaking');
+      if (neuralAudioB64) {
+        voiceService.speakNeural(
+          neuralAudioB64,
+          () => setVoiceState('speaking'),
+          () => {
+            isProcessingRef.current = false;
+            setVoiceState('listening');
+            startListeningLoop();
+          },
+          () => {
+            voiceService.speak(reply, () => setVoiceState('speaking'), () => {
+              isProcessingRef.current = false;
+              setVoiceState('listening');
+              startListeningLoop();
+            });
+          }
+        );
+      } else {
+        voiceService.speak(reply, () => setVoiceState('speaking'), () => {
+          isProcessingRef.current = false;
+          setVoiceState('listening');
+          startListeningLoop();
+        });
+      }
+    } catch (err) {
+      console.warn('[VoiceSupport] Error handling typed voice query:', err);
+      const fallbackReply = "Could you please say that again?";
+      const aiMsg: Message = {
+        id: 'ai-err-' + Date.now(),
+        role: 'model',
+        content: fallbackReply,
+        status: 'sent',
+        actions: [],
+      };
+      onAddMessage(aiMsg);
+      startStreamingText(fallbackReply);
+
+      setVoiceState('speaking');
+      voiceService.speak(fallbackReply, () => setVoiceState('speaking'), () => {
+        isProcessingRef.current = false;
+        setVoiceState('listening');
+        startListeningLoop();
+      });
     } finally {
       setTimeout(() => {
         isProcessingRef.current = false;
@@ -517,6 +641,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     setIsCompactView((prev) => !prev);
   };
 
+  // ONLY tapping the white X button closes Voice Mode!
   const handleClose = () => {
     Haptics.selectionAsync().catch(() => {});
     cleanupVoiceSession();
@@ -536,15 +661,6 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       try {
         if (audioRecorder.isRecording) audioRecorder.stop();
       } catch {}
-    }
-  };
-
-  const handleSwitchToText = () => {
-    Haptics.selectionAsync().catch(() => {});
-    cleanupVoiceSession();
-    onClose();
-    if (onSwitchToText) {
-      onSwitchToText();
     }
   };
 
@@ -584,7 +700,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
               </TouchableOpacity>
             </View>
           ) : (
-            /* Mode 2: Live Speech-Synced Transcript Screen with Mini-Orb (matching ChatGPT UI) */
+            /* Mode 2: Live Speech-Synced Transcript Screen with Mini-Orb sharing exact same conversation history */
             <View style={styles.transcriptContainer}>
               <ScrollView
                 ref={scrollViewRef}
@@ -593,8 +709,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                 showsVerticalScrollIndicator={false}
                 onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
               >
-                {conversation.map((msg, idx) => {
-                  const isLatestAi = msg.role === 'model' && idx === conversation.length - 1 && voiceState === 'speaking';
+                {messages.map((msg, idx) => {
+                  const isLatestAi = msg.role === 'model' && idx === messages.length - 1 && voiceState === 'speaking';
                   const displayText = isLatestAi && streamingAiText ? streamingAiText : msg.content;
 
                   if (msg.role === 'user') {
@@ -686,58 +802,108 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                   style={styles.sheetItem}
                   onPress={() => {
                     setShowQuickSheet(false);
-                    handleSwitchToText();
+                    setIsTypingInVoice(true);
+                    setIsCompactView(true);
                   }}
                 >
                   <Zap size={18} color="#10B981" />
-                  <Text style={styles.sheetItemText}>Paste MoMo SMS to Auto-Log</Text>
+                  <Text style={styles.sheetItemText}>Type in Voice Mode</Text>
                 </TouchableOpacity>
               </GlassSurface>
             </View>
           )}
 
-          {/* ChatGPT Voice Bottom Bar (Ask CediSmart pill on left, Mute in middle, White Close on right) */}
-          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            {/* Functional Ask CediSmart Pill */}
-            <TouchableOpacity
-              onPress={handleSwitchToText}
-              activeOpacity={0.8}
-              style={styles.askPill}
-              accessibilityLabel="Switch to text composer"
+          {/* ChatGPT Voice Bottom Bar */}
+          {isTypingInVoice ? (
+            /* In-Voice Mode Text Input Bar (Keyboard does NOT exit voice mode) */
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
             >
+              <View style={[styles.inlineTypeBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+                <View style={styles.inlineTypeCapsule}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setIsTypingInVoice(false);
+                      setVoiceInputText('');
+                    }}
+                    style={styles.inlineCancelBtn}
+                    accessibilityLabel="Cancel typing"
+                  >
+                    <X size={18} color="#9CA3AF" />
+                  </TouchableOpacity>
+
+                  <TextInput
+                    ref={voiceInputRef}
+                    style={styles.inlineTextInput}
+                    placeholder="Ask CediSmart..."
+                    placeholderTextColor="#9CA3AF"
+                    value={voiceInputText}
+                    onChangeText={setVoiceInputText}
+                    onSubmitEditing={handleSendTypedInVoice}
+                    returnKeyType="send"
+                    autoFocus
+                  />
+
+                  <TouchableOpacity
+                    onPress={handleSendTypedInVoice}
+                    disabled={!voiceInputText.trim()}
+                    style={[styles.inlineSendBtn, !voiceInputText.trim() && { opacity: 0.5 }]}
+                    accessibilityLabel="Send query"
+                  >
+                    <Send size={16} color="white" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          ) : (
+            /* Standard ChatGPT Voice Bottom Bar (Ask CediSmart pill, Mute, White X close) */
+            <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+              {/* Ask CediSmart pill (tapping opens in-voice keyboard, does NOT exit voice mode) */}
               <TouchableOpacity
-                onPress={() => setShowQuickSheet((prev) => !prev)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setIsTypingInVoice(true);
+                  setIsCompactView(true);
+                }}
+                activeOpacity={0.8}
+                style={styles.askPill}
+                accessibilityLabel="Type in voice mode"
               >
-                <Plus size={18} color="#9CA3AF" />
+                <TouchableOpacity
+                  onPress={() => setShowQuickSheet((prev) => !prev)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Plus size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+                <Text style={styles.askPillText}>Ask CediSmart...</Text>
               </TouchableOpacity>
-              <Text style={styles.askPillText}>Ask CediSmart...</Text>
-            </TouchableOpacity>
 
-            {/* Mute / Unmute Button */}
-            <TouchableOpacity
-              onPress={handleToggleMute}
-              activeOpacity={0.8}
-              style={[styles.muteBtn, isMuted && styles.mutedActive]}
-              accessibilityLabel={isMuted ? 'Unmute microphone' : 'Mute microphone'}
-            >
-              {isMuted ? (
-                <MicOff size={22} color="#f43f5e" />
-              ) : (
-                <Mic size={22} color="#FFFFFF" />
-              )}
-            </TouchableOpacity>
+              {/* Mute / Unmute Button */}
+              <TouchableOpacity
+                onPress={handleToggleMute}
+                activeOpacity={0.8}
+                style={[styles.muteBtn, isMuted && styles.mutedActive]}
+                accessibilityLabel={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+              >
+                {isMuted ? (
+                  <MicOff size={22} color="#f43f5e" />
+                ) : (
+                  <Mic size={22} color="#FFFFFF" />
+                )}
+              </TouchableOpacity>
 
-            {/* White Circular Close Button matching OpenAI Voice */}
-            <TouchableOpacity
-              onPress={handleClose}
-              activeOpacity={0.85}
-              style={styles.closeBtn}
-              accessibilityLabel="Close voice mode"
-            >
-              <X size={22} color="#000000" />
-            </TouchableOpacity>
-          </View>
+              {/* White Circular Close Button: ONLY this button closes voice mode */}
+              <TouchableOpacity
+                onPress={handleClose}
+                activeOpacity={0.85}
+                style={styles.closeBtn}
+                accessibilityLabel="Close voice mode"
+              >
+                <X size={22} color="#000000" />
+              </TouchableOpacity>
+            </View>
+          )}
         </SafeAreaView>
       </View>
     </Modal>
@@ -940,5 +1106,45 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  inlineTypeBar: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    width: '100%',
+  },
+  inlineTypeCapsule: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 52,
+    paddingHorizontal: 12,
+    borderRadius: 26,
+    backgroundColor: '#1E1E1E',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  inlineCancelBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  inlineTextInput: {
+    flex: 1,
+    height: '100%',
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontFamily: 'Inter_400Regular',
+    paddingHorizontal: 4,
+  },
+  inlineSendBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#0d631b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
   },
 });
