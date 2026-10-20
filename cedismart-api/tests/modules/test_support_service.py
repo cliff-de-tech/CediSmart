@@ -80,7 +80,11 @@ async def test_voice_transcription_preserves_intent_and_synthesizes_reply(
     def respond(request: Request) -> Response:
         body = json.loads(request.content)
         if body["generationConfig"].get("responseMimeType") == "application/json":
-            part = {"text": json.dumps(intent)}
+            if "gemini-flash-lite-latest:" in request.url.path:
+                return Response(200, json={"candidates": []})
+            if "gemini-3.5-flash-lite:" in request.url.path:
+                return Response(200, json={"candidates": [{"content": {"parts": []}}]})
+            part = {"text": "```json\n" + json.dumps(intent) + "\n```"}
         else:
             part = {"inlineData": {"data": "YXVkaW8=", "mimeType": "audio/wav"}}
         return Response(200, json={"candidates": [{"content": {"parts": [part]}}]})
@@ -90,14 +94,14 @@ async def test_voice_transcription_preserves_intent_and_synthesizes_reply(
         "data:audio/m4a;base64, YXVkaW8= ", audio_mime, user_name="Mr. Clifford"
     )
     assert result == {**intent, "audio_base64": "YXVkaW8=", "audio_mime_type": "audio/wav"}
-    assert len(requests) == 2
+    assert len(requests) == 4
     recognition = json.loads(requests[0].content)
     assert recognition["contents"][0]["parts"][0]["inlineData"] == {
         "mimeType": provider_mime,
         "data": "YXVkaW8=",
     }
     assert "talking directly to Clifford in Ghana" in recognition["contents"][0]["parts"][1]["text"]
-    synthesis = json.loads(requests[1].content)
+    synthesis = json.loads(requests[-1].content)
     assert synthesis["contents"][0]["parts"][0]["text"] == intent["response"]
     assert synthesis["generationConfig"]["responseModalities"] == ["AUDIO"]
 
@@ -108,7 +112,7 @@ async def test_voice_provider_errors_return_a_safe_repeat_request(
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini")
 
     def respond(request: Request) -> Response:
-        if "gemini-1.5-flash:" in request.url.path:
+        if "gemini-3.5-flash-lite:" in request.url.path:
             return Response(
                 200, json={"candidates": [{"content": {"parts": [{"text": "invalid JSON"}]}}]}
             )
@@ -123,7 +127,7 @@ async def test_voice_provider_errors_return_a_safe_repeat_request(
         "audio_base64": None,
         "audio_mime_type": "audio/wav",
     }
-    assert len(requests) == 4  # Both recognizers and both neural synthesis providers.
+    assert len(requests) == 5  # Three recognizers and both neural synthesis providers.
 
 
 @pytest.mark.parametrize("pcm_mime", ["audio/L16;rate=24000", "audio/wav;codec=pcm"])
@@ -134,7 +138,7 @@ async def test_neural_speech_retries_and_packages_pcm_as_playable_wav(
     pcm = b"\x00\x00\x64\x00\x9c\xff"
 
     def respond(request: Request) -> Response:
-        if "gemini-3.8-flash-lite-tts:" in request.url.path:
+        if "gemini-2.5-flash-preview-tts:" in request.url.path:
             return Response(503)
         return Response(
             200,
@@ -232,6 +236,8 @@ async def test_non_text_gemini_response_uses_chatgpt(
     assert reply == "Fallback guidance"
     assert [request.url.host for request in requests] == [
         "generativelanguage.googleapis.com",
+        "generativelanguage.googleapis.com",
+        "generativelanguage.googleapis.com",
         "api.openai.com",
     ]
 
@@ -256,7 +262,7 @@ async def test_provider_outages_return_local_auth_help(
     )
     assert "Kwame" in reply
     assert "verification OTP" in reply
-    assert len(requests) == 2
+    assert len(requests) == 4
 
 
 @pytest.mark.parametrize("invalid_text", [None, ["unexpected", "list"]])
