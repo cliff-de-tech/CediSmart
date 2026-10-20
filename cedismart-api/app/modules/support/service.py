@@ -747,7 +747,11 @@ class SupportService:
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
             }
 
-            for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
+            for model_name in [
+                "gemini-flash-lite-latest",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+            ]:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
                 try:
                     async with httpx.AsyncClient(timeout=6.0) as client:
@@ -1351,7 +1355,7 @@ class SupportService:
         initial_context: str | None = "dashboard",
         synthesize_audio: bool = True,
         messages: list[dict[str, str]] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Process spoken user audio with Gemini 2.5 / 1.5 multimodal audio understanding.
 
         Transcribes speech, extracts financial actions (e.g. logging transactions, checking balances),
@@ -1424,7 +1428,11 @@ class SupportService:
 
         # 1. Primary: Gemini Multimodal Audio Understanding (Ultra-Fast Flash-Lite Models)
         if settings.GEMINI_API_KEY:
-            for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
+            for model_name in [
+                "gemini-flash-lite-latest",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+            ]:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
                 contents: list[dict[str, Any]] = []
                 if messages:
@@ -1519,8 +1527,10 @@ class SupportService:
         }
 
     @staticmethod
-    async def synthesize_neural_voice(text: str, voice_name: str = "Kore") -> tuple[str | None, str | None]:
-        """Synthesize natural neural speech using Gemini Flash TTS models. Returns (base64_audio, mime_type)."""
+    async def synthesize_neural_voice(
+        text: str, voice_name: str = "Kore"
+    ) -> tuple[str | None, str | None]:
+        """Synthesize neural speech and return base64 audio with its MIME type."""
         if not settings.GEMINI_API_KEY or not text or not text.strip():
             return None, None
 
@@ -1533,7 +1543,10 @@ class SupportService:
 
         tts_models = ["gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview"]
         for model in tts_models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent?key={settings.GEMINI_API_KEY}"
+            )
             payload = {
                 "contents": [{"parts": [{"text": clean_text}]}],
                 "generationConfig": {
@@ -1567,12 +1580,14 @@ class SupportService:
                         raw_data = inline_data.get("data")
                         raw_mime = inline_data.get("mimeType", "audio/wav")
 
-                        # If raw L16 PCM without WAV header is returned, wrap into standard WAV so mobile players handle it seamlessly
+                        # If raw L16 PCM without WAV header is returned, wrap into standard WAV so
+                        # mobile players handle it seamlessly
                         if "audio/l16" in raw_mime.lower() or "codec=pcm" in raw_mime.lower():
                             try:
+                                import base64
                                 import io
                                 import wave
-                                import base64
+
                                 pcm_bytes = base64.b64decode(raw_data)
                                 wav_io = io.BytesIO()
                                 with wave.open(wav_io, "wb") as wf:
@@ -1591,5 +1606,3 @@ class SupportService:
             except Exception as e:
                 logger.warning("Gemini TTS synthesis failed on %s: %s", model, type(e).__name__)
         return None, None
-
-

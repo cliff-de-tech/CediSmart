@@ -213,7 +213,9 @@ async def test_multi_sms_rescue_parsing() -> None:
 
 @pytest.mark.asyncio
 async def test_support_voice_mock(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock) as mock_voice:
+    with patch(
+        "app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock
+    ) as mock_voice:
         mock_voice.return_value = {
             "transcript": "log 50 cedis for lunch on momo",
             "response": "Done Clifford! Recorded 50 cedis for lunch from your Mobile Money wallet.",
@@ -250,7 +252,9 @@ async def test_support_voice_mock(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock) as mock_synth:
+    with patch(
+        "app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock
+    ) as mock_synth:
         mock_synth.return_value = ("dGVzdC1hdWRpby1ieXRlcw==", "audio/wav")
 
         resp = await client.post(

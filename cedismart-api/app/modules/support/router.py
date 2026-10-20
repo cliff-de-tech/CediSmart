@@ -83,7 +83,9 @@ async def voice_chat_with_support(request: Request, body: VoiceRequest) -> Voice
     summary="Synthesize text to high-fidelity natural neural speech via Gemini TTS",
 )
 @limiter.limit("60/15minutes")
-async def synthesize_voice(request: Request, body: VoiceSynthesizeRequest) -> VoiceSynthesizeResponse:
+async def synthesize_voice(
+    request: Request, body: VoiceSynthesizeRequest
+) -> VoiceSynthesizeResponse:
     """Returns base64 audio bytes for natural sounding spoken playback."""
     audio_b64, mime = await SupportService.synthesize_neural_voice(
         text=body.text,

@@ -1,6 +1,9 @@
 """Exercise support integrations with mocked HTTP and the real test database."""
 
+import base64
+import io
 import json
+import wave
 from collections.abc import AsyncIterator, Callable
 from datetime import date
 from decimal import Decimal
@@ -56,6 +59,118 @@ def _mock_http(
         lambda **kwargs: AsyncClient(transport=MockTransport(record), **kwargs),
     )
     return requests
+
+
+@pytest.mark.parametrize(
+    ("audio_mime", "provider_mime"), [("audio/m4a", "audio/mp4"), ("audio/ogg", "audio/ogg")]
+)
+async def test_voice_transcription_preserves_intent_and_synthesizes_reply(
+    monkeypatch: pytest.MonkeyPatch, audio_mime: str, provider_mime: str
+) -> None:
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini")
+    intent = {
+        "transcript": "log 50 cedis for lunch on momo",
+        "response": "Clifford, ready to add 50 cedis for lunch.",
+        "action": {
+            "type": "create_transaction",
+            "payload": {"amount": 50.0, "type": "expense", "account_type": "mobile_money"},
+        },
+    }
+
+    def respond(request: Request) -> Response:
+        body = json.loads(request.content)
+        if body["generationConfig"].get("responseMimeType") == "application/json":
+            part = {"text": json.dumps(intent)}
+        else:
+            part = {"inlineData": {"data": "YXVkaW8=", "mimeType": "audio/wav"}}
+        return Response(200, json={"candidates": [{"content": {"parts": [part]}}]})
+
+    requests = _mock_http(monkeypatch, respond)
+    result = await SupportService.process_voice(
+        "data:audio/m4a;base64, YXVkaW8= ", audio_mime, user_name="Mr. Clifford"
+    )
+    assert result == {**intent, "audio_base64": "YXVkaW8=", "audio_mime_type": "audio/wav"}
+    assert len(requests) == 2
+    recognition = json.loads(requests[0].content)
+    assert recognition["contents"][0]["parts"][0]["inlineData"] == {
+        "mimeType": provider_mime,
+        "data": "YXVkaW8=",
+    }
+    assert "talking directly to Clifford in Ghana" in recognition["contents"][0]["parts"][1]["text"]
+    synthesis = json.loads(requests[1].content)
+    assert synthesis["contents"][0]["parts"][0]["text"] == intent["response"]
+    assert synthesis["generationConfig"]["responseModalities"] == ["AUDIO"]
+
+
+async def test_voice_provider_errors_return_a_safe_repeat_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini")
+
+    def respond(request: Request) -> Response:
+        if "gemini-1.5-flash:" in request.url.path:
+            return Response(
+                200, json={"candidates": [{"content": {"parts": [{"text": "invalid JSON"}]}}]}
+            )
+        return Response(503, text="Provider temporarily unavailable")
+
+    requests = _mock_http(monkeypatch, respond)
+    result = await SupportService.process_voice("YXVkaW8=", user_name="Dr. Abena")
+    assert result == {
+        "transcript": "Voice note received",
+        "response": "I heard you, Abena. Could you please say that again?",
+        "action": {"type": "general_reply", "payload": None},
+        "audio_base64": None,
+        "audio_mime_type": "audio/wav",
+    }
+    assert len(requests) == 4  # Both recognizers and both neural synthesis providers.
+
+
+@pytest.mark.parametrize("pcm_mime", ["audio/L16;rate=24000", "audio/wav;codec=pcm"])
+async def test_neural_speech_retries_and_packages_pcm_as_playable_wav(
+    monkeypatch: pytest.MonkeyPatch, pcm_mime: str
+) -> None:
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini")
+    pcm = b"\x00\x00\x64\x00\x9c\xff"
+
+    def respond(request: Request) -> Response:
+        if "gemini-3.8-flash-lite-tts:" in request.url.path:
+            return Response(503)
+        return Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "data": base64.b64encode(pcm).decode(),
+                                        "mimeType": pcm_mime,
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        )
+
+    requests = _mock_http(monkeypatch, respond)
+    audio, mime = await SupportService.synthesize_neural_voice(
+        "**Hello** [ACTION:NAV_TRANSACTIONS][VOICE_ACTION:ignored]Clifford", "Aoede"
+    )
+    assert mime == "audio/wav" and audio is not None
+    with wave.open(io.BytesIO(base64.b64decode(audio)), "rb") as wav:
+        assert (wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) == (1, 2, 24000)
+        assert wav.readframes(wav.getnframes()) == pcm
+    assert len(requests) == 2
+    for request in requests:
+        body = json.loads(request.content)
+        assert body["contents"][0]["parts"][0]["text"] == "Hello Clifford"
+        assert body["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"] == {
+            "voiceName": "Aoede"
+        }
 
 
 async def test_gemini_keeps_images_and_financial_guardrails(

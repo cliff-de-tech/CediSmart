@@ -131,9 +131,14 @@ class VoiceResponse(BaseModel):
     action: VoiceAction | None = None
     audio_base64: str | None = Field(
         default=None,
-        description="High-fidelity neural audio bytes (e.g. WAV) synthesized by Gemini for natural speech",
+        description=(
+            "High-fidelity neural audio bytes (e.g. WAV) synthesized by Gemini for natural "
+            "speech"
+        ),
     )
-    audio_mime_type: str | None = Field(default="audio/wav", description="MIME type of synthesized audio")
+    audio_mime_type: str | None = Field(
+        default="audio/wav", description="MIME type of synthesized audio"
+    )
 
 
 class VoiceSynthesizeRequest(BaseModel):
@@ -144,4 +149,3 @@ class VoiceSynthesizeRequest(BaseModel):
 class VoiceSynthesizeResponse(BaseModel):
     audio_base64: str | None = None
     audio_mime_type: str | None = "audio/wav"
-
