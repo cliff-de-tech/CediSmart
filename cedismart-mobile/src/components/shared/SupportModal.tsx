@@ -744,6 +744,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         queryClient.invalidateQueries({ queryKey: ['budgets'], refetchType: 'all' }),
         queryClient.refetchQueries({ queryKey: ['accounts'], type: 'all' }),
         queryClient.refetchQueries({ queryKey: ['transactions'], type: 'all' }),
+        queryClient.refetchQueries({ queryKey: ['transactions', 'summary'], type: 'all' }),
         queryClient.refetchQueries({ queryKey: ['budgets'], type: 'all' }),
       ]);
       onClose();
@@ -950,6 +951,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
           queryClient.invalidateQueries({ queryKey: ['budgets'], refetchType: 'all' }),
           queryClient.refetchQueries({ queryKey: ['accounts'], type: 'all' }),
           queryClient.refetchQueries({ queryKey: ['transactions'], type: 'all' }),
+          queryClient.refetchQueries({ queryKey: ['transactions', 'summary'], type: 'all' }),
           queryClient.refetchQueries({ queryKey: ['budgets'], type: 'all' }),
         ]);
       }

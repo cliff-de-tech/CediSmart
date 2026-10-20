@@ -404,11 +404,16 @@ const DashboardScreen = ({ navigation }: any) => {
     );
   };
 
-  // Sync avatar, KYC status, and saved accounts when screen comes into focus
+  // Sync data, avatar, KYC status, and saved accounts when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadSavedAccounts();
       if (user?.id) {
+        refetchSummary();
+        refetchAccounts();
+        refetchTransactions();
+        refetchBudgets();
+        refetchAllTransactions();
         AsyncStorage.getItem(`user_avatar_${user.id}`).then((uri) => {
           if (uri) {
             setAvatarUri(uri);
@@ -443,7 +448,7 @@ const DashboardScreen = ({ navigation }: any) => {
           })
         ).then(() => setAccountAvatars(avatarMap));
       });
-    }, [user?.id, user?.has_premium_access, loadSavedAccounts])
+    }, [user?.id, user?.has_premium_access, loadSavedAccounts, refetchSummary, refetchAccounts, refetchTransactions, refetchBudgets, refetchAllTransactions])
   );
 
   // Trigger confetti and premium haptics when offline transactions are successfully synced in the background!
@@ -859,17 +864,37 @@ const DashboardScreen = ({ navigation }: any) => {
                   )}
                 </View>
 
-                <View className="flex-row justify-between pt-5 border-t border-white/15">
-                  <View>
-                    <Text className="text-white/65 font-label text-[10px] uppercase tracking-widest block mb-1">Income this month</Text>
-                    <View className="flex-row items-center space-x-2">
-                      <Text className="text-xl font-bold text-success">{hideBalances ? "₵ ••••" : formatGHS(income)}</Text>
+                <View className="flex-row justify-between items-center pt-5 border-t border-white/15">
+                  <View className="flex-1 pr-2">
+                    <Text
+                      style={{ color: 'rgba(255, 255, 255, 0.75)' }}
+                      className="font-label text-[11px] font-bold uppercase tracking-widest mb-1.5"
+                    >
+                      INCOME
+                    </Text>
+                    <View className="flex-row items-center">
+                      <Text
+                        style={{ color: '#4ade80' }}
+                        className="text-xl font-bold font-headline tracking-tight"
+                      >
+                        {hideBalances ? "₵ ••••" : formatGHS(income)}
+                      </Text>
                     </View>
                   </View>
-                  <View className="items-end">
-                    <Text className="text-white/65 font-label text-[10px] uppercase tracking-widest block mb-1">Spent this month</Text>
-                    <View className="flex-row items-center space-x-2">
-                      <Text className="text-xl font-bold text-error">{hideBalances ? "₵ ••••" : formatGHS(expense)}</Text>
+                  <View className="flex-1 pl-2 items-end">
+                    <Text
+                      style={{ color: 'rgba(255, 255, 255, 0.75)' }}
+                      className="font-label text-[11px] font-bold uppercase tracking-widest mb-1.5"
+                    >
+                      SPENT
+                    </Text>
+                    <View className="flex-row items-center">
+                      <Text
+                        style={{ color: '#f87171' }}
+                        className="text-xl font-bold font-headline tracking-tight"
+                      >
+                        {hideBalances ? "₵ ••••" : formatGHS(expense)}
+                      </Text>
                     </View>
                   </View>
                 </View>

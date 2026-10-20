@@ -382,6 +382,16 @@ class SupportService:
 
             if newly_logged:
                 await db.commit()
+                try:
+                    from app.core.redis import init_redis, redis_pool
+                    from app.modules.transactions.service import _invalidate_caches
+                    r_client = redis_pool
+                    if r_client is None:
+                        r_client = await init_redis()
+                    if r_client is not None:
+                        await _invalidate_caches(user_obj.id, date.today(), r_client)
+                except Exception as c_err:
+                    logger.warning("Failed to invalidate cache after SMS rescue: %s", str(c_err))
 
             # Format the verified result banner for Gemini and client confirmation
             parts = []
