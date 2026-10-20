@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Appearance } from 'react-native';
 
 export type Theme = 'light' | 'dark';
-export type ThemeMode = 'dark' | 'system';
+export type ThemeMode = 'none' | 'dark' | 'system';
 
 interface ThemeStoreState {
   themeMode: ThemeMode;
@@ -21,14 +21,21 @@ const getSystemTheme = (): Theme => {
 export const useThemeStore = create<ThemeStoreState>()(
   persist(
     (set, get) => ({
-      themeMode: 'system',
-      theme: getSystemTheme(),
+      themeMode: 'none',
+      theme: 'light',
       setThemeMode: (mode: ThemeMode) => {
-        const activeTheme = mode === 'dark' ? 'dark' : getSystemTheme();
+        let activeTheme: Theme = 'light';
+        if (mode === 'dark') {
+          activeTheme = 'dark';
+        } else if (mode === 'system') {
+          activeTheme = getSystemTheme();
+        } else {
+          activeTheme = 'light';
+        }
         set({ themeMode: mode, theme: activeTheme });
       },
       setTheme: (theme: Theme) => {
-        const mode: ThemeMode = theme === 'dark' ? 'dark' : 'system';
+        const mode: ThemeMode = theme === 'dark' ? 'dark' : 'none';
         set({
           theme,
           themeMode: mode,
@@ -36,8 +43,8 @@ export const useThemeStore = create<ThemeStoreState>()(
       },
       toggleTheme: () => {
         const currentMode = get().themeMode;
-        const nextMode: ThemeMode = currentMode === 'dark' ? 'system' : 'dark';
-        const activeTheme = nextMode === 'dark' ? 'dark' : getSystemTheme();
+        const nextMode: ThemeMode = currentMode === 'dark' ? 'none' : 'dark';
+        const activeTheme: Theme = nextMode === 'dark' ? 'dark' : 'light';
         set({
           themeMode: nextMode,
           theme: activeTheme,
@@ -49,16 +56,22 @@ export const useThemeStore = create<ThemeStoreState>()(
       storage: createJSONStorage(() => AsyncStorage),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const mode: ThemeMode = state.themeMode || (state.theme === 'dark' ? 'dark' : 'system');
+          const mode: ThemeMode = state.themeMode ?? 'none';
           state.themeMode = mode;
-          state.theme = mode === 'dark' ? 'dark' : getSystemTheme();
+          if (mode === 'dark') {
+            state.theme = 'dark';
+          } else if (mode === 'system') {
+            state.theme = getSystemTheme();
+          } else {
+            state.theme = 'light';
+          }
         }
       },
     }
   )
 );
 
-// Listen for device appearance changes in real time
+// Listen for device appearance changes in real time (only when user has selected Device Theme)
 Appearance.addChangeListener(({ colorScheme }) => {
   const currentMode = useThemeStore.getState().themeMode;
   if (currentMode === 'system') {

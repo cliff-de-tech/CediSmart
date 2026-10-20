@@ -1551,18 +1551,33 @@ const SettingsScreen = ({ navigation, route }: any) => {
               value="Always use dark appearance"
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
-                setThemeMode(themeMode === 'dark' ? 'system' : 'dark');
+                setThemeMode(themeMode === 'dark' ? 'none' : 'dark');
               }}
               hideChevron
               rightElement={
-                <Switch 
-                  value={themeMode === 'dark'} 
-                  onValueChange={(val) => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setThemeMode(val ? 'dark' : 'system');
+                <View
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    borderWidth: 2,
+                    borderColor: themeMode === 'dark' ? (isDark ? '#4ade80' : '#0d631b') : (isDark ? '#4B5563' : '#9CA3AF'),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                   }}
-                  trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
-                />
+                >
+                  {themeMode === 'dark' && (
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: isDark ? '#4ade80' : '#0d631b',
+                      }}
+                    />
+                  )}
+                </View>
               }
             />
             <SettingItem 
@@ -1571,18 +1586,33 @@ const SettingsScreen = ({ navigation, route }: any) => {
               value="Match system appearance"
               onPress={() => {
                 Haptics.selectionAsync().catch(() => {});
-                setThemeMode(themeMode === 'system' ? 'dark' : 'system');
+                setThemeMode(themeMode === 'system' ? 'none' : 'system');
               }}
               hideChevron
               rightElement={
-                <Switch 
-                  value={themeMode === 'system'} 
-                  onValueChange={(val) => {
-                    Haptics.selectionAsync().catch(() => {});
-                    setThemeMode(val ? 'system' : 'dark');
+                <View
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    borderWidth: 2,
+                    borderColor: themeMode === 'system' ? (isDark ? '#4ade80' : '#0d631b') : (isDark ? '#4B5563' : '#9CA3AF'),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'transparent',
                   }}
-                  trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
-                />
+                >
+                  {themeMode === 'system' && (
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: isDark ? '#4ade80' : '#0d631b',
+                      }}
+                    />
+                  )}
+                </View>
               }
             />
           </View>
