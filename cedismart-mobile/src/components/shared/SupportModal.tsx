@@ -46,6 +46,7 @@ import {
   Clock,
   Trash2,
   Headphones,
+  Mic,
 } from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { useThemeStore } from '../../stores/themeStore';
@@ -53,6 +54,7 @@ import { useOfflineStore } from '../../stores/offlineStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GlassSurface } from '../glass/GlassSurface';
 import { CoinBackground } from './CoinBackground';
+import { VoiceSupportModal } from '../voice/VoiceSupportModal';
 
 export type ActionTag =
   | 'GENERATE_MOMO_KEY'
@@ -301,6 +303,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   const [isCheckingTicket, setIsCheckingTicket] = useState(false);
   const [isRunningDoctor, setIsRunningDoctor] = useState(false);
   const [showOfflineGuides, setShowOfflineGuides] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
 
   // Screenshot / Receipt Vision attachment state
   const [attachedImage, setAttachedImage] = useState<{
@@ -1186,6 +1189,26 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  onPress={() => setShowVoiceModal(true)}
+                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                  className={`px-2.5 h-9 rounded-full ${
+                    isDark
+                      ? 'bg-emerald-500/20 border border-emerald-500/40'
+                      : 'bg-emerald-50 border border-emerald-300'
+                  } flex-row items-center justify-center`}
+                  accessibilityLabel="Live Voice Mode"
+                >
+                  <Headphones size={15} color={isDark ? '#4ade80' : '#0d631b'} />
+                  <Text
+                    className={`font-headline font-bold text-[11px] ml-1 ${
+                      isDark ? 'text-emerald-400' : 'text-emerald-800'
+                    }`}
+                  >
+                    Voice
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   onPress={handleNewChat}
                   hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                   className={`w-9 h-9 rounded-full ${
@@ -1577,6 +1600,18 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                 <Camera size={18} color={isDark ? '#4ade80' : '#0d631b'} />
               </TouchableOpacity>
 
+              <TouchableOpacity
+                onPress={() => setShowVoiceModal(true)}
+                className={`w-11 h-12 rounded-xl items-center justify-center mr-2 border ${
+                  isDark
+                    ? 'bg-emerald-500/20 border-emerald-500/30'
+                    : 'bg-emerald-50 border-emerald-200'
+                }`}
+                accessibilityLabel="Open Voice Call Mode"
+              >
+                <Mic size={18} color={isDark ? '#4ade80' : '#0d631b'} />
+              </TouchableOpacity>
+
               <TextInput
                 ref={textInputRef}
                 className={`flex-1 h-12 px-4 rounded-xl font-body text-sm mr-2.5 ${
@@ -1802,6 +1837,16 @@ export const SupportModal: React.FC<SupportModalProps> = ({
             </GlassSurface>
           </View>
         </Modal>
+
+        {/* Full-Screen ChatGPT Live Voice Mode */}
+        <VoiceSupportModal
+          visible={showVoiceModal}
+          onClose={() => setShowVoiceModal(false)}
+          userName={userName}
+          phone={phone}
+          initialContext={screenContext}
+          navigation={navigation || nav}
+        />
       </View>
     </Modal>
   );

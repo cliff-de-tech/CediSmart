@@ -12,11 +12,13 @@
       "infoPlist": {
         "NSFaceIDUsageDescription": "CediSmart uses Face ID to allow you to log in quickly and securely.",
         "NSPhotoLibraryUsageDescription": "CediSmart requires photo gallery access to let you upload and crop your profile avatar.",
-        "NSCameraUsageDescription": "CediSmart requires camera access to capture your profile photo."
+        "NSCameraUsageDescription": "CediSmart requires camera access to capture your profile photo.",
+        "NSMicrophoneUsageDescription": "CediSmart uses your microphone for hands-free AI voice support and spoken expense logging."
       }
     },
     "android": {
       "package": "com.cedismart.app",
+      "permissions": ["RECORD_AUDIO"],
       "adaptiveIcon": {
         "backgroundColor": "#0d631b",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -66,7 +68,8 @@
       "./plugins/withAndroidSmsReceiver",
       "expo-secure-store",
       "expo-sharing",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-audio"
     ],
     "extra": {
       "eas": {
