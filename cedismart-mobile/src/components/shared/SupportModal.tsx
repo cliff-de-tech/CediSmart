@@ -48,6 +48,7 @@ import {
   Headphones,
   Mic,
   AudioLines,
+  Landmark,
 } from 'lucide-react-native';
 import apiClient from '../../api/client';
 import { useAuthStore } from '../../stores/authStore';
@@ -1525,123 +1526,138 @@ export const SupportModal: React.FC<SupportModalProps> = ({
               </View>
             )}
 
-            {/* Quick Helper Bar: Screen-aware & fully horizontally swipeable */}
-            {supportType !== 'auth' && !attachedImage && (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6, gap: 8 }}
-                keyboardShouldPersistTaps="handled"
-              >
-                {getScreenQuickPrompts(screenContext, supportType).map((promptText, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    onPress={async () => {
-                      Haptics.selectionAsync().catch(() => {});
-                      if (promptText === 'Paste MoMo SMS to Auto-Log') {
-                        const clip = await Clipboard.getString();
-                        if (clip && clip.trim().length > 0) {
-                          setInput(clip.trim());
-                          textInputRef.current?.focus();
-                        } else {
-                          Alert.alert('Paste MoMo SMS', 'Copy any MTN, Telecel, or AT Money SMS to your clipboard first, then tap here.');
-                        }
-                      } else if (promptText === 'Check for problems') {
-                        runSelfHealDoctor();
-                      } else if (promptText === 'Help Guides (Offline)') {
-                        setShowOfflineGuides(true);
-                      } else {
-                        setInput(promptText);
-                        textInputRef.current?.focus();
-                      }
-                    }}
-                    className={`px-3.5 py-2 rounded-full flex-row items-center border ${
-                      promptText === 'Paste MoMo SMS to Auto-Log'
-                        ? isDark ? 'bg-primary/20 border-primary/35' : 'bg-primary/10 border-primary/25'
-                        : isDark ? 'bg-white/10 border-white/15' : 'bg-black/5 border-black/10'
-                    }`}
-                  >
-                    {promptText === 'Paste MoMo SMS to Auto-Log' ? (
-                      <Zap size={13} color={isDark ? '#4ade80' : '#0d631b'} />
-                    ) : promptText === 'Check for problems' ? (
-                      <Stethoscope size={13} color={isDark ? '#4ade80' : '#0d631b'} />
-                    ) : promptText === 'Help Guides (Offline)' ? (
-                      <BookOpen size={13} color={isDark ? '#4ade80' : '#0d631b'} />
-                    ) : null}
-                    <Text
-                      className={`font-headline font-bold text-xs ${
-                        promptText === 'Paste MoMo SMS to Auto-Log'
-                          ? isDark ? 'text-[#4ade80]' : 'text-primary'
-                          : isDark ? 'text-gray-200' : 'text-charcoal'
-                      } ${promptText === 'Paste MoMo SMS to Auto-Log' || promptText === 'Check for problems' || promptText === 'Help Guides (Offline)' ? 'ml-1.5' : ''}`}
-                    >
-                      {promptText}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+            {/* Quick Helper Actions: Vertically stacked matching /tmp/131462D0-8DA4-4413-833D-B2F502B60D29.jpeg */}
+            {/* Auto-disappears immediately when the user starts typing */}
+            {supportType !== 'auth' && !attachedImage && !input.trim() && (
+              <View className="px-4 pt-1.5 pb-1" style={{ maxHeight: 92 }}>
+                <ScrollView
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 6 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {getScreenQuickPrompts(screenContext, supportType).map((promptText, idx) => {
+                    let IconComponent = Sparkles;
+                    if (promptText === 'Paste MoMo SMS to Auto-Log') IconComponent = Zap;
+                    else if (promptText === 'Check for problems') IconComponent = Stethoscope;
+                    else if (promptText === 'Help Guides (Offline)') IconComponent = BookOpen;
+                    else if (promptText.includes('budget') || promptText.includes('Budget')) IconComponent = PieChart;
+                    else if (promptText.includes('balance') || promptText.includes('account')) IconComponent = Landmark;
+
+                    return (
+                      <TouchableOpacity
+                        key={idx}
+                        activeOpacity={0.7}
+                        onPress={async () => {
+                          Haptics.selectionAsync().catch(() => {});
+                          if (promptText === 'Paste MoMo SMS to Auto-Log') {
+                            const clip = await Clipboard.getString();
+                            if (clip && clip.trim().length > 0) {
+                              setInput(clip.trim());
+                              textInputRef.current?.focus();
+                            } else {
+                              Alert.alert('Paste MoMo SMS', 'Copy any MTN, Telecel, or AT Money SMS to your clipboard first, then tap here.');
+                            }
+                          } else if (promptText === 'Check for problems') {
+                            runSelfHealDoctor();
+                          } else if (promptText === 'Help Guides (Offline)') {
+                            setShowOfflineGuides(true);
+                          } else {
+                            setInput(promptText);
+                            textInputRef.current?.focus();
+                          }
+                        }}
+                        className={`flex-row items-center py-2.5 px-3 rounded-xl border ${
+                          isDark
+                            ? 'bg-white/5 border-white/10 active:bg-white/10'
+                            : 'bg-black/5 border-black/10 active:bg-black/10'
+                        }`}
+                      >
+                        <View className="w-6 h-6 rounded-lg items-center justify-center mr-2.5">
+                          <IconComponent size={15} color={isDark ? '#4ade80' : '#0d631b'} />
+                        </View>
+                        <Text
+                          numberOfLines={1}
+                          className={`flex-1 font-body text-xs font-medium ${
+                            isDark ? 'text-gray-200' : 'text-charcoal'
+                          }`}
+                        >
+                          {promptText}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             )}
 
+            {/* Unified ChatGPT-Style Composer Capsule matching /tmp/131462D0-8DA4-4413-833D-B2F502B60D29.jpeg */}
             <View
               style={{ paddingBottom: Math.max(insets.bottom, 12) }}
-              className="px-4 pt-2.5 flex-row items-center"
+              className="px-4 pt-1.5"
             >
-              <TouchableOpacity
-                onPress={handlePickImage}
-                disabled={chatMutation.isPending}
-                className={`w-11 h-12 rounded-xl items-center justify-center mr-2 border ${
+              <View
+                className={`flex-row items-center h-14 px-3 rounded-full border ${
                   isDark
-                    ? 'bg-black/30 border-white/10'
-                    : 'bg-white/60 border-black/10'
-                }`}
-                accessibilityLabel="Attach Screenshot or Receipt"
+                    ? 'bg-black/40 border-white/15'
+                    : 'bg-white/80 border-black/10'
+                } shadow-sm`}
               >
-                <Camera size={18} color={isDark ? '#4ade80' : '#0d631b'} />
-              </TouchableOpacity>
-
-              <TextInput
-                ref={textInputRef}
-                className={`flex-1 h-12 px-4 rounded-xl font-body text-sm mr-2.5 ${
-                  isDark
-                    ? 'bg-black/30 text-dark-on-surface border-white/10'
-                    : 'bg-white/60 text-on-surface border-black/10'
-                } border`}
-                placeholder={
-                  attachedImage
-                    ? 'Add a note for this image...'
-                    : 'Describe your problem...'
-                }
-                placeholderTextColor={isDark ? '#6b7280' : '#9CA3AF'}
-                value={input}
-                onChangeText={setInput}
-                onSubmitEditing={handleSend}
-                blurOnSubmit={false}
-                editable={!chatMutation.isPending}
-              />
-
-              {/* OpenAI-Style Dynamic Action Button: Default is Voice, switches to Send when user types */}
-              {!input.trim() && !attachedImage ? (
+                {/* Plus Attach Button matching ChatGPT */}
                 <TouchableOpacity
-                  onPress={() => setShowVoiceModal(true)}
-                  className="w-12 h-12 rounded-full items-center justify-center bg-primary shadow-sm active:scale-95"
-                  accessibilityLabel="Open Live Voice Mode"
-                >
-                  <AudioLines size={20} color="white" />
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  onPress={handleSend}
+                  onPress={handlePickImage}
                   disabled={chatMutation.isPending}
-                  className="w-12 h-12 rounded-full items-center justify-center bg-primary shadow-sm active:scale-95"
-                  accessibilityLabel="Send message"
+                  className={`w-9 h-9 rounded-full items-center justify-center mr-1.5 ${
+                    isDark ? 'bg-white/10 active:bg-white/20' : 'bg-black/5 active:bg-black/10'
+                  }`}
+                  accessibilityLabel="Attach Screenshot or Receipt"
                 >
-                  {chatMutation.isPending ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Send size={18} color="white" />
-                  )}
+                  <Plus size={18} color={isDark ? '#E5E7EB' : '#374151'} />
                 </TouchableOpacity>
-              )}
+
+                {/* Main Text Input: Ask CediSmart... */}
+                <TextInput
+                  ref={textInputRef}
+                  className={`flex-1 h-full px-2 font-body text-sm ${
+                    isDark ? 'text-dark-on-surface' : 'text-on-surface'
+                  }`}
+                  placeholder={
+                    attachedImage
+                      ? 'Add a note for this image...'
+                      : 'Ask CediSmart...'
+                  }
+                  placeholderTextColor={isDark ? '#9CA3AF' : '#6B7280'}
+                  value={input}
+                  onChangeText={setInput}
+                  onSubmitEditing={handleSend}
+                  blurOnSubmit={false}
+                  editable={!chatMutation.isPending}
+                />
+
+                {/* Right Action: Voice Waveform (when empty) ➔ Send (when typed) */}
+                {!input.trim() && !attachedImage ? (
+                  <TouchableOpacity
+                    onPress={() => setShowVoiceModal(true)}
+                    className="w-10 h-10 rounded-full items-center justify-center bg-primary shadow-sm active:scale-95 ml-1"
+                    accessibilityLabel="Open Live Voice Mode"
+                  >
+                    <AudioLines size={19} color="white" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={handleSend}
+                    disabled={chatMutation.isPending}
+                    className="w-10 h-10 rounded-full items-center justify-center bg-primary shadow-sm active:scale-95 ml-1"
+                    accessibilityLabel="Send message"
+                  >
+                    {chatMutation.isPending ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Send size={17} color="white" />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </GlassSurface>
         </KeyboardAvoidingView>
@@ -1835,6 +1851,12 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         <VoiceSupportModal
           visible={showVoiceModal}
           onClose={() => setShowVoiceModal(false)}
+          onSwitchToText={() => {
+            setShowVoiceModal(false);
+            setTimeout(() => {
+              textInputRef.current?.focus();
+            }, 350);
+          }}
           userName={userName}
           phone={phone}
           initialContext={screenContext}

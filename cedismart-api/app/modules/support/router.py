@@ -14,6 +14,8 @@ from app.modules.support.schemas import (
     FeedbackRequest,
     FeedbackResponse,
     TicketStatusResponse,
+    VoiceRequest,
+    VoiceResponse,
 )
 from app.modules.support.service import SupportService
 
@@ -48,6 +50,25 @@ async def chat_with_support(request: Request, body: ChatRequest, db: DBSession) 
         **extra_kwargs,
     )
     return ChatResponse(response=response_text)
+
+
+@router.post(
+    "/voice",
+    response_model=VoiceResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Process spoken user audio with Gemini multimodal audio understanding",
+)
+@limiter.limit("60/15minutes")
+async def voice_chat_with_support(request: Request, body: VoiceRequest) -> VoiceResponse:
+    """Transcribes spoken user audio and returns a natural spoken response + detected action."""
+    result = await SupportService.process_voice(
+        audio_base64=body.audio_base64,
+        audio_mime_type=body.audio_mime_type,
+        user_name=body.user_name,
+        phone=body.phone,
+        initial_context=body.initial_context,
+    )
+    return VoiceResponse(**result)
 
 
 @router.post(

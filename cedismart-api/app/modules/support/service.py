@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from datetime import date
@@ -1086,3 +1087,129 @@ class SupportService:
                 "status_description": "Your issue report has been logged with CediSmart Support.",
                 "stage_step": 1,
             }
+
+    @staticmethod
+    async def process_voice(
+        audio_base64: str,
+        audio_mime_type: str = "audio/m4a",
+        user_name: str | None = None,
+        phone: str | None = None,
+        initial_context: str | None = "dashboard",
+    ) -> dict:
+        """Process spoken user audio with Gemini 2.5 / 1.5 multimodal audio understanding.
+
+        Transcribes speech, extracts financial actions (e.g. logging transactions, checking balances),
+        and returns a natural spoken response suitable for Text-to-Speech playback.
+        """
+        # Resolve clean first name
+        first_name = "there"
+        if user_name:
+            clean_name = re.sub(
+                r"^(mr|mrs|ms|dr|rev|prof)\.?\s+", "", user_name, flags=re.IGNORECASE
+            ).strip()
+            first_name = clean_name.split()[0] if clean_name else "there"
+
+        # Clean audio base64
+        clean_b64 = audio_base64
+        if "base64," in clean_b64:
+            clean_b64 = clean_b64.split("base64,")[1]
+        clean_b64 = clean_b64.strip()
+
+        # Normalise mime type for Gemini inlineData
+        mime = audio_mime_type.lower()
+        if "m4a" in mime or "mp4" in mime:
+            effective_mime = "audio/mp4"
+        elif "wav" in mime:
+            effective_mime = "audio/wav"
+        elif "aac" in mime:
+            effective_mime = "audio/aac"
+        elif "mp3" in mime or "mpeg" in mime:
+            effective_mime = "audio/mp3"
+        elif "ogg" in mime:
+            effective_mime = "audio/ogg"
+        else:
+            effective_mime = "audio/mp4"
+
+        prompt = (
+            f"You are CediSmart AI Voice Assistant, talking directly to {first_name} in Ghana.\n"
+            "The user spoke an audio message. Your tasks:\n"
+            "1. Transcribe the user's speech accurately into English or Ghanaian Pidgin.\n"
+            "2. Detect user intent:\n"
+            "   - 'create_transaction': If user says e.g. 'log 50 cedis for fuel on momo', 'spent 20 cedis on lunch', 'received 500 from kwame on bank'. Extract amount (number), type ('expense' or 'income'), category ('Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Income'), description (e.g. 'Fuel', 'Lunch'), and account_type ('mobile_money', 'cash', or 'bank').\n"
+            "   - 'check_balance': If user asks about their balance, wallets, or money.\n"
+            "   - 'check_budget': If user asks about their budget or spending limits.\n"
+            "   - 'navigate': If user asks to open/go to a screen ('Budgets', 'Transactions', 'Settings').\n"
+            "   - 'general_reply': For any questions, support, or financial guidance.\n"
+            "3. Generate a warm, concise spoken response in 1-2 short sentences (maximum 25 words) that sounds natural when spoken aloud via Text-To-Speech.\n\n"
+            "Return valid JSON matching this schema:\n"
+            "{\n"
+            '  "transcript": "Transcribed user speech here",\n'
+            '  "response": "Concise spoken reply here",\n'
+            '  "action": {\n'
+            '    "type": "create_transaction" | "check_balance" | "check_budget" | "navigate" | "general_reply",\n'
+            '    "payload": {\n'
+            '      "amount": null or float,\n'
+            '      "type": null or "expense" or "income",\n'
+            '      "category": null or string,\n'
+            '      "description": null or string,\n'
+            '      "account_type": null or "mobile_money" or "cash" or "bank",\n'
+            '      "screen": null or string\n'
+            "    }\n"
+            "  }\n"
+            "}"
+        )
+
+        # 1. Primary: Gemini Multimodal Audio Understanding
+        if settings.GEMINI_API_KEY:
+            for model_name in ["gemini-2.5-flash", "gemini-1.5-flash"]:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
+                payload = {
+                    "contents": [
+                        {
+                            "role": "user",
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "mimeType": effective_mime,
+                                        "data": clean_b64,
+                                    }
+                                },
+                                {
+                                    "text": prompt,
+                                },
+                            ],
+                        }
+                    ],
+                    "generationConfig": {
+                        "responseMimeType": "application/json",
+                        "temperature": 0.2,
+                    },
+                }
+                try:
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        resp = await client.post(url, json=payload)
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            candidate_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                            parsed = json.loads(candidate_text)
+                            return {
+                                "transcript": parsed.get("transcript") or "Voice message",
+                                "response": parsed.get("response") or f"I heard you, {first_name}.",
+                                "action": parsed.get("action"),
+                            }
+                        logger.warning(
+                            "Gemini audio recognition error (%s status %d): %s",
+                            model_name,
+                            resp.status_code,
+                            resp.text[:200],
+                        )
+                except Exception as exc:
+                    logger.warning("Gemini audio request failed (%s): %s", model_name, str(exc))
+
+        # 2. Fallback response
+        return {
+            "transcript": "Voice note received",
+            "response": f"I heard you, {first_name}. Could you please say that again?",
+            "action": {"type": "general_reply", "payload": None},
+        }
+

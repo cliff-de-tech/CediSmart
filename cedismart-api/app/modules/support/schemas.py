@@ -89,3 +89,35 @@ class TicketStatusResponse(BaseModel):
     status_label: str = Field(default="Report Received")
     status_description: str = Field(default="Your report and diagnostic data have been received.")
     stage_step: int = Field(default=1)
+
+
+class VoiceActionPayload(BaseModel):
+    amount: float | None = None
+    type: str | None = None  # 'expense' or 'income'
+    category: str | None = None
+    description: str | None = None
+    account_type: str | None = None  # 'mobile_money', 'cash', 'bank'
+    screen: str | None = None
+
+
+class VoiceAction(BaseModel):
+    type: str  # 'create_transaction', 'check_balance', 'navigate', 'general_reply'
+    payload: VoiceActionPayload | None = None
+
+
+class VoiceRequest(BaseModel):
+    audio_base64: str = Field(..., description="Base64-encoded audio recorded by client")
+    audio_mime_type: str = Field(
+        default="audio/m4a",
+        description="MIME type of the audio (e.g. audio/m4a, audio/mp4, audio/wav, audio/aac)",
+    )
+    user_name: str | None = None
+    phone: str | None = None
+    initial_context: str | None = "dashboard"
+
+
+class VoiceResponse(BaseModel):
+    transcript: str = Field(..., description="Transcribed user speech")
+    response: str = Field(..., description="Spoken AI reply")
+    action: VoiceAction | None = None
+

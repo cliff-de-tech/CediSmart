@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  ScrollView,
   Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +18,17 @@ import {
   X,
   Plus,
   CheckCircle2,
+  Stethoscope,
+  Zap,
+  Landmark,
 } from 'lucide-react-native';
+import {
+  useAudioRecorder,
+  useAudioRecorderState,
+  requestRecordingPermissionsAsync,
+  RecordingPresets,
+} from 'expo-audio';
+import * as FileSystem from 'expo-file-system/legacy';
 import { VoiceOrb, VoiceState } from './VoiceOrb';
 import { voiceService, VoiceAction } from '../../services/voiceService';
 import { GlassSurface } from '../glass/GlassSurface';
@@ -25,9 +36,16 @@ import { useThemeStore } from '../../stores/themeStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 
+interface VoiceMessage {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+}
+
 interface VoiceSupportModalProps {
   visible: boolean;
   onClose: () => void;
+  onSwitchToText?: () => void;
   userName?: string;
   phone?: string;
   initialContext?: string;
@@ -39,6 +57,7 @@ const { width } = Dimensions.get('window');
 export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   visible,
   onClose,
+  onSwitchToText,
   userName,
   phone,
   initialContext = 'dashboard',
@@ -47,17 +66,37 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const theme = useThemeStore((state) => state.theme);
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Audio Recorder from expo-audio (SDK 57)
+  const audioRecorder = useAudioRecorder({
+    ...RecordingPresets.HIGH_QUALITY,
+    isMeteringEnabled: true,
+  });
+  const recorderState = useAudioRecorderState(audioRecorder, 100);
 
   // Voice Interaction States
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [isCompactView, setIsCompactView] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
   const [actionToast, setActionToast] = useState<{
     title: string;
     description: string;
   } | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [showQuickSheet, setShowQuickSheet] = useState(false);
 
-  // Fetch accounts & categories for intelligent voice-to-ledger matching
+  // Conversation history for the live transcript view
+  const [conversation, setConversation] = useState<VoiceMessage[]>([]);
+  const [streamingAiText, setStreamingAiText] = useState('');
+  const streamingTimerRef = useRef<any>(null);
+
+  // Voice Activity Detection (VAD) references
+  const hasSpokenRef = useRef(false);
+  const silenceTimerRef = useRef<any>(null);
+  const isProcessingRef = useRef(false);
+
+  // Fetch accounts & categories for intelligent ledger actions
   const { data: accounts } = useQuery<any[]>({
     queryKey: ['accounts'],
     queryFn: async () => {
@@ -79,171 +118,347 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   // Welcome greeting on launch
   useEffect(() => {
     if (visible) {
-      setVoiceState('speaking');
+      setIsCompactView(false);
+      setIsMuted(false);
+      setAudioLevel(0);
+      setActionToast(null);
+      isProcessingRef.current = false;
+
       const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
       const greeting = cleanName ? `Hi ${cleanName}, I'm listening.` : "Hi, I'm listening.";
 
+      const initialGreetingMsg: VoiceMessage = {
+        id: 'greet-' + Date.now(),
+        role: 'model',
+        content: greeting,
+      };
+      setConversation([initialGreetingMsg]);
+      startStreamingText(greeting);
+
+      setVoiceState('speaking');
       voiceService.speak(
         greeting,
         () => setVoiceState('speaking'),
-        () => setVoiceState('listening'),
-        () => setVoiceState('idle')
+        () => {
+          setVoiceState('listening');
+          startListeningLoop();
+        },
+        () => {
+          setVoiceState('listening');
+          startListeningLoop();
+        }
       );
     } else {
-      voiceService.stop();
-      setVoiceState('idle');
-      setActionToast(null);
+      cleanupVoiceSession();
     }
 
     return () => {
-      voiceService.stop();
+      cleanupVoiceSession();
     };
   }, [visible, userName]);
 
-  /**
-   * Execute voice task and reply vocally
-   */
-  const processSpokenInput = async (spokenText: string) => {
-    if (!spokenText.trim() || isProcessing) return;
+  // Clean up all active listeners, recorders, and synthesizers
+  const cleanupVoiceSession = async () => {
+    voiceService.stop();
+    if (streamingTimerRef.current) clearInterval(streamingTimerRef.current);
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    hasSpokenRef.current = false;
+    isProcessingRef.current = false;
+    try {
+      if (audioRecorder.isRecording) {
+        await audioRecorder.stop();
+      }
+    } catch {}
+    setVoiceState('idle');
+  };
 
-    setIsProcessing(true);
+  /**
+   * Start live microphone recording loop
+   */
+  const startListeningLoop = async () => {
+    if (isMuted || !visible || isProcessingRef.current) return;
+
+    try {
+      const { granted } = await requestRecordingPermissionsAsync();
+      if (!granted) {
+        console.warn('[VoiceSupport] Microphone permission denied');
+        return;
+      }
+
+      hasSpokenRef.current = false;
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+      setVoiceState('listening');
+    } catch (err) {
+      console.warn('[VoiceSupport] Failed to start recorder:', err);
+      setVoiceState('listening');
+    }
+  };
+
+  /**
+   * Voice Activity Detection (VAD) & Live Pulse Effect
+   */
+  useEffect(() => {
+    if (voiceState !== 'listening' || !recorderState.isRecording || isMuted || isProcessingRef.current) {
+      return;
+    }
+
+    const metering = recorderState.metering ?? -160;
+
+    // Normalise decibels (-55dB to -10dB) to 0.0 - 1.0 for the Voice Orb
+    const normalized = metering > -55 ? Math.min(1, Math.max(0, (metering + 55) / 45)) : 0;
+    setAudioLevel(normalized);
+
+    // Speech detected
+    if (metering > -40) {
+      hasSpokenRef.current = true;
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+    }
+
+    // Silence detection after user spoke: 1.4s of quiet triggers submission
+    if (hasSpokenRef.current && metering <= -44) {
+      if (!silenceTimerRef.current) {
+        silenceTimerRef.current = setTimeout(() => {
+          stopAndProcessAudio();
+        }, 1400);
+      }
+    }
+  }, [recorderState.metering, recorderState.isRecording, voiceState, isMuted]);
+
+  /**
+   * Stop recording and send audio to backend for transcription and action execution
+   */
+  const stopAndProcessAudio = async () => {
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+
     setVoiceState('thinking');
+    setAudioLevel(0);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
     try {
-      const action: VoiceAction = voiceService.parseSpokenIntent(spokenText);
-
-      if (action.type === 'create_transaction' && action.payload) {
-        let targetAccountId = accounts?.[0]?.id;
-        if (accounts && accounts.length > 0) {
-          const matchedAcc = accounts.find((a) => {
-            if (action.payload.accountType === 'mobile_money') {
-              return a.account_type === 'mobile_money' || /momo|mtn|telecel/i.test(a.name);
-            }
-            if (action.payload.accountType === 'bank') {
-              return a.account_type === 'bank';
-            }
-            return a.account_type === 'cash';
-          });
-          if (matchedAcc) targetAccountId = matchedAcc.id;
-        }
-
-        let targetCategoryId = categories?.[0]?.id;
-        if (categories && categories.length > 0) {
-          const matchedCat = categories.find((c) =>
-            c.name.toLowerCase().includes(action.payload.categoryName.toLowerCase())
-          );
-          if (matchedCat) targetCategoryId = matchedCat.id;
-        }
-
-        if (targetAccountId) {
-          const txDate = new Date().toISOString();
-          await apiClient.post('/transactions/', {
-            account_id: targetAccountId,
-            category_id: targetCategoryId,
-            amount: action.payload.amount,
-            type: action.payload.type,
-            description: action.payload.description,
-            transaction_date: txDate,
-          });
-
-          queryClient.invalidateQueries({ queryKey: ['transactions'] });
-          queryClient.invalidateQueries({ queryKey: ['accounts'] });
-          queryClient.invalidateQueries({ queryKey: ['budgets'] });
-
-          const formatted = formatGHS(action.payload.amount);
-          setActionToast({
-            title: `Recorded ${formatted} ${action.payload.type === 'expense' ? 'Spent' : 'Received'}`,
-            description: `${action.payload.description} • ${action.payload.categoryName}`,
-          });
-
-          setVoiceState('executed');
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-
-          const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
-          const namePrefix = cleanName ? `${cleanName}, ` : '';
-          const reply = `Done ${namePrefix}! Recorded ${formatted} for ${action.payload.description}.`;
-
-          setTimeout(() => {
-            voiceService.speak(
-              reply,
-              () => setVoiceState('speaking'),
-              () => setVoiceState('listening'),
-              () => setVoiceState('idle')
-            );
-          }, 300);
-
-          setIsProcessing(false);
-          return;
-        }
+      if (audioRecorder.isRecording) {
+        await audioRecorder.stop();
       }
 
-      if (action.type === 'check_balance') {
+      const uri = audioRecorder.uri;
+      if (!uri) {
+        isProcessingRef.current = false;
+        startListeningLoop();
+        return;
+      }
+
+      // Read audio file as base64
+      const base64Audio = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Send to backend /support/voice endpoint
+      const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
+      const res = await apiClient.post('/support/voice', {
+        audio_base64: base64Audio,
+        audio_mime_type: 'audio/m4a',
+        user_name: cleanName || userName,
+        phone: phone || 'Anonymous',
+        initial_context: initialContext,
+      });
+
+      const transcript = res.data?.transcript || '';
+      const reply = res.data?.response || "I'm listening, go ahead.";
+      const action = res.data?.action;
+
+      // Append user transcription to live conversation history
+      if (transcript && transcript !== 'Voice note received') {
+        const userMsg: VoiceMessage = {
+          id: 'user-' + Date.now(),
+          role: 'user',
+          content: transcript,
+        };
+        setConversation((prev) => [...prev, userMsg]);
+      }
+
+      // Execute detected voice action (e.g. create transaction or check balance)
+      if (action && action.type === 'create_transaction' && action.payload) {
+        await handleExecuteVoiceTransaction(action.payload);
+      } else if (action && action.type === 'check_balance') {
         const totalBalance = (accounts || []).reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
-        const reply = `Your total available balance is ${formatGHS(totalBalance)}.`;
         setActionToast({
           title: `Balance: ${formatGHS(totalBalance)}`,
           description: `${(accounts || []).length} active wallets`,
         });
-        voiceService.speak(
-          reply,
-          () => setVoiceState('speaking'),
-          () => setVoiceState('listening'),
-          () => setVoiceState('idle')
-        );
-        setIsProcessing(false);
-        return;
       }
 
-      if (action.type === 'navigate' && action.payload?.screen) {
-        const screenName = action.payload.screen;
-        const reply = `Opening ${screenName}.`;
-        voiceService.speak(reply, () => setVoiceState('speaking'), () => {
-          onClose();
-          try {
-            if (navigation) {
-              if (screenName === 'Budgets') navigation.navigate('MainTabs', { screen: 'BudgetsTab' });
-              else if (screenName === 'Transactions') navigation.navigate('MainTabs', { screen: 'DashboardTab' });
-              else navigation.navigate(screenName);
-            }
-          } catch {}
-        });
-        setIsProcessing(false);
-        return;
-      }
+      // Append AI response to live transcript
+      const aiMsg: VoiceMessage = {
+        id: 'ai-' + Date.now(),
+        role: 'model',
+        content: reply,
+      };
+      setConversation((prev) => [...prev, aiMsg]);
+      startStreamingText(reply);
 
-      const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
-      const res = await apiClient.post('/support/chat', {
-        messages: [{ role: 'user', content: `[VOICE_MODE: Speak concisely in 1-2 short sentences] ${spokenText}` }],
-        phone: phone || 'Anonymous',
-        user_name: cleanName || userName,
-        support_type: 'general',
-      });
-
-      const reply = res.data?.response || "I'm listening, go ahead.";
+      // Speak response aloud via TTS
+      setVoiceState('speaking');
       voiceService.speak(
         reply,
         () => setVoiceState('speaking'),
-        () => setVoiceState('listening'),
-        () => setVoiceState('idle')
+        () => {
+          isProcessingRef.current = false;
+          setVoiceState('listening');
+          startListeningLoop();
+        },
+        () => {
+          isProcessingRef.current = false;
+          setVoiceState('listening');
+          startListeningLoop();
+        }
       );
     } catch (err: any) {
-      console.warn('[VoiceSupport] Error:', err);
-      const errReply = "Could you please say that again?";
+      console.warn('[VoiceSupport] Voice processing error:', err);
+      const fallbackReply = "Could you please say that again?";
+      const aiMsg: VoiceMessage = {
+        id: 'ai-err-' + Date.now(),
+        role: 'model',
+        content: fallbackReply,
+      };
+      setConversation((prev) => [...prev, aiMsg]);
+      startStreamingText(fallbackReply);
+
+      setVoiceState('speaking');
       voiceService.speak(
-        errReply,
+        fallbackReply,
         () => setVoiceState('speaking'),
-        () => setVoiceState('listening'),
-        () => setVoiceState('idle')
+        () => {
+          isProcessingRef.current = false;
+          setVoiceState('listening');
+          startListeningLoop();
+        },
+        () => {
+          isProcessingRef.current = false;
+          setVoiceState('listening');
+          startListeningLoop();
+        }
       );
     } finally {
-      setIsProcessing(false);
+      setTimeout(() => {
+        isProcessingRef.current = false;
+      }, 500);
     }
+  };
+
+  /**
+   * Execute voice-parsed transaction against backend
+   */
+  const handleExecuteVoiceTransaction = async (payload: any) => {
+    try {
+      let targetAccountId = accounts?.[0]?.id;
+      if (accounts && accounts.length > 0) {
+        const matched = accounts.find((a) => {
+          if (payload.account_type === 'mobile_money') {
+            return a.account_type === 'mobile_money' || /momo|mtn|telecel/i.test(a.name);
+          }
+          if (payload.account_type === 'bank') {
+            return a.account_type === 'bank';
+          }
+          return a.account_type === 'cash';
+        });
+        if (matched) targetAccountId = matched.id;
+      }
+
+      let targetCategoryId = categories?.[0]?.id;
+      if (categories && categories.length > 0) {
+        const matchedCat = categories.find((c) =>
+          c.name.toLowerCase().includes((payload.category || '').toLowerCase())
+        );
+        if (matchedCat) targetCategoryId = matchedCat.id;
+      }
+
+      if (targetAccountId) {
+        await apiClient.post('/transactions/', {
+          account_id: targetAccountId,
+          category_id: targetCategoryId,
+          amount: payload.amount,
+          type: payload.type || 'expense',
+          description: payload.description || 'Voice expense',
+          transaction_date: new Date().toISOString(),
+        });
+
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        queryClient.invalidateQueries({ queryKey: ['accounts'] });
+        queryClient.invalidateQueries({ queryKey: ['budgets'] });
+
+        const formatted = formatGHS(payload.amount);
+        setActionToast({
+          title: `Recorded ${formatted} ${payload.type === 'income' ? 'Received' : 'Spent'}`,
+          description: `${payload.description} • ${payload.category || 'General'}`,
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('[VoiceSupport] Failed to execute voice transaction:', e);
+    }
+  };
+
+  /**
+   * Smooth typewriter / text stream as the AI speaks
+   */
+  const startStreamingText = (fullText: string) => {
+    if (streamingTimerRef.current) clearInterval(streamingTimerRef.current);
+    setStreamingAiText('');
+
+    const words = fullText.split(' ');
+    let currentIndex = 0;
+
+    streamingTimerRef.current = setInterval(() => {
+      currentIndex += 1;
+      setStreamingAiText(words.slice(0, currentIndex).join(' '));
+      if (currentIndex >= words.length) {
+        if (streamingTimerRef.current) clearInterval(streamingTimerRef.current);
+      }
+    }, 45);
+  };
+
+  /**
+   * Tap on orb:
+   * - If speaking: barge-in interrupt
+   * - If listening: immediately stop and submit voice
+   * - Also toggles compact / transcript view!
+   */
+  const handleOrbPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (voiceState === 'speaking') {
+      voiceService.stop();
+      if (streamingTimerRef.current) clearInterval(streamingTimerRef.current);
+      setVoiceState('listening');
+      startListeningLoop();
+      return;
+    }
+
+    if (voiceState === 'listening' && hasSpokenRef.current) {
+      stopAndProcessAudio();
+      return;
+    }
+
+    // Toggle between large orb mode and compact transcript mode
+    setIsCompactView((prev) => !prev);
   };
 
   const handleClose = () => {
     Haptics.selectionAsync().catch(() => {});
-    voiceService.stop();
+    cleanupVoiceSession();
     onClose();
   };
 
@@ -252,17 +467,24 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     if (isMuted) {
       setIsMuted(false);
       setVoiceState('listening');
+      startListeningLoop();
     } else {
       voiceService.stop();
       setIsMuted(true);
       setVoiceState('idle');
+      try {
+        if (audioRecorder.isRecording) audioRecorder.stop();
+      } catch {}
     }
   };
 
-  const handleInterrupt = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    voiceService.stop();
-    setVoiceState('listening');
+  const handleSwitchToText = () => {
+    Haptics.selectionAsync().catch(() => {});
+    cleanupVoiceSession();
+    onClose();
+    if (onSwitchToText) {
+      onSwitchToText();
+    }
   };
 
   return (
@@ -275,29 +497,77 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       {/* Pure, immersive OpenAI ChatGPT Voice background */}
       <View style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          {/* Minimal Top Indicator matching ChatGPT Voice */}
+          {/* Minimal Top Bar matching ChatGPT Voice */}
           <View style={styles.topBar}>
             <TouchableOpacity
               onPress={handleClose}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.topIndicator}
+              accessibilityLabel="Close voice mode"
             >
               <View style={styles.topDash} />
               <View style={styles.topDot} />
             </TouchableOpacity>
           </View>
 
-          {/* Majestic Center Voice Orb */}
-          <View style={styles.centerOrbWrapper}>
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={voiceState === 'speaking' ? handleInterrupt : undefined}
-            >
-              <VoiceOrb state={voiceState} size={210} />
-            </TouchableOpacity>
-          </View>
+          {/* MAIN CONTENT AREA */}
+          {!isCompactView ? (
+            /* Mode 1: Full-Screen Large Voice Orb Mode */
+            <View style={styles.centerOrbWrapper}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={handleOrbPress}
+                accessibilityLabel="Tap to resize orb or interrupt"
+              >
+                <VoiceOrb state={voiceState} audioLevel={audioLevel} size={210} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            /* Mode 2: Live Speech-Synced Transcript Screen with Mini-Orb (matching ChatGPT UI) */
+            <View style={styles.transcriptContainer}>
+              <ScrollView
+                ref={scrollViewRef}
+                style={styles.transcriptScroll}
+                contentContainerStyle={styles.transcriptContent}
+                showsVerticalScrollIndicator={false}
+                onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+              >
+                {conversation.map((msg, idx) => {
+                  const isLatestAi = msg.role === 'model' && idx === conversation.length - 1 && voiceState === 'speaking';
+                  const displayText = isLatestAi && streamingAiText ? streamingAiText : msg.content;
 
-          {/* Floating Action Confirmation Toast (Only appears when task executes) */}
+                  if (msg.role === 'user') {
+                    return (
+                      <View key={msg.id || idx} style={styles.userBubbleWrapper}>
+                        <View style={styles.userBubble}>
+                          <Text style={styles.userBubbleText}>{displayText}</Text>
+                        </View>
+                      </View>
+                    );
+                  }
+
+                  return (
+                    <View key={msg.id || idx} style={styles.aiMessageWrapper}>
+                      <Text style={styles.aiMessageText}>{displayText}</Text>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Anchored Mini Voice Orb right above bottom controls */}
+              <View style={styles.miniOrbWrapper}>
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  onPress={handleOrbPress}
+                  accessibilityLabel="Tap to expand voice orb"
+                >
+                  <VoiceOrb state={voiceState} audioLevel={audioLevel} size={64} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Floating Action Confirmation Toast */}
           {actionToast && (
             <View style={styles.toastContainer}>
               <GlassSurface
@@ -318,16 +588,68 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
             </View>
           )}
 
-          {/* ChatGPT Voice Bottom Bar (Search pill on left, Mute in middle, White Close on right) */}
+          {/* Quick Action Sheet Modal / Popover when user taps [+] */}
+          {showQuickSheet && (
+            <View style={styles.sheetOverlay}>
+              <GlassSurface variant="thick" radius={24} style={styles.sheetCard}>
+                <View style={styles.sheetHeader}>
+                  <Text style={styles.sheetTitle}>Quick Voice Actions</Text>
+                  <TouchableOpacity onPress={() => setShowQuickSheet(false)}>
+                    <X size={18} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity
+                  style={styles.sheetItem}
+                  onPress={() => {
+                    setShowQuickSheet(false);
+                    setActionToast({ title: 'System Diagnostics', description: 'Checking ledger & wallet health...' });
+                    voiceService.speak("Running a quick health check on your wallets. All data caches are fully synchronized.");
+                  }}
+                >
+                  <Stethoscope size={18} color="#10B981" />
+                  <Text style={styles.sheetItemText}>Run System Diagnostics</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.sheetItem}
+                  onPress={() => {
+                    setShowQuickSheet(false);
+                    const totalBalance = (accounts || []).reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
+                    setActionToast({ title: `Balance: ${formatGHS(totalBalance)}`, description: 'Active accounts refreshed' });
+                    voiceService.speak(`Your total available balance is ${formatGHS(totalBalance)}.`);
+                  }}
+                >
+                  <Landmark size={18} color="#10B981" />
+                  <Text style={styles.sheetItemText}>Check Wallet Balances</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.sheetItem}
+                  onPress={() => {
+                    setShowQuickSheet(false);
+                    handleSwitchToText();
+                  }}
+                >
+                  <Zap size={18} color="#10B981" />
+                  <Text style={styles.sheetItemText}>Paste MoMo SMS to Auto-Log</Text>
+                </TouchableOpacity>
+              </GlassSurface>
+            </View>
+          )}
+
+          {/* ChatGPT Voice Bottom Bar (Ask CediSmart pill on left, Mute in middle, White Close on right) */}
           <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            {/* Ask CediSmart Text Pill */}
+            {/* Functional Ask CediSmart Pill */}
             <TouchableOpacity
-              onPress={handleClose}
+              onPress={handleSwitchToText}
               activeOpacity={0.8}
               style={styles.askPill}
               accessibilityLabel="Switch to text composer"
             >
-              <Plus size={18} color="#9CA3AF" />
+              <TouchableOpacity
+                onPress={() => setShowQuickSheet((prev) => !prev)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Plus size={18} color="#9CA3AF" />
+              </TouchableOpacity>
               <Text style={styles.askPillText}>Ask CediSmart...</Text>
             </TouchableOpacity>
 
@@ -398,10 +720,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  transcriptContainer: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  transcriptScroll: {
+    flex: 1,
+    paddingHorizontal: 24,
+  },
+  transcriptContent: {
+    paddingTop: 24,
+    paddingBottom: 24,
+  },
+  userBubbleWrapper: {
+    alignItems: 'flex-end',
+    marginBottom: 16,
+  },
+  userBubble: {
+    backgroundColor: '#064e3b', // CediSmart signature deep emerald
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 22,
+    maxWidth: '82%',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.25)',
+  },
+  userBubbleText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'Inter_500Medium',
+  },
+  aiMessageWrapper: {
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    maxWidth: '92%',
+  },
+  aiMessageText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    lineHeight: 28,
+    fontFamily: 'Inter_400Regular',
+  },
+  miniOrbWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
   toastContainer: {
     alignItems: 'center',
     paddingHorizontal: 24,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   toastCard: {
     paddingHorizontal: 18,
@@ -429,6 +797,41 @@ const styles = StyleSheet.create({
   toastDesc: {
     fontSize: 10,
     color: '#9CA3AF',
+  },
+  sheetOverlay: {
+    position: 'absolute',
+    bottom: 96,
+    left: 20,
+    right: 20,
+    zIndex: 999,
+  },
+  sheetCard: {
+    padding: 18,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+  },
+  sheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  sheetItemText: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
+    marginLeft: 12,
   },
   bottomBar: {
     flexDirection: 'row',

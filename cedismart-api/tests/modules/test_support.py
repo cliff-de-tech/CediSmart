@@ -195,4 +195,42 @@ async def test_multi_sms_rescue_parsing() -> None:
     assert "SD SAMATECH ENTERPRISE" in banner
 
 
+@pytest.mark.asyncio
+async def test_support_voice_mock(client: AsyncClient) -> None:
+    with patch("app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock) as mock_voice:
+        mock_voice.return_value = {
+            "transcript": "log 50 cedis for lunch on momo",
+            "response": "Done Clifford! Recorded 50 cedis for lunch from your Mobile Money wallet.",
+            "action": {
+                "type": "create_transaction",
+                "payload": {
+                    "amount": 50.0,
+                    "type": "expense",
+                    "category": "Food",
+                    "description": "lunch",
+                    "account_type": "mobile_money",
+                    "screen": None,
+                },
+            },
+        }
+
+        resp = await client.post(
+            "/api/v1/support/voice",
+            json={
+                "audio_base64": "UklGRi4AAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=",
+                "audio_mime_type": "audio/m4a",
+                "user_name": "Mr. Clifford",
+                "phone": "+233241234567",
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["transcript"] == "log 50 cedis for lunch on momo"
+        assert "Recorded 50 cedis" in body["response"]
+        assert body["action"]["type"] == "create_transaction"
+        assert body["action"]["payload"]["amount"] == 50.0
+        mock_voice.assert_called_once()
+
+
+
 
