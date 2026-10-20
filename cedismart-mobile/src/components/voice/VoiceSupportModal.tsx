@@ -201,7 +201,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
   // Voice Activity Detection (VAD) references
   const hasSpokenRef = useRef(false);
-  const silenceTimerRef = useRef<any>(null);
+  const speechTicksRef = useRef(0);
+  const silenceTicksRef = useRef(0);
   const isProcessingRef = useRef(false);
 
   // Fetch accounts & categories for intelligent ledger actions
@@ -311,8 +312,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const cleanupVoiceSession = async () => {
     voiceService.stop();
     if (streamingTimerRef.current) clearInterval(streamingTimerRef.current);
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     hasSpokenRef.current = false;
+    speechTicksRef.current = 0;
+    silenceTicksRef.current = 0;
     isProcessingRef.current = false;
     try {
       if (audioRecorder.isRecording) {
@@ -342,10 +344,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       });
 
       hasSpokenRef.current = false;
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
+      speechTicksRef.current = 0;
+      silenceTicksRef.current = 0;
 
       await audioRecorder.prepareToRecordAsync({
         ...RecordingPresets.HIGH_QUALITY,
@@ -360,10 +360,16 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   };
 
   /**
-   * Voice Activity Detection (VAD) & Live Pulse Effect
+   * Voice Activity Detection (VAD) & Instant Auto-Send (Fast 600ms automatic submission)
    */
   useEffect(() => {
-    if (voiceState !== 'listening' || !recorderState.isRecording || isMuted || isProcessingRef.current || isTypingInVoice) {
+    if (
+      voiceState !== 'listening' ||
+      !recorderState.isRecording ||
+      isMuted ||
+      isProcessingRef.current ||
+      isTypingInVoice
+    ) {
       return;
     }
 
@@ -373,24 +379,40 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     const normalized = metering > -65 ? Math.min(1, Math.max(0, (metering + 65) / 50)) : 0;
     setAudioLevel(normalized);
 
-    // Speech detected: -52 dB captures natural human voice at normal distance
-    if (metering > -52) {
-      hasSpokenRef.current = true;
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
+    // SPEECH_THRESHOLD: -46 dB captures human speech clearly above ambient room levels
+    const SPEECH_THRESHOLD = -46;
+
+    if (metering > SPEECH_THRESHOLD) {
+      // User is actively speaking
+      speechTicksRef.current += 1;
+      silenceTicksRef.current = 0;
+
+      // Require at least 2 ticks (200ms) of speech to confirm intentional utterance
+      if (speechTicksRef.current >= 2) {
+        hasSpokenRef.current = true;
+      }
+    } else {
+      // Audio level is below speech threshold (silence/ambient)
+      speechTicksRef.current = 0;
+
+      if (hasSpokenRef.current) {
+        silenceTicksRef.current += 1;
+
+        // Auto-send immediately after 600ms (6 ticks x 100ms) of quiet after speaking!
+        if (silenceTicksRef.current >= 6) {
+          silenceTicksRef.current = 0;
+          stopAndProcessAudio();
+        }
       }
     }
 
-    // Silence detection after user spoke: 1.2s of quiet triggers submission
-    if (hasSpokenRef.current && metering <= -55) {
-      if (!silenceTimerRef.current) {
-        silenceTimerRef.current = setTimeout(() => {
-          stopAndProcessAudio();
-        }, 1200);
-      }
+    // Safety timeout: If user has spoken and recorded continuously for 14+ seconds, auto-submit
+    if (hasSpokenRef.current && (recorderState.durationMillis ?? 0) >= 14000) {
+      speechTicksRef.current = 0;
+      silenceTicksRef.current = 0;
+      stopAndProcessAudio();
     }
-  }, [recorderState.metering, recorderState.isRecording, voiceState, isMuted, isTypingInVoice]);
+  }, [recorderState.metering, recorderState.durationMillis, recorderState.isRecording, voiceState, isMuted, isTypingInVoice]);
 
   /**
    * Stop recording and send audio to backend for transcription and action execution
@@ -399,10 +421,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     if (isProcessingRef.current) return;
     isProcessingRef.current = true;
 
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
+    speechTicksRef.current = 0;
+    silenceTicksRef.current = 0;
+    hasSpokenRef.current = false;
 
     setVoiceState('thinking');
     setAudioLevel(0);
