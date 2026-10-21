@@ -69,6 +69,8 @@ async def voice_chat_with_support(request: Request, body: VoiceRequest) -> Voice
         user_name=body.user_name,
         phone=body.phone,
         initial_context=body.initial_context,
+        synthesize_audio=body.synthesize_audio,
+        messages=body.messages,
     )
     return VoiceResponse(**result)
 

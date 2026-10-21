@@ -114,6 +114,8 @@ class VoiceRequest(BaseModel):
     user_name: str | None = None
     phone: str | None = None
     initial_context: str | None = "dashboard"
+    synthesize_audio: bool = True
+    messages: list[dict[str, str]] | None = None
 
 
 class VoiceResponse(BaseModel):

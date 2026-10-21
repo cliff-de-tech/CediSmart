@@ -1096,6 +1096,8 @@ class SupportService:
         user_name: str | None = None,
         phone: str | None = None,
         initial_context: str | None = "dashboard",
+        synthesize_audio: bool = True,
+        messages: list[dict[str, str]] | None = None,
     ) -> dict:
         """Process spoken user audio with Gemini 2.5 / 1.5 multimodal audio understanding.
 
@@ -1134,7 +1136,7 @@ class SupportService:
         prompt = (
             f"You are CediSmart AI Voice Assistant, talking directly to {first_name} in Ghana.\n"
             "The user spoke an audio message. Your tasks:\n"
-            "1. Transcribe the user's speech accurately into English or Ghanaian Pidgin.\n"
+            "1. Transcribe the user's speech accurately into English or Ghanaian Pidgin. If there is no speech, background silence, or non-speech noise, set transcript to '' (empty string). NEVER output timestamps such as '00:00' or tags like '<noise>'.\n"
             "2. Detect user intent:\n"
             "   - 'create_transaction': If user says e.g. 'log 50 cedis for fuel on momo', 'spent 20 cedis on lunch', 'received 500 from kwame on bank'. Extract amount (number), type ('expense' or 'income'), category ('Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Income'), description (e.g. 'Fuel', 'Lunch'), and account_type ('mobile_money', 'cash', or 'bank').\n"
             "   - 'check_balance': If user asks about their balance, wallets, or money.\n"
@@ -1164,23 +1166,33 @@ class SupportService:
         if settings.GEMINI_API_KEY:
             for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
+                contents: list[dict[str, Any]] = []
+                if messages:
+                    for prev_msg in messages[-6:]:
+                        p_role = "model" if prev_msg.get("role") in ("model", "assistant") else "user"
+                        p_text = prev_msg.get("content", "")
+                        if p_text:
+                            contents.append({"role": p_role, "parts": [{"text": p_text}]})
+
+                contents.append(
+                    {
+                        "role": "user",
+                        "parts": [
+                            {
+                                "inlineData": {
+                                    "mimeType": effective_mime,
+                                    "data": clean_b64,
+                                }
+                            },
+                            {
+                                "text": prompt,
+                            },
+                        ],
+                    }
+                )
+
                 payload = {
-                    "contents": [
-                        {
-                            "role": "user",
-                            "parts": [
-                                {
-                                    "inlineData": {
-                                        "mimeType": effective_mime,
-                                        "data": clean_b64,
-                                    }
-                                },
-                                {
-                                    "text": prompt,
-                                },
-                            ],
-                        }
-                    ],
+                    "contents": contents,
                     "generationConfig": {
                         "responseMimeType": "application/json",
                         "temperature": 0.2,
@@ -1205,12 +1217,20 @@ class SupportService:
                                 parsed = json.loads(candidate_text)
                             except Exception:
                                 continue
-                            transcript = parsed.get("transcript") or "Voice message"
+                            raw_transcript = (parsed.get("transcript") or "").strip()
+                            # Clean timestamp hallucinations (e.g. 00:00) and audio noise tags
+                            if re.match(r"^\[?\(?\d{1,2}:\d{2}(\.\d+)?\)?\]?$", raw_transcript) or re.match(r"^<[^>]+>$", raw_transcript):
+                                raw_transcript = ""
+                            transcript = raw_transcript
                             reply_text = parsed.get("response") or f"I heard you, {first_name}."
                             action_payload = parsed.get("action")
 
-                            # Synthesize natural neural voice audio via Gemini TTS
-                            audio_b64, audio_mime = await SupportService.synthesize_neural_voice(reply_text)
+                            # Synthesize natural neural voice audio via Gemini TTS if requested
+                            audio_b64, audio_mime = (
+                                await SupportService.synthesize_neural_voice(reply_text)
+                                if synthesize_audio
+                                else (None, "audio/wav")
+                            )
 
                             return {
                                 "transcript": transcript,
@@ -1230,7 +1250,11 @@ class SupportService:
 
         # 2. Fallback response
         fallback_text = f"I heard you, {first_name}. Could you please say that again?"
-        fb_audio, fb_mime = await SupportService.synthesize_neural_voice(fallback_text)
+        fb_audio, fb_mime = (
+            await SupportService.synthesize_neural_voice(fallback_text)
+            if synthesize_audio
+            else (None, "audio/wav")
+        )
         return {
             "transcript": "Voice note received",
             "response": fallback_text,

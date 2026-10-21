@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,11 @@ import {
   Image,
   Linking,
   PermissionsAndroid,
-  TouchableWithoutFeedback,
   StyleSheet,
+  Keyboard,
+  PanResponder,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -29,9 +29,12 @@ import { useNavigation } from '@react-navigation/native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   X,
-  Send,
-  Bot,
-  User,
+  ArrowUp,
+  ArrowDown,
+  PanelLeft,
+  Edit3,
+  Copy,
+  Check,
   Sparkles,
   AlertCircle,
   Plus,
@@ -47,11 +50,8 @@ import {
   PieChart,
   MessageSquare,
   RotateCcw,
-  History,
-  Clock,
+  Search,
   Trash2,
-  Headphones,
-  Mic,
   AudioLines,
   Landmark,
   ImageIcon,
@@ -63,11 +63,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GlassSurface } from '../glass/GlassSurface';
-import { CoinBackground } from './CoinBackground';
 import { VoiceSupportModal } from '../voice/VoiceSupportModal';
-
-// Height of one quick-action row; the list shows exactly two rows and scrolls for the rest.
-const QUICK_ACTION_ROW_HEIGHT = 44;
 
 export type ActionTag =
   | 'GENERATE_MOMO_KEY'
@@ -189,6 +185,40 @@ export const getScreenQuickPrompts = (ctx?: string, type?: string) => {
   }
 };
 
+// Welcome copy stays local to the chat UI and never assumes a user's financial status.
+const WELCOME_QUESTIONS = {
+  dashboard: [
+    'What would you like to do with your money today?',
+    'What can I help you make sense of today?',
+    'Shall we look at your spending together?',
+    'What’s on your mind about money?',
+  ],
+  budgets: [
+    'What would you like to plan for?',
+    'How can I help with your budget today?',
+    'Which spending goal shall we work on?',
+    'Want to make a plan for the month ahead?',
+  ],
+  transactions: [
+    'What would you like to track today?',
+    'Need a hand finding a transaction?',
+    'Which expense shall we look at together?',
+    'What would you like to understand about your spending?',
+  ],
+  settings: [
+    'What can I help you set up today?',
+    'Need a hand with your accounts or MoMo?',
+    'What would you like to fine-tune?',
+    'How can I make CediSmart easier for you?',
+  ],
+  auth: [
+    'How can I help you get started?',
+    'Need a hand signing in?',
+    'What can I help with on your account?',
+    'Shall we get you settled in?',
+  ],
+};
+
 const ACTION_TAG_REGEX = /\[ACTION:(GENERATE_MOMO_KEY|OPEN_SHORTCUTS|SYNC_OFFLINE_QUEUE|HEAL_APP|NAV_ADD_EXPENSE|NAV_BUDGETS|NAV_TRANSACTIONS|REPORT_PROBLEM|PROBLEM_RESOLVED)\]/g;
 
 const extractActionsAndCleanText = (rawText: string): { cleanText: string; actions: ActionTag[] } => {
@@ -234,12 +264,12 @@ const parseMarkdown = (text: string, isDark: boolean) => {
     if (headingMatch) {
       const level = headingMatch[1].length;
       const content = headingMatch[2];
-      const fontSize = level === 1 ? 20 : level === 2 ? 17 : 15;
+      const fontSize = level === 1 ? 22 : level === 2 ? 19 : 17;
       return (
         <Text
           key={lineIndex}
           selectable={true}
-          style={{ fontSize, fontWeight: 'bold', marginVertical: 4 }}
+          style={{ fontSize, lineHeight: fontSize + 8, fontWeight: '600', marginTop: 12, marginBottom: 6 }}
           className={isDark ? 'text-dark-on-surface' : 'text-on-surface'}
         >
           {parseInlineStyles(content)}
@@ -253,8 +283,8 @@ const parseMarkdown = (text: string, isDark: boolean) => {
       const content = listMatch[3];
       return (
         <View key={lineIndex} className="flex-row items-start mb-1" style={{ marginLeft: indent + 6 }}>
-          <Text selectable={true} className={`mr-2 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>•</Text>
-          <Text selectable={true} className={`flex-1 font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed`}>
+          <Text selectable={true} style={chatStyles.messageText} className={`mr-2 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>•</Text>
+          <Text selectable={true} style={chatStyles.messageText} className={`flex-1 font-body ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>
             {parseInlineStyles(content)}
           </Text>
         </View>
@@ -268,8 +298,8 @@ const parseMarkdown = (text: string, isDark: boolean) => {
       const content = numListMatch[3];
       return (
         <View key={lineIndex} className="flex-row items-start mb-1" style={{ marginLeft: indent + 6 }}>
-          <Text selectable={true} className={`mr-2 font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{index}.</Text>
-          <Text selectable={true} className={`flex-1 font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed`}>
+          <Text selectable={true} style={chatStyles.messageText} className={`mr-2 font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>{index}.</Text>
+          <Text selectable={true} style={chatStyles.messageText} className={`flex-1 font-body ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>
             {parseInlineStyles(content)}
           </Text>
         </View>
@@ -280,7 +310,8 @@ const parseMarkdown = (text: string, isDark: boolean) => {
       <Text
         key={lineIndex}
         selectable={true}
-        className={`font-body text-sm ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} leading-relaxed mb-1`}
+        style={chatStyles.messageText}
+        className={`font-body ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}
       >
         {parseInlineStyles(line)}
       </Text>
@@ -300,6 +331,15 @@ export const SupportModal: React.FC<SupportModalProps> = ({
 }) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
+  const colors = {
+    background: isDark ? '#080a08' : '#f5f8f5',
+    surface: isDark ? '#181e19' : '#ffffff',
+    text: isDark ? '#e1e3e0' : '#1c1b1f',
+    muted: isDark ? '#b2b6b1' : '#40493d',
+    border: isDark ? '#303a32' : '#dce5d9',
+    accent: isDark ? '#4ade80' : '#0d631b',
+    userBubble: isDark ? '#193823' : '#e3efdf',
+  };
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const navProp = useNavigation<any>();
@@ -331,6 +371,10 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   const [showOfflineGuides, setShowOfflineGuides] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const isNearBottom = useRef(true);
+  const isWelcome = messages.every((message) => message.id === 'default_greeting');
 
   // Screenshot / Receipt Vision attachment state
   const [attachedImage, setAttachedImage] = useState<{
@@ -348,6 +392,34 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historySearch, setHistorySearch] = useState('');
+  const [welcomeMoment, setWelcomeMoment] = useState(() => ({ hour: new Date().getHours(), variation: 0 }));
+
+  // Refresh on opening or switching chats, never on typing or other UI updates.
+  useEffect(() => {
+    if (!visible || !activeSessionId) return;
+    setWelcomeMoment((previous) => ({
+      hour: new Date().getHours(),
+      variation: previous.variation + 1,
+    }));
+  }, [visible, activeSessionId]);
+
+  const timeGreeting = welcomeMoment.hour >= 5 && welcomeMoment.hour < 12
+    ? 'Good morning'
+    : welcomeMoment.hour >= 12 && welcomeMoment.hour < 17
+      ? 'Good afternoon'
+      : 'Good evening';
+  const welcomeGreeting = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
+  const welcomeQuestions = WELCOME_QUESTIONS[supportType === 'auth' ? 'auth' : screenContext];
+  const welcomeQuestion = welcomeQuestions[welcomeMoment.variation % welcomeQuestions.length];
+
+  const historySessions = useMemo(() => {
+    const query = historySearch.trim().toLowerCase();
+    return sessions
+      .filter((session) => (session.messages || []).some((message) => message.role === 'user'))
+      .filter((session) => !query || (session.title || 'Conversation').toLowerCase().includes(query))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [sessions, historySearch]);
 
   const defaultGreeting: Message = {
     id: 'default_greeting',
@@ -488,14 +560,22 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   }, [messages, isHistoryLoaded, activeSessionId]);
 
   useEffect(() => {
-    if (visible) {
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [visible]);
+    isNearBottom.current = true;
+    setShowScrollToBottom(false);
+    setShowAttachMenu(false);
+  }, [activeSessionId, visible]);
 
   useEffect(() => {
+    if (!copiedMessageId) return;
+    const timeout = setTimeout(() => setCopiedMessageId(null), 2000);
+    return () => clearTimeout(timeout);
+  }, [copiedMessageId]);
+
+  const scrollToLatest = () => {
+    isNearBottom.current = true;
+    setShowScrollToBottom(false);
     scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [messages]);
+  };
 
   const handleMessagePress = (msg: Message) => {
     const isUser = msg.role === 'user';
@@ -533,6 +613,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   };
 
   const handleSelectSession = (session: ChatSession) => {
+    isNearBottom.current = true;
+    setShowScrollToBottom(false);
     setActiveSessionId(session.id);
     setMessages(session.messages && session.messages.length > 0 ? session.messages : [defaultGreeting]);
     setShowHistoryModal(false);
@@ -1125,6 +1207,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     const imgBase64 = attachedImage?.base64;
     const imgMime = attachedImage?.mimeType;
 
+    isNearBottom.current = true;
+    setShowScrollToBottom(false);
     setMessages(updatedMessages);
     setInput('');
     setAttachedImage(null);
@@ -1135,6 +1219,47 @@ export const SupportModal: React.FC<SupportModalProps> = ({
       targetMessageId: newMsgId,
     });
   };
+
+  const handleQuickPrompt = async (promptText: string) => {
+    Haptics.selectionAsync().catch(() => {});
+    if (promptText === 'Paste MoMo SMS to Auto-Log') {
+      const clip = await Clipboard.getString();
+      if (clip && clip.trim().length > 0) {
+        setInput(clip.trim());
+        textInputRef.current?.focus();
+      } else {
+        Alert.alert('Paste MoMo SMS', 'Copy any MTN, Telecel, or AT Money SMS to your clipboard first, then tap here.');
+      }
+    } else if (promptText === 'Check for problems') {
+      runSelfHealDoctor();
+    } else if (promptText === 'Help Guides (Offline)') {
+      setShowOfflineGuides(true);
+    } else {
+      setInput(promptText);
+      textInputRef.current?.focus();
+    }
+  };
+
+  const openHistory = useCallback(() => {
+    Keyboard.dismiss();
+    setHistorySearch('');
+    setShowHistoryModal(true);
+  }, []);
+
+  const historySwipe = useMemo(() => PanResponder.create({
+    // Claim deliberate, single-finger left swipes without taking vertical scrolling.
+    onMoveShouldSetPanResponderCapture: (_, gesture) =>
+      !chatMutation.isPending &&
+      gesture.numberActiveTouches === 1 &&
+      gesture.dx < -24 &&
+      Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+    onPanResponderRelease: (_, gesture) => {
+      const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2;
+      const isLeftSwipe = gesture.dx < -72 || (gesture.dx < -24 && gesture.vx < -0.5);
+      if (!chatMutation.isPending && isHorizontal && isLeftSwipe) openHistory();
+    },
+    onPanResponderTerminationRequest: () => true,
+  }), [chatMutation.isPending, openHistory]);
 
   const renderActionBadgeLabel = (action: ActionTag) => {
     switch (action) {
@@ -1166,768 +1291,543 @@ export const SupportModal: React.FC<SupportModalProps> = ({
       transparent={false}
       onRequestClose={onClose}
     >
-      <View className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
-        <CoinBackground />
+      <View style={[chatStyles.screen, { backgroundColor: colors.background }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          className="flex-1"
+          style={chatStyles.screen}
         >
-          {/* Liquid Glass Header */}
-          <GlassSurface
-            tint="emerald"
-            variant="thick"
-            elevated
-            radius={28}
-            style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
-          >
-            <View
-              style={{ paddingTop: Math.max(insets.top, 16) }}
-              className="px-4 pb-4 flex-row items-center justify-between"
-            >
-              {/* Left Identity: Emerald Headphones Avatar + Live Green Indicator + Title */}
-              <View className="flex-row items-center flex-1 min-w-0 mr-3">
-                <View className="relative flex-shrink-0 mr-3">
-                  <View
-                    className={`w-10 h-10 rounded-2xl items-center justify-center border ${
-                      isDark
-                        ? 'bg-emerald-500/15 border-emerald-500/30'
-                        : 'bg-emerald-600/10 border-emerald-600/25'
-                    }`}
-                  >
-                    <Headphones size={20} color={isDark ? '#4ade80' : '#0d631b'} />
-                  </View>
-                  {/* Glowing live status dot */}
-                  <View
-                    className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 ${
-                      isDark ? 'border-[#0a180e]' : 'border-white'
-                    }`}
-                  />
-                </View>
-
-                <View className="flex-1 min-w-0 justify-center pr-1">
-                  <Text
-                    className={`font-headline font-bold text-base leading-tight ${
-                      isDark ? 'text-white' : 'text-charcoal'
-                    }`}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit={true}
-                    minimumFontScale={0.8}
-                  >
-                    CediSmart Support
-                  </Text>
-                  <View className="flex-row items-center mt-1">
-                    <Text
-                      className={`font-body text-[11px] font-medium leading-none ${
-                        isDark ? 'text-emerald-300' : 'text-emerald-700'
-                      }`}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit={true}
-                      minimumFontScale={0.8}
-                    >
-                      Active • Finance & MoMo Assistant
-                    </Text>
-                  </View>
-                </View>
+          <View style={{ paddingTop: insets.top, backgroundColor: colors.background }}>
+            <View style={chatStyles.header}>
+              <TouchableOpacity
+                onPress={openHistory}
+                disabled={chatMutation.isPending}
+                style={chatStyles.iconButton}
+                accessibilityRole="button"
+                accessibilityLabel="Open chat history"
+                accessibilityState={{ disabled: chatMutation.isPending }}
+              >
+                <PanelLeft size={22} color={colors.text} strokeWidth={1.7} />
+              </TouchableOpacity>
+              <View style={chatStyles.headerIdentity}>
+                <Text style={[chatStyles.headerTitle, { color: colors.text }]} numberOfLines={1}>CediSmart AI</Text>
+                <Text style={[chatStyles.headerSubtitle, { color: colors.muted }]} numberOfLines={1}>
+                  {supportType === 'auth' ? 'Account assistant' : 'Your money, made clearer'}
+                </Text>
               </View>
-
-              {/* Right Action Suite: History, New Chat, Close */}
-              <View className="flex-row items-center flex-shrink-0" style={{ gap: 8 }}>
-                <TouchableOpacity
-                  onPress={() => setShowHistoryModal(true)}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                  className={`w-9 h-9 rounded-full ${
-                    isDark ? 'bg-white/10 border border-white/10' : 'bg-black/5 border border-black/5'
-                  } items-center justify-center`}
-                  accessibilityLabel="Past conversations"
-                >
-                  <History size={17} color={isDark ? 'white' : '#1C1C2E'} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleNewChat}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                  className={`w-9 h-9 rounded-full ${
-                    isDark
-                      ? 'bg-primary/25 border border-primary/40'
-                      : 'bg-primary/10 border border-primary/25'
-                  } items-center justify-center`}
-                  accessibilityLabel="New Conversation"
-                >
-                  <Plus size={18} color={isDark ? '#4ade80' : '#0d631b'} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={onClose}
-                  hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                  className={`w-9 h-9 rounded-full ${
-                    isDark ? 'bg-white/10 border border-white/10' : 'bg-black/5 border border-black/5'
-                  } items-center justify-center`}
-                  accessibilityLabel="Close support"
-                >
-                  <X size={18} color={isDark ? 'white' : '#1C1C2E'} />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                onPress={handleNewChat}
+                disabled={chatMutation.isPending}
+                style={chatStyles.iconButton}
+                accessibilityRole="button"
+                accessibilityLabel="Start a new chat"
+                accessibilityState={{ disabled: chatMutation.isPending }}
+              >
+                <Edit3 size={21} color={colors.text} strokeWidth={1.7} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onClose} style={chatStyles.iconButton} accessibilityRole="button" accessibilityLabel="Close AI chat">
+                <X size={22} color={colors.text} strokeWidth={1.7} />
+              </TouchableOpacity>
             </View>
-          </GlassSurface>
+          </View>
 
-          {/* Chat Messages */}
-          <ScrollView
-            ref={scrollViewRef}
-            className="flex-1 px-4"
-            contentContainerStyle={{ paddingTop: 16, paddingBottom: 28 }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {messages.map((msg, index) => {
-              const isUser = msg.role === 'user';
-              return (
-                <View key={msg.id || index} className="mb-5">
-                  <View className={`flex-row ${isUser ? 'justify-end' : 'justify-start'}`}>
-                    {!isUser && (
-                      <View className="w-8 h-8 rounded-full bg-primary/15 items-center justify-center mr-2 self-end">
-                        <Bot size={16} color={isDark ? '#4ade80' : '#0d631b'} />
-                      </View>
-                    )}
-                    {isUser ? (
-                      <View className="max-w-[82%] items-end">
-                        <TouchableOpacity
-                          onLongPress={() => handleMessagePress(msg)}
-                          delayLongPress={300}
-                          activeOpacity={0.85}
-                          className={`rounded-2xl rounded-tr-none px-4 py-3 shadow-sm ${
-                            msg.status === 'failed' ? 'bg-error/90' : 'bg-primary'
-                          }`}
-                        >
-                          {msg.imageUri && (
-                            <Image
-                              source={{ uri: msg.imageUri }}
-                              style={{ width: 190, height: 130, borderRadius: 12, marginBottom: 8 }}
-                              resizeMode="cover"
-                            />
-                          )}
-                          <Text selectable={true} className="font-body text-sm text-white leading-relaxed">
-                            {msg.content}
-                          </Text>
-                        </TouchableOpacity>
-
-                        {/* Message Delivery Status / 1-Tap Retry */}
-                        {msg.status === 'failed' && (
-                          <TouchableOpacity
-                            onPress={() => handleRetryMessage(msg)}
-                            className="flex-row items-center mt-1.5 bg-error/15 px-3 py-1.5 rounded-full border border-error/30"
-                          >
-                            <RotateCcw size={12} color="#ef4444" />
-                            <Text className="text-error font-headline font-bold text-[11px] ml-1.5">
-                              Couldn't send. Tap to retry
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                        {msg.status === 'sending' && (
-                          <Text className={`text-[10px] mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                            Sending...
-                          </Text>
-                        )}
-                      </View>
-                    ) : (
-                      <GlassSurface radius={20} style={{ maxWidth: '84%' }}>
-                        <TouchableOpacity
-                          onLongPress={() => handleMessagePress(msg)}
-                          delayLongPress={300}
-                          activeOpacity={0.85}
-                          className="px-4 py-3"
-                        >
-                          <View className="space-y-1">
-                            {parseMarkdown(msg.content, isDark)}
-                          </View>
-                        </TouchableOpacity>
-                      </GlassSurface>
-                    )}
-                    {isUser && (
-                      <View className="w-8 h-8 rounded-full bg-primary/20 items-center justify-center ml-2 self-end">
-                        <User size={16} color={isDark ? '#4ade80' : '#0d631b'} />
-                      </View>
-                    )}
+          <View style={chatStyles.screen} {...historySwipe.panHandlers}>
+            <ScrollView
+              ref={scrollViewRef}
+              style={chatStyles.screen}
+              contentContainerStyle={[chatStyles.conversation, isWelcome && chatStyles.welcomeConversation]}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              showsVerticalScrollIndicator={false}
+              scrollEventThrottle={32}
+              onScroll={({ nativeEvent }) => {
+                const distance = nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height - nativeEvent.contentOffset.y;
+                isNearBottom.current = distance < 100;
+                setShowScrollToBottom(distance >= 100);
+              }}
+              onLayout={() => {
+                if (isNearBottom.current && !isWelcome) scrollViewRef.current?.scrollToEnd({ animated: false });
+              }}
+              onContentSizeChange={() => {
+                if (isNearBottom.current && !isWelcome) scrollViewRef.current?.scrollToEnd({ animated: true });
+              }}
+            >
+              {!isHistoryLoaded ? (
+                <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} accessibilityLabel="Loading conversation" />
+              ) : isWelcome ? (
+                <View style={chatStyles.welcome}>
+                  <View style={[chatStyles.welcomeMark, { backgroundColor: colors.userBubble }]}>
+                    <Sparkles size={30} color={colors.accent} strokeWidth={1.5} />
                   </View>
-
-                  {/* 1-Tap Action Cards & Navigation Shortcuts */}
-                  {!isUser && msg.actions && msg.actions.length > 0 && (
-                    <View className="ml-10 mt-2.5 flex-row flex-wrap" style={{ gap: 8 }}>
-                      {msg.actions.map((act) => {
-                        const { label, icon: IconComp } = renderActionBadgeLabel(act);
-                        return (
-                          <TouchableOpacity
-                            key={act}
-                            onPress={() => handleActionCardPress(act)}
-                            activeOpacity={0.85}
-                            className={`flex-row items-center px-3.5 py-2 rounded-xl border ${
-                              isDark
-                                ? 'bg-primary/25 border-primary/40'
-                                : 'bg-primary/10 border-primary/25'
-                            }`}
-                          >
-                            <IconComp size={14} color={isDark ? '#4ade80' : '#0d631b'} />
-                            <Text
-                              className={`font-headline font-bold text-xs ml-2 ${
-                                isDark ? 'text-[#4ade80]' : 'text-primary'
-                              }`}
-                            >
-                              {label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-
-            {/* AI thinking state */}
-            {chatMutation.isPending && (
-              <View className="flex-row mb-5 justify-start items-center">
-                <View className="w-8 h-8 rounded-full bg-primary/15 items-center justify-center mr-2">
-                  <Bot size={16} color={isDark ? '#4ade80' : '#0d631b'} />
-                </View>
-                <GlassSurface radius={20}>
-                  <View className="px-4 py-3 flex-row items-center">
-                    <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
-                    <Text className={`font-body text-xs ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} ml-2`}>
-                      Checking...
-                    </Text>
-                  </View>
-                </GlassSurface>
-              </View>
-            )}
-
-            {/* Problem Reporting Card */}
-            {showEscalate && !escalatedTicket && (
-              <GlassSurface radius={22} style={{ marginBottom: 16 }}>
-                <View className="p-5 items-center">
-                  <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center mb-2">
-                    <MessageSquare size={20} color={isDark ? '#4ade80' : '#0d631b'} />
-                  </View>
-                  <Text className={`font-headline font-bold text-sm text-center mb-1 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>
-                    Report a Problem
+                  <Text style={[chatStyles.eyebrow, { color: colors.muted }]}>{welcomeGreeting}</Text>
+                  <Text style={[chatStyles.welcomeTitle, { color: colors.text }]}>
+                    {welcomeQuestion}
                   </Text>
-                  <Text className={`font-body text-xs text-center mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Need assistance from our team? Send your question and device diagnostics directly to CediSmart customer support.
+                  <Text style={[chatStyles.welcomeSubtitle, { color: colors.muted }]}>
+                    {supportType === 'auth' ? 'Get help with your account, verification or sign-in.' : 'Make sense of spending, manage MoMo, or ask a question.'}
                   </Text>
-                  <View className="flex-row space-x-3 w-full">
-                    <TouchableOpacity
-                      onPress={() => setShowEscalate(false)}
-                      className={`flex-1 py-3 rounded-xl items-center justify-center border ${isDark ? 'border-white/10' : 'border-gray-200'}`}
-                    >
-                      <Text className={`font-headline font-bold text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                        Cancel
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => escalateMutation.mutate()}
-                      disabled={escalateMutation.isPending}
-                      className="flex-1 bg-primary py-3 rounded-xl flex-row items-center justify-center shadow-sm"
-                    >
-                      {escalateMutation.isPending ? (
-                        <ActivityIndicator size="small" color="white" />
-                      ) : (
-                        <Text className="text-white font-headline font-bold text-xs">
-                          Send Report
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </GlassSurface>
-            )}
-
-            {/* User-Facing Problem Report Status Tracker */}
-            {escalatedTicket && (
-              <GlassSurface radius={22} style={{ marginBottom: 16 }}>
-                <View className="p-5">
-                  <View className="flex-row items-center justify-between mb-3">
-                    <View className="flex-row items-center">
-                      <MessageSquare size={18} color={isDark ? '#4ade80' : '#0d631b'} />
-                      <Text className={`font-headline font-bold text-sm ml-2 ${isDark ? 'text-white' : 'text-charcoal'}`}>
-                        Report #{escalatedTicket.number}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => checkLiveTicketStatus()}
-                      disabled={isCheckingTicket}
-                      className="flex-row items-center px-3 py-1.5 rounded-full bg-primary/10"
-                    >
-                      {isCheckingTicket ? (
-                        <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
-                      ) : (
-                        <>
-                          <RefreshCw size={12} color={isDark ? '#4ade80' : '#0d631b'} />
-                          <Text className={`font-headline font-bold text-[10px] ml-1.5 ${isDark ? 'text-[#4ade80]' : 'text-primary'}`}>
-                            Check Status
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* 4-Step Progress Indicator: Report received → Investigating → Fix being tested → Update available */}
-                  <View className="flex-row items-center justify-between mb-4 mt-2 px-1">
-                    {[
-                      { step: 1, label: 'Received' },
-                      { step: 2, label: 'Investigating' },
-                      { step: 3, label: 'Fix in QA' },
-                      { step: 4, label: 'Update Ready' },
-                    ].map((st) => {
-                      const currentStage = ticketStatus?.stage_step || 1;
-                      const isDone = currentStage > st.step;
-                      const isCurrent = currentStage === st.step;
+                  <View style={chatStyles.promptGrid}>
+                    {getScreenQuickPrompts(screenContext, supportType).slice(0, 4).map((promptText) => {
+                      const Icon = promptText.includes('budget') ? PieChart
+                        : promptText.includes('balance') ? Landmark
+                        : promptText === 'Check for problems' ? Stethoscope
+                        : promptText === 'Help Guides (Offline)' ? BookOpen
+                        : promptText.includes('MoMo') ? Zap : MessageSquare;
                       return (
-                        <View key={st.step} className="items-center flex-1">
-                          <View
-                            className={`w-7 h-7 rounded-full items-center justify-center mb-1 ${
-                              isDone
-                                ? 'bg-success'
-                                : isCurrent
-                                  ? 'bg-primary'
-                                  : isDark
-                                    ? 'bg-white/10'
-                                    : 'bg-black/10'
-                            }`}
-                          >
-                            {isDone ? (
-                              <CheckCircle2 size={14} color="white" />
-                            ) : isCurrent ? (
-                              <ActivityIndicator size="small" color="white" />
-                            ) : (
-                              <Text className={`font-bold text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                {st.step}
-                              </Text>
-                            )}
-                          </View>
-                          <Text
-                            className={`text-[9px] font-headline text-center ${
-                              isCurrent || isDone
-                                ? isDark
-                                  ? 'text-white font-bold'
-                                  : 'text-charcoal font-bold'
-                                : isDark
-                                  ? 'text-gray-400'
-                                  : 'text-gray-500'
-                            }`}
-                            numberOfLines={1}
-                          >
-                            {st.label}
-                          </Text>
-                        </View>
+                        <TouchableOpacity
+                          key={promptText}
+                          onPress={() => handleQuickPrompt(promptText)}
+                          activeOpacity={0.7}
+                          style={[chatStyles.promptCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                          accessibilityRole="button"
+                        >
+                          <Icon size={19} color={colors.accent} strokeWidth={1.7} />
+                          <Text style={[chatStyles.promptText, { color: colors.text }]}>{promptText}</Text>
+                        </TouchableOpacity>
                       );
                     })}
                   </View>
-
-                  <Text className={`font-body text-xs leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                    {ticketStatus?.status_description ||
-                      'Your report and device diagnostics have been logged with CediSmart Support. Our team is working on it.'}
-                  </Text>
                 </View>
-              </GlassSurface>
-            )}
-          </ScrollView>
-
-          {/* Chat Input Bar + Quick Actions (no surrounding container, ChatGPT-style) */}
-          <View>
-            {/* Attached Screenshot / Receipt Preview */}
-            {attachedImage && (
-              <View className="px-4 pt-3 flex-row items-center">
-                <View className="relative">
-                  <Image
-                    source={{ uri: attachedImage.uri }}
-                    style={{ width: 56, height: 56, borderRadius: 12 }}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setAttachedImage(null)}
-                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-error items-center justify-center"
-                  >
-                    <X size={12} color="white" />
-                  </TouchableOpacity>
-                </View>
-                <Text
-                  className={`font-body text-xs ml-3 flex-1 ${
-                    isDark ? 'text-emerald-300' : 'text-emerald-800'
-                  }`}
-                >
-                  Screenshot / Receipt attached for visual analysis
-                </Text>
-              </View>
-            )}
-
-            {/* Quick Helper Actions: Vertically stacked matching /tmp/131462D0-8DA4-4413-833D-B2F502B60D29.jpeg */}
-            {/* Auto-disappears immediately when the user starts typing */}
-            {supportType !== 'auth' && !attachedImage && !input.trim() && (
-              <View className="px-5" style={{ height: QUICK_ACTION_ROW_HEIGHT * 2 }}>
-                <ScrollView
-                  nestedScrollEnabled
-                  showsVerticalScrollIndicator={false}
-                  snapToInterval={QUICK_ACTION_ROW_HEIGHT}
-                  decelerationRate="fast"
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {getScreenQuickPrompts(screenContext, supportType).map((promptText, idx) => {
-                    let IconComponent = Sparkles;
-                    if (promptText === 'Paste MoMo SMS to Auto-Log') IconComponent = Zap;
-                    else if (promptText === 'Check for problems') IconComponent = Stethoscope;
-                    else if (promptText === 'Help Guides (Offline)') IconComponent = BookOpen;
-                    else if (promptText.includes('budget') || promptText.includes('Budget')) IconComponent = PieChart;
-                    else if (promptText.includes('balance') || promptText.includes('account')) IconComponent = Landmark;
-
-                    return (
-                      <TouchableOpacity
-                        key={idx}
-                        activeOpacity={0.7}
-                        onPress={async () => {
-                          Haptics.selectionAsync().catch(() => {});
-                          if (promptText === 'Paste MoMo SMS to Auto-Log') {
-                            const clip = await Clipboard.getString();
-                            if (clip && clip.trim().length > 0) {
-                              setInput(clip.trim());
-                              textInputRef.current?.focus();
-                            } else {
-                              Alert.alert('Paste MoMo SMS', 'Copy any MTN, Telecel, or AT Money SMS to your clipboard first, then tap here.');
-                            }
-                          } else if (promptText === 'Check for problems') {
-                            runSelfHealDoctor();
-                          } else if (promptText === 'Help Guides (Offline)') {
-                            setShowOfflineGuides(true);
-                          } else {
-                            setInput(promptText);
-                            textInputRef.current?.focus();
-                          }
-                        }}
-                        style={{ height: QUICK_ACTION_ROW_HEIGHT }}
-                        className="flex-row items-center"
-                      >
-                        <View className="w-7 items-center justify-center mr-3">
-                          <IconComponent size={20} color={isDark ? '#4ade80' : '#0d631b'} />
-                        </View>
-                        <Text
-                          numberOfLines={1}
-                          className={`flex-1 font-body text-base font-medium ${
-                            isDark ? 'text-gray-200' : 'text-charcoal'
-                          }`}
+              ) : messages.filter((msg) => msg.id !== 'default_greeting').map((msg, index) => {
+                const isUser = msg.role === 'user';
+                return (
+                  <View key={msg.id || index} style={chatStyles.messageGroup}>
+                    {isUser ? (
+                      <View style={chatStyles.userMessage}>
+                        <TouchableOpacity
+                          onLongPress={() => handleMessagePress(msg)}
+                          delayLongPress={300}
+                          activeOpacity={0.85}
+                          style={[chatStyles.userBubble, { backgroundColor: colors.userBubble }]}
+                          accessibilityHint="Long press to copy or edit your message"
                         >
-                          {promptText}
+                          {msg.imageUri && (
+                            <Image source={{ uri: msg.imageUri }} style={chatStyles.messageImage} resizeMode="cover" accessibilityLabel="Attached image" />
+                          )}
+                          <Text selectable style={[chatStyles.messageText, { color: colors.text }]}>{msg.content}</Text>
+                        </TouchableOpacity>
+                        {msg.status === 'failed' && (
+                          <TouchableOpacity onPress={() => handleRetryMessage(msg)} style={chatStyles.retryButton} accessibilityRole="button">
+                            <RotateCcw size={14} color={isDark ? '#fca5a5' : '#ba1a1a'} />
+                            <Text style={{ color: isDark ? '#fca5a5' : '#ba1a1a', fontSize: 12 }}>Couldn't send. Tap to retry</Text>
+                          </TouchableOpacity>
+                        )}
+                        {msg.status === 'sending' && <Text style={[chatStyles.deliveryStatus, { color: colors.muted }]}>Sending…</Text>}
+                      </View>
+                    ) : (
+                      <View>
+                        <TouchableOpacity onLongPress={() => handleMessagePress(msg)} delayLongPress={300} activeOpacity={0.9}>
+                          {parseMarkdown(msg.content, isDark)}
+                        </TouchableOpacity>
+                        {msg.actions && msg.actions.length > 0 && (
+                          <View style={chatStyles.actionRow}>
+                            {msg.actions.map((act) => {
+                              const { label, icon: IconComp } = renderActionBadgeLabel(act);
+                              return (
+                                <TouchableOpacity
+                                  key={act}
+                                  onPress={() => handleActionCardPress(act)}
+                                  style={[chatStyles.actionChip, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                                  accessibilityRole="button"
+                                >
+                                  <IconComp size={16} color={colors.accent} />
+                                  <Text style={{ color: colors.text, fontSize: 13, flexShrink: 1 }}>{label}</Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        )}
+                        <TouchableOpacity
+                          onPress={() => {
+                            Clipboard.setString(msg.content);
+                            setCopiedMessageId(msg.id);
+                            Haptics.selectionAsync().catch(() => {});
+                          }}
+                          style={chatStyles.copyButton}
+                          accessibilityRole="button"
+                          accessibilityLabel={copiedMessageId === msg.id ? 'Response copied' : 'Copy response'}
+                        >
+                          {copiedMessageId === msg.id ? <Check size={16} color={colors.accent} /> : <Copy size={16} color={colors.muted} strokeWidth={1.6} />}
+                          {copiedMessageId === msg.id && <Text style={{ color: colors.muted, fontSize: 12 }}>Copied</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+
+              {chatMutation.isPending && (
+                <View style={chatStyles.thinking} accessibilityLiveRegion="polite">
+                  <ActivityIndicator size="small" color={colors.accent} />
+                  <Text style={{ color: colors.muted, fontSize: 14 }}>Thinking…</Text>
+                </View>
+              )}
+
+              {/* Problem Reporting Card */}
+              {showEscalate && !escalatedTicket && (
+                <GlassSurface radius={22} style={{ marginBottom: 16 }}>
+                  <View className="p-5 items-center">
+                    <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center mb-2">
+                      <MessageSquare size={20} color={isDark ? '#4ade80' : '#0d631b'} />
+                    </View>
+                    <Text className={`font-headline font-bold text-sm text-center mb-1 ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>
+                      Report a Problem
+                    </Text>
+                    <Text className={`font-body text-xs text-center mb-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Need assistance from our team? Send your question and device diagnostics directly to CediSmart customer support.
+                    </Text>
+                    <View className="flex-row space-x-3 w-full">
+                      <TouchableOpacity
+                        onPress={() => setShowEscalate(false)}
+                        className={`flex-1 py-3 rounded-xl items-center justify-center border ${isDark ? 'border-white/10' : 'border-gray-200'}`}
+                      >
+                        <Text className={`font-headline font-bold text-xs ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                          Cancel
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            )}
-
-            {/* OpenAI-Style '+' Attachment Popup Menu matching /tmp/251D00D0-82A9-45A6-BF8C-DF8025F38843.jpeg */}
-            {showAttachMenu && (
-              <>
-                <TouchableWithoutFeedback onPress={() => setShowAttachMenu(false)}>
-                  <View style={StyleSheet.absoluteFill} className="z-40" />
-                </TouchableWithoutFeedback>
-
-                <View
-                  style={{
-                    position: 'absolute',
-                    bottom: 84,
-                    left: 16,
-                    zIndex: 50,
-                    width: 216,
-                    borderRadius: 26,
-                    overflow: 'hidden',
-                    borderWidth: 1,
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.1)',
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 10 },
-                    shadowOpacity: 0.4,
-                    shadowRadius: 20,
-                    elevation: 16,
-                  }}
-                >
-                  <BlurView
-                    intensity={Platform.OS === 'ios' ? 80 : 100}
-                    tint={isDark ? 'dark' : 'light'}
-                    style={{
-                      padding: 8,
-                      backgroundColor: isDark ? 'rgba(30, 30, 30, 0.72)' : 'rgba(245, 245, 245, 0.82)',
-                    }}
-                  >
-                    {/* Camera Option */}
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={handleLaunchCamera}
-                      className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
-                    >
-                      <View
-                        className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                          isDark ? 'bg-white/10' : 'bg-black/5'
-                        }`}
+                      <TouchableOpacity
+                        onPress={() => escalateMutation.mutate()}
+                        disabled={escalateMutation.isPending}
+                        className="flex-1 bg-primary py-3 rounded-xl flex-row items-center justify-center shadow-sm"
                       >
-                        <Camera size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
+                        {escalateMutation.isPending ? (
+                          <ActivityIndicator size="small" color="white" />
+                        ) : (
+                          <Text className="text-white font-headline font-bold text-xs">
+                            Send Report
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </GlassSurface>
+              )}
+
+              {/* User-Facing Problem Report Status Tracker */}
+              {escalatedTicket && (
+                <GlassSurface radius={22} style={{ marginBottom: 16 }}>
+                  <View className="p-5">
+                    <View className="flex-row items-center justify-between mb-3">
+                      <View className="flex-row items-center">
+                        <MessageSquare size={18} color={isDark ? '#4ade80' : '#0d631b'} />
+                        <Text className={`font-headline font-bold text-sm ml-2 ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                          Report #{escalatedTicket.number}
+                        </Text>
                       </View>
-                      <Text
-                        className={`font-body text-base font-medium ${
-                          isDark ? 'text-white' : 'text-gray-900'
-                        }`}
+                      <TouchableOpacity
+                        onPress={() => checkLiveTicketStatus()}
+                        disabled={isCheckingTicket}
+                        className="flex-row items-center px-3 py-1.5 rounded-full bg-primary/10"
                       >
-                        Camera
-                      </Text>
-                    </TouchableOpacity>
+                        {isCheckingTicket ? (
+                          <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
+                        ) : (
+                          <>
+                            <RefreshCw size={12} color={isDark ? '#4ade80' : '#0d631b'} />
+                            <Text className={`font-headline font-bold text-[10px] ml-1.5 ${isDark ? 'text-[#4ade80]' : 'text-primary'}`}>
+                              Check Status
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
 
-                    {/* Photos Option */}
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={handlePickPhotos}
-                      className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
-                    >
-                      <View
-                        className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                          isDark ? 'bg-white/10' : 'bg-black/5'
-                        }`}
-                      >
-                        <ImageIcon size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
-                      </View>
-                      <Text
-                        className={`font-body text-base font-medium ${
-                          isDark ? 'text-white' : 'text-gray-900'
-                        }`}
-                      >
-                        Photos
-                      </Text>
-                    </TouchableOpacity>
+                    {/* 4-Step Progress Indicator: Report received → Investigating → Fix being tested → Update available */}
+                    <View className="flex-row items-center justify-between mb-4 mt-2 px-1">
+                      {[
+                        { step: 1, label: 'Received' },
+                        { step: 2, label: 'Investigating' },
+                        { step: 3, label: 'Fix in QA' },
+                        { step: 4, label: 'Update Ready' },
+                      ].map((st) => {
+                        const currentStage = ticketStatus?.stage_step || 1;
+                        const isDone = currentStage > st.step;
+                        const isCurrent = currentStage === st.step;
+                        return (
+                          <View key={st.step} className="items-center flex-1">
+                            <View
+                              className={`w-7 h-7 rounded-full items-center justify-center mb-1 ${
+                                isDone
+                                  ? 'bg-success'
+                                  : isCurrent
+                                    ? 'bg-primary'
+                                    : isDark
+                                      ? 'bg-white/10'
+                                      : 'bg-black/10'
+                              }`}
+                            >
+                              {isDone ? (
+                                <CheckCircle2 size={14} color="white" />
+                              ) : isCurrent ? (
+                                <ActivityIndicator size="small" color="white" />
+                              ) : (
+                                <Text className={`font-bold text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                  {st.step}
+                                </Text>
+                              )}
+                            </View>
+                            <Text
+                              className={`text-[9px] font-headline text-center ${
+                                isCurrent || isDone
+                                  ? isDark
+                                    ? 'text-white font-bold'
+                                    : 'text-charcoal font-bold'
+                                  : isDark
+                                    ? 'text-gray-400'
+                                    : 'text-gray-500'
+                              }`}
+                              numberOfLines={1}
+                            >
+                              {st.label}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
 
-                    {/* Files Option */}
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={handlePickDocument}
-                      className="flex-row items-center py-2 px-2.5 rounded-2xl active:bg-white/10"
-                    >
-                      <View
-                        className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                          isDark ? 'bg-white/10' : 'bg-black/5'
-                        }`}
-                      >
-                        <Paperclip size={19} color={isDark ? '#F3F4F6' : '#1F2937'} />
-                      </View>
-                      <Text
-                        className={`font-body text-base font-medium ${
-                          isDark ? 'text-white' : 'text-gray-900'
-                        }`}
-                      >
-                        Files
-                      </Text>
-                    </TouchableOpacity>
-                  </BlurView>
-                </View>
-              </>
-            )}
-
-            {/* Unified ChatGPT-Style Composer Capsule matching /tmp/131462D0-8DA4-4413-833D-B2F502B60D29.jpeg */}
-            <View
-              style={{ paddingBottom: Math.max(insets.bottom, 12) }}
-              className="px-4 pt-1.5"
-            >
-              <View
-                className={`flex-row items-center h-14 pl-2 pr-1.5 rounded-full ${
-                  isDark ? 'bg-[#222222]' : 'bg-[#efefef]'
-                }`}
+                    <Text className={`font-body text-xs leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                      {ticketStatus?.status_description ||
+                        'Your report and device diagnostics have been logged with CediSmart Support. Our team is working on it.'}
+                    </Text>
+                  </View>
+                </GlassSurface>
+              )}
+            </ScrollView>
+            {showScrollToBottom && !isWelcome && (
+              <TouchableOpacity
+                onPress={scrollToLatest}
+                style={[chatStyles.scrollButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                accessibilityRole="button"
+                accessibilityLabel="Scroll to latest message"
               >
-                {/* Plus Attach Button matching ChatGPT */}
+                <ArrowDown size={20} color={colors.text} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={[chatStyles.composerArea, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.background }]}>
+            <View style={[chatStyles.composer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {attachedImage && (
+                <View style={chatStyles.attachmentPreview}>
+                  <Image source={{ uri: attachedImage.uri }} style={chatStyles.attachmentThumbnail} accessibilityLabel="Image ready to send" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontSize: 14, fontWeight: '500' }}>Image attached</Text>
+                    <Text style={{ color: colors.muted, fontSize: 12, marginTop: 3 }}>Add a message or send to analyse</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => setAttachedImage(null)} style={chatStyles.iconButton} accessibilityRole="button" accessibilityLabel="Remove attachment">
+                    <X size={18} color={colors.muted} />
+                  </TouchableOpacity>
+                </View>
+              )}
+              <TextInput
+                ref={textInputRef}
+                style={[chatStyles.input, { color: colors.text }]}
+                placeholder={attachedImage ? 'Ask about this image…' : 'Message CediSmart…'}
+                placeholderTextColor={colors.muted}
+                value={input}
+                onChangeText={setInput}
+                multiline
+                textAlignVertical="top"
+                editable={!chatMutation.isPending}
+                accessibilityLabel="Message CediSmart AI"
+              />
+              <View style={chatStyles.composerToolbar}>
                 <TouchableOpacity
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => {});
-                    setShowAttachMenu((prev) => !prev);
+                    setShowAttachMenu(true);
                   }}
                   disabled={chatMutation.isPending}
-                  className="w-10 h-10 rounded-full items-center justify-center"
-                  accessibilityLabel="Attach Screenshot or Receipt"
+                  style={chatStyles.iconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Attachments and chat tools"
+                  accessibilityState={{ disabled: chatMutation.isPending }}
                 >
-                  <Plus size={22} color={isDark ? '#F3F4F6' : '#1F2937'} />
+                  <Plus size={23} color={colors.text} strokeWidth={1.7} />
                 </TouchableOpacity>
-
-                {/* Main Text Input: Ask CediSmart... */}
-                <TextInput
-                  ref={textInputRef}
-                  className={`flex-1 h-full px-2 font-body text-base ${
-                    isDark ? 'text-dark-on-surface' : 'text-on-surface'
-                  }`}
-                  placeholder={
-                    attachedImage
-                      ? 'Add a note for this image...'
-                      : 'Ask CediSmart...'
-                  }
-                  placeholderTextColor={isDark ? '#9CA3AF' : '#6B7280'}
-                  value={input}
-                  onChangeText={setInput}
-                  onSubmitEditing={handleSend}
-                  blurOnSubmit={false}
-                  editable={!chatMutation.isPending}
-                />
-
-                {/* Right Action: Voice Waveform (when empty) ➔ Send (when typed) */}
-                {!input.trim() && !attachedImage ? (
-                  <TouchableOpacity
-                    onPress={() => setShowVoiceModal(true)}
-                    className="w-10 h-10 rounded-full items-center justify-center bg-primary shadow-sm active:scale-95 ml-1"
-                    accessibilityLabel="Open Live Voice Mode"
-                  >
-                    <AudioLines size={19} color="white" />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    onPress={handleSend}
-                    disabled={chatMutation.isPending}
-                    className="w-10 h-10 rounded-full items-center justify-center bg-primary shadow-sm active:scale-95 ml-1"
-                    accessibilityLabel="Send message"
-                  >
-                    {chatMutation.isPending ? (
-                      <ActivityIndicator size="small" color="white" />
-                    ) : (
-                      <Send size={17} color="white" />
-                    )}
-                  </TouchableOpacity>
-                )}
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity
+                  onPress={input.trim() || attachedImage ? handleSend : () => setShowVoiceModal(true)}
+                  disabled={chatMutation.isPending}
+                  style={[chatStyles.sendButton, { opacity: chatMutation.isPending ? 0.55 : 1 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={chatMutation.isPending ? 'Waiting for response' : input.trim() || attachedImage ? 'Send message' : 'Open voice chat'}
+                  accessibilityState={{ disabled: chatMutation.isPending }}
+                >
+                  {chatMutation.isPending ? <ActivityIndicator size="small" color="white" />
+                    : input.trim() || attachedImage ? <ArrowUp size={22} color="white" />
+                    : <AudioLines size={22} color="white" />}
+                </TouchableOpacity>
               </View>
             </View>
           </View>
         </KeyboardAvoidingView>
 
-        {/* Past Conversations History Modal */}
+        <Modal visible={showAttachMenu} transparent animationType="fade" onRequestClose={() => setShowAttachMenu(false)}>
+          <View style={chatStyles.sheetBackdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowAttachMenu(false)} accessibilityRole="button" accessibilityLabel="Dismiss chat tools" />
+            <View style={[chatStyles.sheet, { backgroundColor: colors.surface, maxHeight: '85%', paddingBottom: Math.max(insets.bottom, 20) }]}>
+              <View style={chatStyles.sheetHeader}>
+                <Text style={[chatStyles.sheetTitle, { color: colors.text }]}>Add to your chat</Text>
+                <TouchableOpacity onPress={() => setShowAttachMenu(false)} style={chatStyles.iconButton} accessibilityRole="button" accessibilityLabel="Close chat tools">
+                  <X size={20} color={colors.muted} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView keyboardShouldPersistTaps="handled">
+                <View style={chatStyles.attachmentOptions}>
+                  {[
+                    { label: 'Camera', icon: Camera, onPress: handleLaunchCamera },
+                    { label: 'Photos', icon: ImageIcon, onPress: handlePickPhotos },
+                    { label: 'Files', icon: Paperclip, onPress: handlePickDocument },
+                  ].map(({ label, icon: Icon, onPress }) => (
+                    <TouchableOpacity key={label} onPress={onPress} style={[chatStyles.attachmentOption, { borderColor: colors.border }]} accessibilityRole="button">
+                      <Icon size={23} color={colors.accent} strokeWidth={1.7} />
+                      <Text style={{ color: colors.text, fontSize: 14 }}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {supportType !== 'auth' && (
+                  <View style={{ marginTop: 12 }}>
+                    {['Paste MoMo SMS to Auto-Log', 'Check for problems', 'Help Guides (Offline)'].map((prompt) => (
+                      <TouchableOpacity key={prompt} onPress={() => { setShowAttachMenu(false); handleQuickPrompt(prompt); }} style={chatStyles.toolRow} accessibilityRole="button">
+                        <Text style={{ color: colors.text, fontSize: 15, flexShrink: 1 }}>{prompt}</Text>
+                        <ArrowUpRight size={17} color={colors.muted} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Chat history sidebar */}
         <Modal
           visible={showHistoryModal}
           transparent
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setShowHistoryModal(false)}
         >
-          <View className="flex-1 justify-end bg-black/60">
-            <GlassSurface
-              variant="thick"
-              elevated
-              radius={32}
-              style={{ width: '100%', maxHeight: 480, padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}
+          <View style={chatStyles.historyBackdrop}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setShowHistoryModal(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss chat history"
+            />
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              style={[chatStyles.historySidebar, {
+                backgroundColor: colors.surface,
+                paddingTop: Math.max(insets.top, 12),
+                paddingBottom: Math.max(insets.bottom, 16),
+              }]}
             >
-              <View className="flex-row justify-between items-center mb-4">
-                <View className="flex-row items-center">
-                  <History size={20} color={isDark ? '#4ade80' : '#0d631b'} />
-                  <Text className={`font-headline font-bold text-lg ml-2 ${isDark ? 'text-white' : 'text-charcoal'}`}>
-                    Past Conversations
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => setShowHistoryModal(false)} className="p-1">
-                  <X size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
+              <View style={chatStyles.historyHeader}>
+                <Text style={[chatStyles.headerTitle, { color: colors.text, flex: 1 }]} numberOfLines={1}>CediSmart AI</Text>
+                <TouchableOpacity
+                  onPress={() => setShowHistoryModal(false)}
+                  style={chatStyles.iconButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close chat history"
+                >
+                  <PanelLeft size={21} color={colors.muted} strokeWidth={1.7} />
                 </TouchableOpacity>
               </View>
 
-              <View className="flex-row items-center mb-4" style={{ gap: 8 }}>
-                <TouchableOpacity
-                  onPress={handleNewChat}
-                  className="flex-1 bg-primary py-3 rounded-2xl flex-row items-center justify-center shadow-sm"
-                >
-                  <Plus size={18} color="white" />
-                  <Text className="text-white font-headline font-bold text-xs ml-2">
-                    New Chat
-                  </Text>
-                </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleNewChat}
+                style={[chatStyles.historyNewChat, { backgroundColor: colors.userBubble }]}
+                accessibilityRole="button"
+                accessibilityLabel="Start a new chat from history"
+              >
+                <Edit3 size={19} color={colors.accent} strokeWidth={1.7} />
+                <Text style={{ color: colors.text, fontSize: 15, fontWeight: '500' }}>New chat</Text>
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowHistoryModal(false);
-                    runSelfHealDoctor();
-                  }}
-                  disabled={isRunningDoctor}
-                  className={`px-4 py-3 rounded-2xl flex-row items-center justify-center border ${
-                    isDark
-                      ? 'bg-primary/20 border-primary/40'
-                      : 'bg-primary/10 border-primary/25'
-                  }`}
-                  accessibilityLabel="Run Diagnostics"
-                >
-                  {isRunningDoctor ? (
-                    <ActivityIndicator size="small" color={isDark ? '#4ade80' : '#0d631b'} />
-                  ) : (
-                    <>
-                      <Stethoscope size={16} color={isDark ? '#4ade80' : '#0d631b'} />
-                      <Text
-                        className={`font-headline font-bold text-xs ml-1.5 ${
-                          isDark ? 'text-[#4ade80]' : 'text-primary'
-                        }`}
-                      >
-                        Diagnostics
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+              <View style={[chatStyles.historySearch, { borderColor: colors.border }]}>
+                <Search size={17} color={colors.muted} />
+                <TextInput
+                  value={historySearch}
+                  onChangeText={setHistorySearch}
+                  placeholder="Search chats"
+                  placeholderTextColor={colors.muted}
+                  style={[chatStyles.historySearchInput, { color: colors.text }]}
+                  accessibilityLabel="Search chat history"
+                  autoCorrect={false}
+                  returnKeyType="search"
+                />
+                {!!historySearch && (
+                  <TouchableOpacity onPress={() => setHistorySearch('')} style={chatStyles.iconButton} accessibilityRole="button" accessibilityLabel="Clear chat search">
+                    <X size={16} color={colors.muted} />
+                  </TouchableOpacity>
+                )}
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {sessions.filter((sess) => (sess.messages || []).some((m) => m.role === 'user')).length === 0 ? (
-                  <View className="py-8 items-center justify-center">
-                    <Text className={`font-body text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      No past conversations yet.
+              <Text style={[chatStyles.historyLabel, { color: colors.muted }]}>Your chats</Text>
+              <ScrollView
+                style={chatStyles.screen}
+                contentContainerStyle={{ paddingBottom: 16 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+              >
+                {historySessions.length === 0 ? (
+                  <View style={chatStyles.historyEmpty}>
+                    <MessageSquare size={24} color={colors.muted} strokeWidth={1.5} />
+                    <Text style={{ color: colors.text, fontSize: 14, fontWeight: '500', textAlign: 'center' }}>
+                      {historySearch.trim() ? 'No matching chats' : 'No conversations yet'}
+                    </Text>
+                    <Text style={{ color: colors.muted, fontSize: 13, lineHeight: 20, textAlign: 'center' }}>
+                      {historySearch.trim() ? 'Try a different chat title.' : 'Start a chat and find it here later.'}
                     </Text>
                   </View>
-                ) : (
-                  sessions
-                    .filter((sess) => (sess.messages || []).some((m) => m.role === 'user'))
-                    .map((sess) => {
-                      const isActive = sess.id === activeSessionId;
-                      const msgCount = (sess.messages || []).filter((m) => m.role === 'user').length;
-                      const dateStr = new Date(sess.updatedAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      });
-
-                      return (
-                        <View
-                          key={sess.id}
-                          className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${
-                            isActive
-                              ? isDark
-                                ? 'bg-primary/20 border-primary/50'
-                                : 'bg-primary/10 border-primary/30'
-                              : isDark
-                                ? 'bg-white/5 border-white/10'
-                                : 'bg-black/5 border-black/5'
-                          }`}
-                        >
-                          <TouchableOpacity
-                            onPress={() => handleSelectSession(sess)}
-                            className="flex-1 mr-3"
-                          >
-                            <Text
-                              numberOfLines={1}
-                              className={`font-headline font-bold text-sm mb-1 ${
-                                isActive
-                                  ? isDark
-                                    ? 'text-white'
-                                    : 'text-primary'
-                                  : isDark
-                                    ? 'text-gray-200'
-                                    : 'text-charcoal'
-                              }`}
-                            >
-                              {sess.title || 'Conversation'}
-                            </Text>
-                            <Text className={`font-body text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {dateStr} • {msgCount} {msgCount === 1 ? 'question' : 'questions'}
-                            </Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            onPress={() => handleDeleteSession(sess.id)}
-                            className="p-2 rounded-xl"
-                            accessibilityLabel="Delete conversation"
-                          >
-                            <Trash2 size={16} color={isDark ? '#ef4444' : '#dc2626'} />
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    })
-                )}
+                ) : historySessions.map((session) => {
+                  const isActive = session.id === activeSessionId;
+                  return (
+                    <View key={session.id} style={[chatStyles.historyRow, { backgroundColor: isActive ? colors.userBubble : 'transparent' }]}>
+                      <TouchableOpacity
+                        onPress={() => handleSelectSession(session)}
+                        style={chatStyles.historyConversation}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: isActive }}
+                        accessibilityLabel={session.title || 'Conversation'}
+                      >
+                        <Text numberOfLines={1} style={{ color: colors.text, fontSize: 14, fontWeight: isActive ? '600' : '400' }}>
+                          {session.title || 'Conversation'}
+                        </Text>
+                        <Text style={{ color: colors.muted, fontSize: 11, marginTop: 5 }}>
+                          {new Date(session.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteSession(session.id)}
+                        style={chatStyles.iconButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete conversation: ${session.title || 'Conversation'}`}
+                      >
+                        <Trash2 size={15} color={colors.muted} strokeWidth={1.6} />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
               </ScrollView>
-            </GlassSurface>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShowHistoryModal(false);
+                  runSelfHealDoctor();
+                }}
+                disabled={isRunningDoctor}
+                style={[chatStyles.historyFooter, { borderTopColor: colors.border }]}
+                accessibilityRole="button"
+                accessibilityLabel="Run Diagnostics"
+                accessibilityState={{ disabled: isRunningDoctor }}
+              >
+                {isRunningDoctor ? <ActivityIndicator size="small" color={colors.accent} /> : <Stethoscope size={18} color={colors.accent} />}
+                <Text style={{ color: colors.text, fontSize: 14 }}>Diagnostics</Text>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
           </View>
         </Modal>
 
@@ -1939,12 +1839,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({
           onRequestClose={() => setShowOfflineGuides(false)}
         >
           <View className="flex-1 justify-end bg-black/60">
-            <GlassSurface
-              variant="thick"
-              elevated
-              radius={32}
-              style={{ width: '100%', padding: 24, paddingBottom: Math.max(insets.bottom, 24) }}
-            >
+            <View style={[chatStyles.sheet, { backgroundColor: colors.surface, maxHeight: '85%', paddingBottom: Math.max(insets.bottom, 24) }]}>
+
               <View className="flex-row justify-between items-center mb-4">
                 <View className="flex-row items-center">
                   <BookOpen size={20} color={isDark ? '#4ade80' : '#0d631b'} />
@@ -1952,7 +1848,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                     CediSmart Quick Guides
                   </Text>
                 </View>
-                <TouchableOpacity onPress={() => setShowOfflineGuides(false)} className="p-1">
+                <TouchableOpacity onPress={() => setShowOfflineGuides(false)} style={chatStyles.iconButton} accessibilityRole="button" accessibilityLabel="Close help guides">
                   <X size={20} color={isDark ? '#9ca3af' : '#6b7280'} />
                 </TouchableOpacity>
               </View>
@@ -1973,7 +1869,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                   </View>
                 ))}
               </ScrollView>
-            </GlassSurface>
+            </View>
           </View>
         </Modal>
 
@@ -1997,3 +1893,60 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     </Modal>
   );
 };
+
+
+const chatStyles = StyleSheet.create({
+  screen: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, minHeight: 64, paddingVertical: 6 },
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  headerIdentity: { flex: 1, paddingLeft: 6, paddingRight: 4 },
+  headerTitle: { fontSize: 18, fontWeight: '600', letterSpacing: -0.4 },
+  headerSubtitle: { fontSize: 11, marginTop: 3 },
+  conversation: { flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24 },
+  welcomeConversation: { justifyContent: 'center' },
+  welcome: { paddingVertical: 24, alignItems: 'center' },
+  welcomeMark: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  eyebrow: { fontSize: 14, marginBottom: 10 },
+  welcomeTitle: { fontSize: 28, lineHeight: 35, fontWeight: '600', letterSpacing: -0.8, textAlign: 'center', maxWidth: 340 },
+  welcomeSubtitle: { fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 300, marginTop: 12 },
+  promptGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, width: '100%', maxWidth: 440, marginTop: 32 },
+  promptCard: { flexGrow: 1, flexBasis: '45%', borderWidth: 1, borderRadius: 18, padding: 16, gap: 12, minHeight: 96 },
+  promptText: { fontSize: 13, lineHeight: 19, fontWeight: '500' },
+  messageGroup: { marginBottom: 24 },
+  messageText: { fontSize: 16, lineHeight: 25 },
+  userMessage: { alignSelf: 'flex-end', maxWidth: '86%', alignItems: 'flex-end' },
+  userBubble: { borderRadius: 22, paddingHorizontal: 16, paddingVertical: 12 },
+  messageImage: { width: 190, maxWidth: '100%', height: 140, borderRadius: 14, marginBottom: 10 },
+  deliveryStatus: { fontSize: 11, marginTop: 6, marginRight: 4 },
+  retryButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  actionChip: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10, minHeight: 44, maxWidth: '100%' },
+  copyButton: { minWidth: 44, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginLeft: -12, paddingHorizontal: 12 },
+  thinking: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, marginBottom: 16 },
+  scrollButton: { position: 'absolute', bottom: 12, alignSelf: 'center', width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  composerArea: { paddingHorizontal: 12, paddingTop: 8 },
+  composer: { width: '100%', maxWidth: 736, alignSelf: 'center', borderWidth: 1, borderRadius: 28, padding: 6 },
+  input: { fontSize: 16, lineHeight: 23, minHeight: 46, maxHeight: 140, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8 },
+  composerToolbar: { flexDirection: 'row', alignItems: 'center', paddingRight: 2 },
+  sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#0d631b', alignItems: 'center', justifyContent: 'center' },
+  attachmentPreview: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingLeft: 10, paddingTop: 8 },
+  attachmentThumbnail: { width: 52, height: 52, borderRadius: 12 },
+  historyBackdrop: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.45)' },
+  historySidebar: { width: '86%', maxWidth: 360, height: '100%', paddingHorizontal: 16, borderTopRightRadius: 24, borderBottomRightRadius: 24 },
+  historyHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingLeft: 8 },
+  historyNewChat: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, borderRadius: 14, marginBottom: 16 },
+  historySearch: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14, paddingLeft: 14, minHeight: 46 },
+  historySearchInput: { flex: 1, fontSize: 14, paddingHorizontal: 10, paddingVertical: 12 },
+  historyLabel: { fontSize: 12, fontWeight: '500', marginTop: 26, marginBottom: 12, paddingHorizontal: 12 },
+  historyEmpty: { paddingHorizontal: 12, paddingVertical: 32, alignItems: 'center', gap: 10 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, marginBottom: 4 },
+  historyConversation: { flex: 1, paddingHorizontal: 12, paddingVertical: 13, minHeight: 56 },
+  historyFooter: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, borderTopWidth: 1, paddingHorizontal: 12, marginTop: 8 },
+  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  sheet: { padding: 20, borderTopLeftRadius: 28, borderTopRightRadius: 28 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sheetTitle: { fontSize: 18, fontWeight: '600', flexShrink: 1 },
+  attachmentOptions: { flexDirection: 'row', gap: 12 },
+  attachmentOption: { flex: 1, borderWidth: 1, borderRadius: 18, alignItems: 'center', paddingVertical: 18, gap: 10 },
+  toolRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+});

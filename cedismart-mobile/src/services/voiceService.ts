@@ -12,129 +12,155 @@ export interface VoiceParseResult {
   action?: VoiceAction;
 }
 
+export interface VoicePlaybackFeedback {
+  onProgress?: (fraction: number) => void;
+  onAudioLevel?: (level: number) => void;
+}
+
 class VoiceService {
   private isSpeaking = false;
+  private generation = 0;
   private activePlayer: AudioPlayer | null = null;
+  private activeFile: string | null = null;
+  private subscriptions: { remove(): void }[] = [];
+  private loadTimer: ReturnType<typeof setTimeout> | null = null;
 
-  /**
-   * Play high-fidelity neural audio (Gemini Neural TTS) natively via expo-audio.
-   */
+  private releasePlayer() {
+    if (this.loadTimer) clearTimeout(this.loadTimer);
+    this.loadTimer = null;
+    this.subscriptions.forEach((subscription) => subscription.remove());
+    this.subscriptions = [];
+    const player = this.activePlayer;
+    this.activePlayer = null;
+    try { player?.remove(); } catch {}
+    const file = this.activeFile;
+    this.activeFile = null;
+    if (file) void FileSystem.deleteAsync(file, { idempotent: true }).catch(() => {});
+  }
+
+  private async clearPlayback() {
+    this.isSpeaking = false;
+    this.releasePlayer();
+    try { await Speech.stop(); } catch {}
+  }
+
+  /** Play neural audio; cancellation invalidates pending file writes and stale callbacks. */
   async speakNeural(
     audioBase64: string,
     onStart?: () => void,
     onDone?: () => void,
-    onError?: (error: any) => void
+    onError?: (error: any) => void,
+    feedback?: VoicePlaybackFeedback
   ): Promise<void> {
-    try {
-      await this.stop();
-      this.isSpeaking = true;
-      onStart?.();
-
-      const tempUri = `${FileSystem.cacheDirectory}neural_${Date.now()}.wav`;
-      await FileSystem.writeAsStringAsync(tempUri, audioBase64, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      const player = createAudioPlayer({ uri: tempUri });
-      this.activePlayer = player;
-
-      player.addListener('playbackStatusUpdate', (status) => {
-        if (
-          status.didJustFinish ||
-          (status.duration > 0 && status.currentTime >= status.duration && !status.playing)
-        ) {
-          this.isSpeaking = false;
-          this.activePlayer = null;
-          onDone?.();
-        }
-      });
-
-      player.play();
-    } catch (err) {
+    const generation = ++this.generation;
+    await this.clearPlayback();
+    if (generation !== this.generation) return;
+    let settled = false;
+    const finish = (error?: unknown) => {
+      if (settled || generation !== this.generation) return;
+      settled = true;
       this.isSpeaking = false;
-      this.activePlayer = null;
-      onError?.(err);
+      this.releasePlayer();
+      feedback?.onAudioLevel?.(0);
+      if (error) onError?.(error);
+      else { feedback?.onProgress?.(1); onDone?.(); }
+    };
+    try {
+      const tempUri = `${FileSystem.cacheDirectory}neural_${Date.now()}_${generation}.wav`;
+      this.activeFile = tempUri;
+      await FileSystem.writeAsStringAsync(tempUri, audioBase64, { encoding: FileSystem.EncodingType.Base64 });
+      if (generation !== this.generation) {
+        void FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
+        return;
+      }
+      const player = createAudioPlayer({ uri: tempUri }, { updateInterval: 100 });
+      this.activePlayer = player;
+      let started = false;
+      this.subscriptions.push(player.addListener('playbackStatusUpdate', (status) => {
+        if (generation !== this.generation || settled) return;
+        if (status.error) { finish(new Error(status.error)); return; }
+        if (status.playing && !started) {
+          started = true;
+          if (this.loadTimer) clearTimeout(this.loadTimer);
+          this.loadTimer = null;
+          this.isSpeaking = true;
+          onStart?.();
+        }
+        if (status.duration > 0) feedback?.onProgress?.(Math.min(1, status.currentTime / status.duration));
+        if (status.didJustFinish) finish();
+      }));
+      // Sampling is optional: unsupported devices still play audio normally.
+      if (feedback?.onAudioLevel && player.isAudioSamplingSupported) {
+        try {
+          this.subscriptions.push(player.addListener('audioSampleUpdate', (sample) => {
+            if (generation !== this.generation || settled) return;
+            const frames = sample.channels[0]?.frames || [];
+            const energy = frames.reduce((sum, value) => sum + value * value, 0);
+            feedback.onAudioLevel?.(frames.length ? Math.min(1, Math.sqrt(energy / frames.length) * 4) : 0);
+          }));
+          player.setAudioSamplingEnabled(true);
+        } catch {}
+      }
+      this.loadTimer = setTimeout(() => finish(new Error('Audio playback could not start')), 8000);
+      player.play();
+    } catch (error) {
+      finish(error);
     }
   }
 
-  /**
-   * Speak a message out loud to the user via Text-to-Speech (TTS).
-   */
+  /** Device speech fallback shares cancellation and playback feedback with neural audio. */
   async speak(
     text: string,
     onStart?: () => void,
     onDone?: () => void,
-    onError?: (error: any) => void
+    onError?: (error: any) => void,
+    feedback?: VoicePlaybackFeedback
   ): Promise<void> {
+    const generation = ++this.generation;
+    await this.clearPlayback();
+    if (generation !== this.generation) return;
+    let settled = false;
+    const finish = (error?: unknown) => {
+      if (settled || generation !== this.generation) return;
+      settled = true;
+      this.isSpeaking = false;
+      feedback?.onAudioLevel?.(0);
+      if (error) onError?.(error);
+      else { feedback?.onProgress?.(1); onDone?.(); }
+    };
     try {
-      // Clean interactive tags or markdown before reading out loud
       const cleanText = text
         .replace(/\[ACTION:[^\]]+\]/g, '')
         .replace(/\[VOICE_ACTION:[^\]]+\]/g, '')
         .replace(/[*#_`]/g, '')
         .trim();
-
-      if (!cleanText) {
-        onDone?.();
-        return;
-      }
-
-      // Stop any active utterance first
-      await this.stop();
-
-      this.isSpeaking = true;
+      if (!cleanText) { finish(); return; }
       Speech.speak(cleanText, {
-        language: 'en-US',
-        pitch: 1.0,
-        rate: 0.98,
+        language: 'en-US', pitch: 1, rate: 0.98,
         onStart: () => {
+          if (generation !== this.generation || settled) return;
           this.isSpeaking = true;
           onStart?.();
         },
-        onDone: () => {
-          this.isSpeaking = false;
-          onDone?.();
+        onBoundary: (event: { charIndex: number; charLength?: number }) => {
+          if (generation !== this.generation || settled) return;
+          feedback?.onProgress?.(Math.min(1, (event.charIndex + (event.charLength || 0)) / cleanText.length));
         },
-        onStopped: () => {
-          this.isSpeaking = false;
-          onDone?.();
-        },
-        onError: (err) => {
-          this.isSpeaking = false;
-          onError?.(err);
-        },
+        onDone: () => finish(),
+        onStopped: () => finish(),
+        onError: (error) => finish(error),
       });
-    } catch (e) {
-      this.isSpeaking = false;
-      onError?.(e);
-    }
+    } catch (error) { finish(error); }
   }
 
-  /**
-   * Stop speech immediately (Barge-in when user speaks).
-   */
+  /** Stop without firing callbacks from the interrupted response. */
   async stop(): Promise<void> {
-    try {
-      this.isSpeaking = false;
-      if (this.activePlayer) {
-        this.activePlayer.pause();
-        this.activePlayer = null;
-      }
-      await Speech.stop();
-    } catch (e) {
-      // Ignore if not speaking
-    }
+    ++this.generation;
+    await this.clearPlayback();
   }
 
-  /**
-   * Check if the voice synthesizer is currently speaking.
-   */
   async isCurrentlySpeaking(): Promise<boolean> {
-    try {
-      return await Speech.isSpeakingAsync();
-    } catch (e) {
-      return this.isSpeaking;
-    }
+    return this.isSpeaking;
   }
 
   /**
