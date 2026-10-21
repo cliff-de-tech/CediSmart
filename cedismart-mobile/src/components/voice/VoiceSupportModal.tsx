@@ -315,7 +315,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
           playsInSilentMode: true,
           allowsRecording: true,
           shouldRouteThroughEarpiece: false,
-          interruptionMode: 'doNotMix',
+          interruptionMode: 'mixWithOthers',
         });
         if (!isCurrentTurn(turn) || !canListen()) return;
         await audioRecorder.prepareToRecordAsync(VOICE_RECORDING_OPTIONS);
@@ -423,10 +423,6 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
   const playResponse = async (reply: string, neuralAudio: string | null, turn: number) => {
     if (!isCurrentTurn(turn)) return;
-    try {
-      await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false, interruptionMode: 'doNotMix' });
-    } catch {}
-    if (!isCurrentTurn(turn)) return;
     const feedback: VoicePlaybackFeedback = {
       onProgress: (fraction) => {
         if (!isCurrentTurn(turn)) return;
@@ -509,7 +505,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         user_name: cleanName || userName,
         phone: phone || 'Anonymous',
         initial_context: initialContext,
-        synthesize_audio: false,
+        synthesize_audio: true,
         messages: messagesRef.current.slice(-12).map(({ role, content }) => ({ role, content })),
       }, { signal: controller.signal });
       if (!isCurrentTurn(turn)) return;

@@ -73,13 +73,13 @@ class VoiceService {
         void FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => {});
         return;
       }
-      const player = createAudioPlayer({ uri: tempUri }, { updateInterval: 100 });
+      const player = createAudioPlayer({ uri: tempUri }, { updateInterval: 100, keepAudioSessionActive: true });
       this.activePlayer = player;
       let started = false;
       this.subscriptions.push(player.addListener('playbackStatusUpdate', (status) => {
         if (generation !== this.generation || settled) return;
         if (status.error) { finish(new Error(status.error)); return; }
-        if (status.playing && !started) {
+        if ((status.playing || status.currentTime > 0) && !started) {
           started = true;
           if (this.loadTimer) clearTimeout(this.loadTimer);
           this.loadTimer = null;
@@ -87,21 +87,16 @@ class VoiceService {
           onStart?.();
         }
         if (status.duration > 0) feedback?.onProgress?.(Math.min(1, status.currentTime / status.duration));
-        if (status.didJustFinish) finish();
+        if (
+          status.didJustFinish ||
+          (status.duration > 0 && status.currentTime >= status.duration && !status.playing)
+        ) {
+          finish();
+        }
       }));
-      // Sampling is optional: unsupported devices still play audio normally.
-      if (feedback?.onAudioLevel && player.isAudioSamplingSupported) {
-        try {
-          this.subscriptions.push(player.addListener('audioSampleUpdate', (sample) => {
-            if (generation !== this.generation || settled) return;
-            const frames = sample.channels[0]?.frames || [];
-            const energy = frames.reduce((sum, value) => sum + value * value, 0);
-            feedback.onAudioLevel?.(frames.length ? Math.min(1, Math.sqrt(energy / frames.length) * 4) : 0);
-          }));
-          player.setAudioSamplingEnabled(true);
-        } catch {}
-      }
-      this.loadTimer = setTimeout(() => finish(new Error('Audio playback could not start')), 8000);
+      this.loadTimer = setTimeout(() => {
+        if (!started) finish(new Error('Audio playback could not start'));
+      }, 6000);
       player.play();
     } catch (error) {
       finish(error);
