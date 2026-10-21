@@ -404,9 +404,10 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     }));
   }, [visible, activeSessionId]);
 
-  const timeGreeting = welcomeMoment.hour >= 5 && welcomeMoment.hour < 12
+  const hour = welcomeMoment.hour;
+  const timeGreeting = hour >= 4 && hour < 12
     ? 'Good morning'
-    : welcomeMoment.hour >= 12 && welcomeMoment.hour < 17
+    : hour >= 12 && hour < 17
       ? 'Good afternoon'
       : 'Good evening';
   const welcomeGreeting = firstName ? `${timeGreeting}, ${firstName}` : timeGreeting;
@@ -1355,8 +1356,13 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                 <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} accessibilityLabel="Loading conversation" />
               ) : isWelcome ? (
                 <View style={chatStyles.welcome}>
-                  <View style={[chatStyles.welcomeMark, { backgroundColor: colors.userBubble }]}>
-                    <Sparkles size={30} color={colors.accent} strokeWidth={1.5} />
+                  <View style={chatStyles.welcomeMark}>
+                    <Image
+                      source={require('../../../assets/cedismart_ai_logo.png')}
+                      style={chatStyles.welcomeLogo}
+                      resizeMode="cover"
+                      accessibilityLabel="CediSmart AI"
+                    />
                   </View>
                   <Text style={[chatStyles.eyebrow, { color: colors.muted }]}>{welcomeGreeting}</Text>
                   <Text style={[chatStyles.welcomeTitle, { color: colors.text }]}>
@@ -1365,8 +1371,13 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                   <Text style={[chatStyles.welcomeSubtitle, { color: colors.muted }]}>
                     {supportType === 'auth' ? 'Get help with your account, verification or sign-in.' : 'Make sense of spending, manage MoMo, or ask a question.'}
                   </Text>
-                  <View style={chatStyles.promptGrid}>
-                    {getScreenQuickPrompts(screenContext, supportType).slice(0, 4).map((promptText) => {
+                  <ScrollView
+                    style={chatStyles.capsuleContainer}
+                    contentContainerStyle={chatStyles.capsuleList}
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled={true}
+                  >
+                    {getScreenQuickPrompts(screenContext, supportType).map((promptText) => {
                       const Icon = promptText.includes('budget') ? PieChart
                         : promptText.includes('balance') ? Landmark
                         : promptText === 'Check for problems' ? Stethoscope
@@ -1377,15 +1388,15 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                           key={promptText}
                           onPress={() => handleQuickPrompt(promptText)}
                           activeOpacity={0.7}
-                          style={[chatStyles.promptCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                          style={[chatStyles.capsulePill, { backgroundColor: colors.surface, borderColor: colors.border }]}
                           accessibilityRole="button"
                         >
-                          <Icon size={19} color={colors.accent} strokeWidth={1.7} />
-                          <Text style={[chatStyles.promptText, { color: colors.text }]}>{promptText}</Text>
+                          <Icon size={16} color={colors.accent} strokeWidth={1.8} />
+                          <Text numberOfLines={1} style={[chatStyles.capsuleText, { color: colors.text }]}>{promptText}</Text>
                         </TouchableOpacity>
                       );
                     })}
-                  </View>
+                  </ScrollView>
                 </View>
               ) : messages.filter((msg) => msg.id !== 'default_greeting').map((msg, index) => {
                 const isUser = msg.role === 'user';
@@ -1905,13 +1916,15 @@ const chatStyles = StyleSheet.create({
   conversation: { flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24 },
   welcomeConversation: { justifyContent: 'center' },
   welcome: { paddingVertical: 24, alignItems: 'center' },
-  welcomeMark: { width: 64, height: 64, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
+  welcomeMark: { width: 68, height: 68, borderRadius: 22, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  welcomeLogo: { width: 68, height: 68, borderRadius: 22 },
   eyebrow: { fontSize: 14, marginBottom: 10 },
   welcomeTitle: { fontSize: 28, lineHeight: 35, fontWeight: '600', letterSpacing: -0.8, textAlign: 'center', maxWidth: 340 },
   welcomeSubtitle: { fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 300, marginTop: 12 },
-  promptGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, width: '100%', maxWidth: 440, marginTop: 32 },
-  promptCard: { flexGrow: 1, flexBasis: '45%', borderWidth: 1, borderRadius: 18, padding: 16, gap: 12, minHeight: 96 },
-  promptText: { fontSize: 13, lineHeight: 19, fontWeight: '500' },
+  capsuleContainer: { width: '100%', maxWidth: 380, maxHeight: 96, marginTop: 24 },
+  capsuleList: { gap: 8 },
+  capsulePill: { flexDirection: 'row', alignItems: 'center', height: 44, borderRadius: 22, borderWidth: 1, paddingHorizontal: 16, gap: 10 },
+  capsuleText: { fontSize: 13, fontWeight: '500', flexShrink: 1 },
   messageGroup: { marginBottom: 24 },
   messageText: { fontSize: 16, lineHeight: 25 },
   userMessage: { alignSelf: 'flex-end', maxWidth: '86%', alignItems: 'flex-end' },

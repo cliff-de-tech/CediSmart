@@ -111,6 +111,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const [audioLevel, setAudioLevel] = useState(0);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [dynamicStatus, setDynamicStatus] = useState<string | null>(null);
   const [actionToast, setActionToast] = useState<{
     title: string;
     description: string;
@@ -287,6 +288,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     requestRef.current?.abort();
     requestRef.current = null;
     isProcessingRef.current = false;
+    setDynamicStatus(null);
     hasSpokenRef.current = false;
     retryAudioRef.current = null;
     void voiceService.stop();
@@ -421,6 +423,20 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     }
   }, [recorderState.metering, recorderState.durationMillis, recorderState.isRecording, voiceState, isMuted, isTypingInVoice]);
 
+  const playBridgePhrase = (text: string, audioB64: string, turn: number): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      if (!isCurrentTurn(turn)) { resolve(); return; }
+      setVoiceState('speaking');
+      setStreamingAiText(text);
+      void voiceService.speakNeural(
+        audioB64,
+        () => { if (isCurrentTurn(turn)) setVoiceState('speaking'); },
+        () => { resolve(); },
+        () => { resolve(); }
+      );
+    });
+  };
+
   const playResponse = async (reply: string, neuralAudio: string | null, turn: number) => {
     if (!isCurrentTurn(turn)) return;
     const feedback: VoicePlaybackFeedback = {
@@ -436,6 +452,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       if (!isCurrentTurn(turn)) return;
       setStreamingAiText(reply);
       isProcessingRef.current = false;
+      setDynamicStatus(null);
       setAudioLevel(0);
       setVoiceState('idle');
       void startListeningLoop();
@@ -443,6 +460,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     const failed = () => {
       if (!isCurrentTurn(turn)) return;
       isProcessingRef.current = false;
+      setDynamicStatus(null);
       setVoiceState('idle');
       setVoiceError('Audio playback is unavailable. Your answer is in the transcript.');
       setIsCompactView(true);
@@ -472,6 +490,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     hasSpokenRef.current = false;
 
     setVoiceState('thinking');
+    setDynamicStatus('Understanding…');
     setAudioLevel(0);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
@@ -483,6 +502,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         const uri = audioRecorder.uri;
         if (!uri) {
           isProcessingRef.current = false;
+          setDynamicStatus(null);
           void startListeningLoop();
           return;
         }
@@ -492,6 +512,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       if (!isCurrentTurn(turn)) return;
       if (!base64Audio || base64Audio.length < 200) {
         isProcessingRef.current = false;
+        setDynamicStatus(null);
         void startListeningLoop();
         return;
       }
@@ -524,6 +545,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       if (!hasValidSpeech) {
         // Only ambient room silence or hallucinated timestamp was received; quietly continue listening
         isProcessingRef.current = false;
+        setDynamicStatus(null);
         setVoiceState('listening');
         startListeningLoop();
         return;
@@ -543,12 +565,20 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
       // Execute detected voice action (e.g. create transaction or check balance)
       if (action && action.type === 'create_transaction' && action.payload) {
+        setDynamicStatus('Recording expense…');
+        if (neuralAudioB64) {
+          await playBridgePhrase(reply, neuralAudioB64, turn);
+        }
+        if (!isCurrentTurn(turn)) return;
         reply = await handleExecuteVoiceTransaction(action.payload, turn);
         neuralAudioB64 = null;
         if (!isCurrentTurn(turn)) return;
       } else if (action && action.type === 'check_balance') {
-        // The original audio only acknowledges the request; it cannot know the client-side result.
-        neuralAudioB64 = null;
+        setDynamicStatus('Checking your balances…');
+        if (neuralAudioB64) {
+          await playBridgePhrase(reply, neuralAudioB64, turn);
+        }
+        if (!isCurrentTurn(turn)) return;
         setActionToast(null);
         try {
           const latestAccounts = await queryClient.fetchQuery<any[]>({
@@ -602,11 +632,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       // Generate speech only after any action result is known.
       if (!isCurrentTurn(turn)) return;
       if (!neuralAudioB64) {
+        setDynamicStatus('Getting answer ready…');
         try {
           const synthRes = await apiClient.post('/support/voice/synthesize', {
             text: reply,
             voice_name: 'Kore',
-          }, { timeout: 8000, signal: controller.signal });
+          }, { timeout: 12000, signal: controller.signal });
           neuralAudioB64 = synthRes.data?.audio_base64 || null;
         } catch {
           // The existing device-speech fallback below reads the same confirmed reply.
@@ -618,6 +649,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     } catch (error) {
       if (!isCurrentTurn(turn) || controller.signal.aborted) return;
       isProcessingRef.current = false;
+      setDynamicStatus(null);
       setVoiceState('idle');
       setVoiceError(retryAudioRef.current
         ? 'Connection interrupted. Your recording is ready to retry.'
@@ -816,6 +848,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     requestRef.current?.abort();
     requestRef.current = null;
     isProcessingRef.current = false;
+    setDynamicStatus(null);
     await voiceService.stop();
     setAudioLevel(0);
     setVoiceState('idle');
@@ -861,7 +894,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const statusLabel = voiceError ? 'Voice paused'
     : isTypingInVoice ? 'Type your message'
     : voiceState === 'speaking' ? 'Speaking · tap the orb to interrupt'
-    : voiceState === 'thinking' ? 'Thinking · tap the orb to cancel'
+    : dynamicStatus ? `${dynamicStatus} · tap to cancel`
+    : voiceState === 'thinking' ? 'Understanding · tap the orb to cancel'
     : isMuted ? 'Microphone muted'
     : voiceState === 'listening' ? 'Listening'
     : 'Getting ready…';
@@ -956,27 +990,6 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                   <VoiceOrb state={voiceState} audioLevel={audioLevel} size={64} />
                 </TouchableOpacity>
               </View>
-            </View>
-          )}
-
-          {/* Floating Action Confirmation Toast */}
-          {actionToast && (
-            <View style={styles.toastContainer}>
-              <GlassSurface
-                variant="thick"
-                radius={20}
-                style={styles.toastCard}
-              >
-                <View style={styles.toastContent}>
-                  <View style={styles.toastIcon}>
-                    <CheckCircle2 size={16} color="#10B981" />
-                  </View>
-                  <View>
-                    <Text style={styles.toastTitle}>{actionToast.title}</Text>
-                    <Text style={styles.toastDesc}>{actionToast.description}</Text>
-                  </View>
-                </View>
-              </GlassSurface>
             </View>
           )}
 

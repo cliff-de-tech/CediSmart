@@ -1143,7 +1143,7 @@ class SupportService:
             "   - 'check_budget': If user asks about their budget or spending limits.\n"
             "   - 'navigate': If user asks to open/go to a screen ('Budgets', 'Transactions', 'Settings').\n"
             "   - 'general_reply': For any questions, support, or financial guidance.\n"
-            "3. Generate a warm, concise spoken response in 1-2 short sentences (maximum 25 words) that sounds natural when spoken aloud via Text-To-Speech.\n\n"
+            "3. Generate a warm, active, concise spoken response in 1-2 short sentences (maximum 20 words) that sounds natural when spoken aloud via Text-To-Speech. For actions ('check_balance', 'create_transaction', 'check_budget'), speak an immediate assuring verbal bridge (e.g. 'Checking your balance real quick...', 'Logging that for you right away...', 'Pulling up your budget now...').\n\n"
             "Return valid JSON matching this schema:\n"
             "{\n"
             '  "transcript": "Transcribed user speech here",\n'
@@ -1293,7 +1293,7 @@ class SupportService:
                 },
             }
             try:
-                async with httpx.AsyncClient(timeout=5.5) as client:
+                async with httpx.AsyncClient(timeout=9.5) as client:
                     resp = await client.post(url, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()

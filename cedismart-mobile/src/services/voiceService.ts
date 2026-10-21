@@ -96,7 +96,7 @@ class VoiceService {
       }));
       this.loadTimer = setTimeout(() => {
         if (!started) finish(new Error('Audio playback could not start'));
-      }, 6000);
+      }, 10000);
       player.play();
     } catch (error) {
       finish(error);
