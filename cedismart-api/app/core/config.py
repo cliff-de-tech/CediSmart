@@ -36,7 +36,6 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8081"
 
-
     # --- Smile ID ---
     SMILE_ID_PARTNER_ID: str = ""
     SMILE_ID_API_KEY: str = ""
@@ -76,4 +75,3 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Trigger reload
-

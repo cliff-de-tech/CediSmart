@@ -45,6 +45,8 @@ include = ["app*"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+# Applied migration revisions are immutable; validate them by running Alembic in CI.
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH"]
@@ -62,6 +64,7 @@ known-first-party = ["app"]
 [tool.black]
 target-version = ["py311"]
 line-length = 100
+extend-exclude = "/alembic/versions/"
 
 [tool.mypy]
 python_version = "3.11"
@@ -73,10 +76,13 @@ disallow_untyped_defs = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
+# SQLAlchemy async operations switch through greenlets; trace resumed coroutines too.
+concurrency = ["greenlet", "thread"]
 source = ["app"]
 omit = ["app/core/config.py"]
 

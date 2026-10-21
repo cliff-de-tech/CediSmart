@@ -6,8 +6,8 @@ Configures middleware, exception handlers, routers, and lifecycle hooks.
 import logging
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -76,7 +76,6 @@ def create_app() -> FastAPI:
             "status": "healthy",
             "version": "0.1.2",
             "has_gemini": bool(settings.GEMINI_API_KEY),
-            "gemini_prefix": settings.GEMINI_API_KEY[:6] if settings.GEMINI_API_KEY else "",
         }
 
     return app

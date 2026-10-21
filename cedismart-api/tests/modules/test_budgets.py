@@ -1,5 +1,7 @@
 """Budgets module integration tests."""
 
+from datetime import UTC
+
 from httpx import AsyncClient
 
 from tests.conftest import assert_error_response, make_auth_headers
@@ -110,9 +112,10 @@ async def test_delete_budget(client: AsyncClient, make_user) -> None:
 
 
 async def test_free_tier_budget_limit(client: AsyncClient, make_user, db_session) -> None:
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta
+
     user = await make_user(is_premium=False)
-    user.trial_started_at = datetime.now(timezone.utc) - timedelta(days=10)
+    user.trial_started_at = datetime.now(UTC) - timedelta(days=10)
     db_session.add(user)
     await db_session.flush()
 

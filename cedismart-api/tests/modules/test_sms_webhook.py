@@ -1,6 +1,9 @@
-import pytest
+from datetime import UTC
+
 from httpx import AsyncClient
-from tests.conftest import make_auth_headers, assert_error_response
+
+from tests.conftest import assert_error_response, make_auth_headers
+
 
 async def _setup_momo(client: AsyncClient, make_user) -> tuple:
     user = await make_user(is_premium=True)
@@ -14,13 +17,14 @@ async def _setup_momo(client: AsyncClient, make_user) -> tuple:
             "account_type": "mobile_money",
             "provider": "MTN MoMo",
             "account_number": "0241234567",
-            "opening_balance": "100.00"
+            "opening_balance": "100.00",
         },
         headers=headers,
     )
     assert account_resp.status_code == 201
 
     return user, account_resp.json()["id"], headers
+
 
 async def test_sms_webhook_income(client: AsyncClient, make_user) -> None:
     _, account_id, headers = await _setup_momo(client, make_user)
@@ -31,12 +35,8 @@ async def test_sms_webhook_income(client: AsyncClient, make_user) -> None:
     )
     resp = await client.post(
         "/api/v1/transactions/sms-webhook",
-        json={
-            "sender": "MobileMoney",
-            "message_body": body,
-            "phone": "0241234567"
-        },
-        headers=headers
+        json={"sender": "MobileMoney", "message_body": body, "phone": "0241234567"},
+        headers=headers,
     )
     assert resp.status_code == 201
     res = resp.json()
@@ -47,14 +47,11 @@ async def test_sms_webhook_income(client: AsyncClient, make_user) -> None:
     # Verify duplicate prevention (409)
     resp_dup = await client.post(
         "/api/v1/transactions/sms-webhook",
-        json={
-            "sender": "MobileMoney",
-            "message_body": body,
-            "phone": "0241234567"
-        },
-        headers=headers
+        json={"sender": "MobileMoney", "message_body": body, "phone": "0241234567"},
+        headers=headers,
     )
     assert resp_dup.status_code == 409
+
 
 async def test_sms_webhook_expense_with_fee(client: AsyncClient, make_user) -> None:
     _, account_id, headers = await _setup_momo(client, make_user)
@@ -66,12 +63,8 @@ async def test_sms_webhook_expense_with_fee(client: AsyncClient, make_user) -> N
     )
     resp = await client.post(
         "/api/v1/transactions/sms-webhook",
-        json={
-            "sender": "MTNMoMo",
-            "message_body": body,
-            "phone": "0241234567"
-        },
-        headers=headers
+        json={"sender": "MTNMoMo", "message_body": body, "phone": "0241234567"},
+        headers=headers,
     )
     assert resp.status_code == 201
     res = resp.json()
@@ -88,6 +81,7 @@ async def test_sms_webhook_expense_with_fee(client: AsyncClient, make_user) -> N
     assert acc_resp.status_code == 200
     assert acc_resp.json()["balance"] == "79.80"
 
+
 async def test_sms_webhook_not_found(client: AsyncClient, make_user) -> None:
     # Test webhook with a phone number that has no linked account
     user = await make_user(is_premium=True)
@@ -99,20 +93,18 @@ async def test_sms_webhook_not_found(client: AsyncClient, make_user) -> None:
     )
     resp = await client.post(
         "/api/v1/transactions/sms-webhook",
-        json={
-            "sender": "MobileMoney",
-            "message_body": body,
-            "phone": "0249999999"
-        },
-        headers=headers
+        json={"sender": "MobileMoney", "message_body": body, "phone": "0249999999"},
+        headers=headers,
     )
     assert resp.status_code == 404
 
+
 async def test_sms_webhook_premium_required(client: AsyncClient, make_user, db_session) -> None:
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta
+
     # Create an expired user (created 10 days ago, is_premium=False)
     user = await make_user(is_premium=False)
-    user.created_at = datetime.now(timezone.utc) - timedelta(days=10)
+    user.created_at = datetime.now(UTC) - timedelta(days=10)
     db_session.add(user)
     await db_session.flush()
 
@@ -123,12 +115,7 @@ async def test_sms_webhook_premium_required(client: AsyncClient, make_user, db_s
     )
     resp = await client.post(
         "/api/v1/transactions/sms-webhook",
-        json={
-            "sender": "MobileMoney",
-            "message_body": body,
-            "phone": "0241234567"
-        },
-        headers=headers
+        json={"sender": "MobileMoney", "message_body": body, "phone": "0241234567"},
+        headers=headers,
     )
     assert_error_response(resp, 403, "PREMIUM_REQUIRED")
-

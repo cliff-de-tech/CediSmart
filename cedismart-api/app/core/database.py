@@ -73,7 +73,7 @@ def get_engine() -> AsyncEngine:
         clean_query = urlencode(qs, doseq=True)
         clean_url = urlunparse(parsed._replace(query=clean_query))
 
-        connect_args: dict = {}
+        connect_args: dict[str, str] = {}
         if ssl_mode in ("require", "verify-ca", "verify-full"):
             connect_args["ssl"] = "require"
 

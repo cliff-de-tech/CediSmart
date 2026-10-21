@@ -16,25 +16,24 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AppException
-from app.modules.auth.models import User
-
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
+from app.core.exceptions import AppException
 from app.core.redis import get_redis
+from app.modules.auth.models import User
 from app.modules.transactions import service
 from app.modules.transactions.schemas import (
     BulkCreateRequest,
     BulkCreateResponse,
     PaginationMeta,
+    SMSParseRequest,
+    SMSParseResponse,
+    SMSWebhookRequest,
     TransactionCreateRequest,
     TransactionListResponse,
     TransactionResponse,
     TransactionSummaryResponse,
     TransactionUpdateRequest,
-    SMSParseRequest,
-    SMSParseResponse,
-    SMSWebhookRequest,
 )
 
 router = APIRouter()
@@ -316,7 +315,8 @@ async def sms_webhook(
         raise AppException(
             status_code=403,
             error_code="PREMIUM_REQUIRED",
-            message="Auto-syncing Mobile Money SMS transactions is a premium feature. Please upgrade to Pro."
+            message="Auto-syncing Mobile Money SMS transactions is a premium feature. Please "
+            "upgrade to Pro.",
         )
     tx = await service.parse_and_log_sms(
         user_id=user_id,
@@ -326,4 +326,4 @@ async def sms_webhook(
         db=db,
         redis=redis,
     )
-    return tx
+    return TransactionResponse.model_validate(tx)

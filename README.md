@@ -23,7 +23,7 @@
 | **Backend Engineer** | [API README](./cedismart-api/README.md) — Full setup, architecture, testing |
 | **Mobile Developer** | [Mobile README](./cedismart-mobile/README.md) — Expo setup, navigation, offline sync |
 | **Frontend/Web Dev** | [Web README](./cedismart-web/README.md) — HTML/CSS/JS setup, API integration |
-| **DevOps/Deployment** | [API README § Deployment](./cedismart-api/README.md#deployment) — Railway, Docker, CI/CD |
+| **DevOps/Deployment** | [API README § Deployment](./cedismart-api/README.md#deployment) — Render, Docker, CI/CD |
 | **Product Manager** | [Budget Blueprint](./docs/budget-app-blueprint.md) — Features, roadmap, design |
 | **Compliance/Legal** | [Docs README](./docs/README.md) — Privacy, terms, regulations |
 
@@ -134,7 +134,7 @@ CediSmart uses a **Modular Monolith** — a single deployable unit with enforced
               ┌──────────────┼──────────────┐
               ▼              ▼              ▼
          PostgreSQL        Redis          Clerk
-         (Railway)        (Railway)     (Auth API)
+      (DATABASE_URL)    (REDIS_URL)    (Auth API)
 ```
 
 ### API Surface
@@ -253,7 +253,7 @@ Three GitHub Actions workflows:
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `backend-ci.yml` | Push / PR to `main` | Lint → type-check → bandit → pytest (Postgres + Redis services) |
-| `backend-deploy.yml` | Push to `main` (CI passes) | Railway deploy → health check → Slack alert on failure |
+| `backend-deploy.yml` | Successful Backend CI on `main`, or manual run | Verify Render API availability; deployments are managed in Render |
 | `mobile-ci.yml` | Push to `mobile/**` | TypeScript check → ESLint (zero warnings) |
 
 ---

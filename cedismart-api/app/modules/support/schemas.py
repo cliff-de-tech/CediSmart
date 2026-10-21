@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -20,7 +22,7 @@ class ChatRequest(BaseModel):
         default="general",
         description="The support category context: 'auth' or 'general'",
     )
-    device_diagnostics: dict | None = Field(
+    device_diagnostics: dict[str, Any] | None = Field(
         default=None,
         description="Optional metadata about client device and X-Ray telemetry",
     )
@@ -30,11 +32,15 @@ class ChatRequest(BaseModel):
     )
     phone: str | None = Field(
         default=None,
-        description="Optional user phone number for live DB X-Ray telemetry and instant MoMo SMS rescue",
+        description=(
+            "Optional user phone number for live DB X-Ray telemetry and instant MoMo SMS rescue"
+        ),
     )
     image_base64: str | None = Field(
         default=None,
-        description="Optional base64-encoded screenshot or receipt image attached to the latest turn",
+        description=(
+            "Optional base64-encoded screenshot or receipt image attached to the latest turn"
+        ),
     )
     image_mime_type: str | None = Field(
         default="image/jpeg",
@@ -50,7 +56,7 @@ class EscalateRequest(BaseModel):
     phone: str
     user_query: str
     chat_history: list[ChatMessage]
-    device_diagnostics: dict | None = Field(
+    device_diagnostics: dict[str, Any] | None = Field(
         default=None,
         description="Client device diagnostic log metadata",
     )
@@ -125,9 +131,14 @@ class VoiceResponse(BaseModel):
     action: VoiceAction | None = None
     audio_base64: str | None = Field(
         default=None,
-        description="High-fidelity neural audio bytes (e.g. WAV) synthesized by Gemini for natural speech",
+        description=(
+            "High-fidelity neural audio bytes (e.g. WAV) synthesized by Gemini for natural "
+            "speech"
+        ),
     )
-    audio_mime_type: str | None = Field(default="audio/wav", description="MIME type of synthesized audio")
+    audio_mime_type: str | None = Field(
+        default="audio/wav", description="MIME type of synthesized audio"
+    )
 
 
 class VoiceSynthesizeRequest(BaseModel):
@@ -138,4 +149,3 @@ class VoiceSynthesizeRequest(BaseModel):
 class VoiceSynthesizeResponse(BaseModel):
     audio_base64: str | None = None
     audio_mime_type: str | None = "audio/wav"
-

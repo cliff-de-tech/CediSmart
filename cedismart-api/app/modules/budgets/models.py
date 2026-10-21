@@ -1,6 +1,7 @@
 """Budget model — monthly spending targets per category."""
 
 import uuid
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -62,7 +63,7 @@ class Budget(TimestampMixin, Base):
     category_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("categories.id", ondelete="CASCADE"), nullable=False
     )
-    amount: Mapped[float] = mapped_column(
+    amount: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False
     )  # Budget limit for the month
     budget_year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
