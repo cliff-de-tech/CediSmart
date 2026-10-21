@@ -106,8 +106,9 @@ async def test_voice_transcription_preserves_intent_and_synthesizes_reply(
     assert synthesis["generationConfig"]["responseModalities"] == ["AUDIO"]
 
 
-async def test_voice_provider_errors_return_a_safe_repeat_request(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("synthesize_audio", [True, False])
+async def test_voice_provider_errors_return_an_explicit_failure(
+    monkeypatch: pytest.MonkeyPatch, synthesize_audio: bool
 ) -> None:
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini")
 
@@ -119,15 +120,103 @@ async def test_voice_provider_errors_return_a_safe_repeat_request(
         return Response(503, text="Provider temporarily unavailable")
 
     requests = _mock_http(monkeypatch, respond)
-    result = await SupportService.process_voice("YXVkaW8=", user_name="Dr. Abena")
+    result = await SupportService.process_voice(
+        "YXVkaW8=", user_name="Dr. Abena", synthesize_audio=synthesize_audio
+    )
     assert result == {
-        "transcript": "Voice note received",
-        "response": "I heard you, Abena. Could you please say that again?",
-        "action": {"type": "general_reply", "payload": None},
+        "transcript": "",
+        "response": "Speech recognition is unavailable. Please retry or type your message.",
+        "action": None,
         "audio_base64": None,
         "audio_mime_type": "audio/wav",
+        "error_code": "recognition_unavailable",
     }
-    assert len(requests) == 5  # Three recognizers and both neural synthesis providers.
+    assert len(requests) == 3
+
+
+async def test_voice_keeps_recent_history_and_can_defer_audio(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini")
+    history = [
+        {"role": "user", "content": "Old question"},
+        {"role": "model", "content": "Old answer"},
+        {"role": "user", "content": "Another old question"},
+        {"role": "assistant", "content": "Checking your balance real quick..."},
+        {"role": "user", "content": "What about my cash account?"},
+        {"role": "model", "content": ""},
+        {"role": "model", "content": "Let me check that cash wallet."},
+        {"role": "user", "content": "Include mobile money too."},
+        {"role": "assistant", "content": "Pulling up your total balance right away..."},
+    ]
+    intent = {
+        "transcript": "Check all my balances",
+        "response": "Getting your current balance right now...",
+        "action": {"type": "check_balance", "payload": None},
+    }
+    requests = _mock_http(
+        monkeypatch,
+        lambda request: Response(
+            200,
+            json={"candidates": [{"content": {"parts": [{"text": json.dumps(intent)}]}}]},
+        ),
+    )
+    result = await SupportService.process_voice(
+        "YXVkaW8=", messages=history, synthesize_audio=False
+    )
+    assert result == {**intent, "audio_base64": None, "audio_mime_type": "audio/wav"}
+    assert len(requests) == 1
+    contents = json.loads(requests[0].content)["contents"]
+    assert contents[:-1] == [
+        {"role": "model", "parts": [{"text": "Checking your balance real quick..."}]},
+        {"role": "user", "parts": [{"text": "What about my cash account?"}]},
+        {"role": "model", "parts": [{"text": "Let me check that cash wallet."}]},
+        {"role": "user", "parts": [{"text": "Include mobile money too."}]},
+        {"role": "model", "parts": [{"text": "Pulling up your total balance right away..."}]},
+    ]
+    assert contents[-1]["role"] == "user"
+    assert contents[-1]["parts"][0]["inlineData"]["data"] == "YXVkaW8="
+
+
+@pytest.mark.parametrize(
+    ("transcript", "expected"),
+    [("00:00", ""), ("<noise>", ""), (None, ""), (" Check my balance ", "Check my balance")],
+)
+async def test_voice_filters_non_speech_transcripts(
+    monkeypatch: pytest.MonkeyPatch, transcript: str | None, expected: str
+) -> None:
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini")
+    requests = _mock_http(
+        monkeypatch,
+        lambda request: Response(
+            200,
+            json={
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "text": json.dumps(
+                                        {
+                                            "transcript": transcript,
+                                            "response": "Let me check your available funds.",
+                                            "action": {"type": "check_balance", "payload": None},
+                                        }
+                                    )
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+        ),
+    )
+    result = await SupportService.process_voice("YXVkaW8=", synthesize_audio=False)
+    assert result["transcript"] == expected
+    assert result["response"] == "Let me check your available funds."
+    assert result["action"] == {"type": "check_balance", "payload": None}
+    assert result["audio_base64"] is None
+    assert len(requests) == 1
 
 
 @pytest.mark.parametrize("pcm_mime", ["audio/L16;rate=24000", "audio/wav;codec=pcm"])
@@ -147,12 +236,13 @@ async def test_neural_speech_retries_and_packages_pcm_as_playable_wav(
                     {
                         "content": {
                             "parts": [
+                                {"text": "Audio follows."},
                                 {
                                     "inlineData": {
                                         "data": base64.b64encode(pcm).decode(),
                                         "mimeType": pcm_mime,
                                     }
-                                }
+                                },
                             ]
                         }
                     }
@@ -170,11 +260,36 @@ async def test_neural_speech_retries_and_packages_pcm_as_playable_wav(
         assert wav.readframes(wav.getnframes()) == pcm
     assert len(requests) == 2
     for request in requests:
+        assert request.extensions["timeout"] == {
+            "connect": 9.5,
+            "read": 9.5,
+            "write": 9.5,
+            "pool": 9.5,
+        }
         body = json.loads(request.content)
         assert body["contents"][0]["parts"][0]["text"] == "Hello Clifford"
         assert body["generationConfig"]["speechConfig"]["voiceConfig"]["prebuiltVoiceConfig"] == {
             "voiceName": "Aoede"
         }
+
+
+async def test_neural_speech_retries_after_invalid_pcm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "test-gemini")
+
+    def respond(request: Request) -> Response:
+        if "gemini-2.5-flash-preview-tts:" in request.url.path:
+            inline = {"data": "not-valid-base64", "mimeType": "audio/L16;rate=24000"}
+        else:
+            inline = {"data": "YXVkaW8=", "mimeType": "audio/wav"}
+        return Response(
+            200, json={"candidates": [{"content": {"parts": [{"inlineData": inline}]}}]}
+        )
+
+    requests = _mock_http(monkeypatch, respond)
+    assert await SupportService.synthesize_neural_voice("Hello") == ("YXVkaW8=", "audio/wav")
+    assert len(requests) == 2
 
 
 async def test_gemini_keeps_images_and_financial_guardrails(

@@ -1356,11 +1356,7 @@ class SupportService:
         synthesize_audio: bool = True,
         messages: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
-        """Process spoken user audio with Gemini 2.5 / 1.5 multimodal audio understanding.
-
-        Transcribes speech, extracts financial actions (e.g. logging transactions, checking balances),
-        and returns a natural spoken response suitable for Text-to-Speech playback.
-        """
+        """Transcribe audio, extract financial intent, and prepare a spoken response."""
         # Resolve clean first name
         first_name = "there"
         if user_name:
@@ -1393,27 +1389,53 @@ class SupportService:
         prompt = (
             f"You are CediSmart AI Voice Assistant, talking directly to {first_name} in Ghana.\n"
             "The user spoke an audio message. Your tasks:\n"
-            "1. Transcribe the user's speech accurately into English or Ghanaian Pidgin. If there is no speech, background silence, or non-speech noise, set transcript to '' (empty string). NEVER output timestamps such as '00:00' or tags like '<noise>'.\n"
+            "1. Transcribe the user's speech accurately into English or Ghanaian Pidgin."
+            " If there is no speech, background silence, or non-speech noise, set "
+            "transcript to '' (empty string). NEVER output timestamps such as '00:00' or"
+            " tags like '<noise>'.\n"
             "2. Detect user intent:\n"
-            "   - 'create_transaction': If user says e.g. 'log 50 cedis for fuel on momo', 'spent 20 cedis on lunch', 'received 500 from kwame on bank'. Extract amount (number), type ('expense' or 'income'), category ('Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Income'), description (e.g. 'Fuel', 'Lunch'), and account_type ('mobile_money', 'cash', or 'bank').\n"
+            "   - 'create_transaction': If user says e.g. 'log 50 cedis for fuel on "
+            "momo', 'spent 20 cedis on lunch', 'received 500 from kwame on bank'. "
+            "Extract amount (number), type ('expense' or 'income'), category ('Food', "
+            "'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Income'),"
+            " description (e.g. 'Fuel', 'Lunch'), and account_type ('mobile_money', "
+            "'cash', or 'bank').\n"
             "   - 'check_balance': If user asks about their balance, wallets, or money.\n"
             "   - 'check_budget': If user asks about their budget or spending limits.\n"
-            "   - 'navigate': If user asks to open/go to a screen ('Budgets', 'Transactions', 'Settings').\n"
+            "   - 'navigate': If user asks to open/go to a screen ('Budgets', "
+            "'Transactions', 'Settings').\n"
             "   - 'general_reply': For any questions, support, or financial guidance.\n"
             "3. Spoken Response & Dynamic Verbal Bridges (CRITICAL):\n"
-            "   - Generate a warm, active, concise spoken response in 1-2 short sentences (maximum 18 words) that sounds friendly, authentic, and natural when spoken aloud via Text-To-Speech in Ghana.\n"
-            "   - For actionable intents ('check_balance', 'create_transaction', 'check_budget'), you MUST provide an immediate reassuring verbal bridge that tells the user what you are doing before fetching or logging data.\n"
-            "   - DO NOT repeat the same bridging phrase consecutively. Dynamically rotate across a rich plethora of natural Ghanaian phrasing:\n"
-            "     * For 'check_balance': e.g., 'Checking your balance real quick...', 'Let me pull up your account balances for you...', 'Getting your current balance right now...', 'Let me look at your wallets real quick...', 'Checking how much you have across your accounts...', 'Pulling up your total balance right away...', 'Let me check your available funds real quick...'\n"
-            "     * For 'create_transaction': e.g., 'Logging that for you right away...', 'Recording that expense now...', 'Adding that to your records real quick...', 'Got it, saving that transaction for you...', 'Putting that into your ledger now...', 'Let me log that for you real quick...'\n"
-            "     * For 'check_budget': e.g., 'Pulling up your budget now...', 'Let me check how your monthly budget is looking...', 'Checking your budget limits real quick...', 'Looking up your budget status for you...', 'Let me inspect your spending limits right away...'\n"
+            "   - Generate a warm, active, concise spoken response in 1-2 short "
+            "sentences (maximum 18 words) that sounds friendly, authentic, and natural "
+            "when spoken aloud via Text-To-Speech in Ghana.\n"
+            "   - For actionable intents ('check_balance', 'create_transaction', "
+            "'check_budget'), you MUST provide an immediate reassuring verbal bridge "
+            "that tells the user what you are doing before fetching or logging data.\n"
+            "   - DO NOT repeat the same bridging phrase consecutively. Dynamically "
+            "rotate across a rich plethora of natural Ghanaian phrasing:\n"
+            "     * For 'check_balance': e.g., 'Checking your balance real quick...', "
+            "'Let me pull up your account balances for you...', 'Getting your current "
+            "balance right now...', 'Let me look at your wallets real quick...', "
+            "'Checking how much you have across your accounts...', 'Pulling up your "
+            "total balance right away...', 'Let me check your available funds real "
+            "quick...'\n"
+            "     * For 'create_transaction': e.g., 'Logging that for you right "
+            "away...', 'Recording that expense now...', 'Adding that to your records "
+            "real quick...', 'Got it, saving that transaction for you...', 'Putting that"
+            " into your ledger now...', 'Let me log that for you real quick...'\n"
+            "     * For 'check_budget': e.g., 'Pulling up your budget now...', 'Let me "
+            "check how your monthly budget is looking...', 'Checking your budget limits "
+            "real quick...', 'Looking up your budget status for you...', 'Let me inspect"
+            " your spending limits right away...'\n"
             "   - Never use static or robotic wording. Keep it reassuring, varied, and lively.\n\n"
             "Return valid JSON matching this schema:\n"
             "{\n"
             '  "transcript": "Transcribed user speech here",\n'
             '  "response": "Concise spoken reply here",\n'
             '  "action": {\n'
-            '    "type": "create_transaction" | "check_balance" | "check_budget" | "navigate" | "general_reply",\n'
+            '    "type": "create_transaction" | "check_balance" | "check_budget" | '
+            '"navigate" | "general_reply",\n'
             '    "payload": {\n'
             '      "amount": null or float,\n'
             '      "type": null or "expense" or "income",\n'
@@ -1437,7 +1459,9 @@ class SupportService:
                 contents: list[dict[str, Any]] = []
                 if messages:
                     for prev_msg in messages[-6:]:
-                        p_role = "model" if prev_msg.get("role") in ("model", "assistant") else "user"
+                        p_role = (
+                            "model" if prev_msg.get("role") in ("model", "assistant") else "user"
+                        )
                         p_text = prev_msg.get("content", "")
                         if p_text:
                             contents.append({"role": p_role, "parts": [{"text": p_text}]})
@@ -1488,7 +1512,9 @@ class SupportService:
                                 continue
                             raw_transcript = (parsed.get("transcript") or "").strip()
                             # Clean timestamp hallucinations (e.g. 00:00) and audio noise tags
-                            if re.match(r"^\[?\(?\d{1,2}:\d{2}(\.\d+)?\)?\]?$", raw_transcript) or re.match(r"^<[^>]+>$", raw_transcript):
+                            if re.match(
+                                r"^\[?\(?\d{1,2}:\d{2}(\.\d+)?\)?\]?$", raw_transcript
+                            ) or re.match(r"^<[^>]+>$", raw_transcript):
                                 raw_transcript = ""
                             transcript = raw_transcript
                             reply_text = parsed.get("response") or f"I heard you, {first_name}."
@@ -1514,7 +1540,9 @@ class SupportService:
                             resp.status_code,
                         )
                 except Exception as exc:
-                    logger.warning("Gemini audio request failed (%s): %s", model_name, type(exc).__name__)
+                    logger.warning(
+                        "Gemini audio request failed (%s): %s", model_name, type(exc).__name__
+                    )
 
         # Provider failures must not masquerade as silence or successful recognition.
         return {
@@ -1571,8 +1599,11 @@ class SupportService:
                             continue
                         parts = (candidates[0].get("content") or {}).get("parts") or []
                         inline_data = next(
-                            (part["inlineData"] for part in parts
-                             if part.get("inlineData", {}).get("data")),
+                            (
+                                part["inlineData"]
+                                for part in parts
+                                if part.get("inlineData", {}).get("data")
+                            ),
                             None,
                         )
                         if not inline_data:
@@ -1598,7 +1629,9 @@ class SupportService:
                                 raw_data = base64.b64encode(wav_io.getvalue()).decode("utf-8")
                                 raw_mime = "audio/wav"
                             except Exception as wav_err:
-                                logger.warning("PCM to WAV packaging error: %s", type(wav_err).__name__)
+                                logger.warning(
+                                    "PCM to WAV packaging error: %s", type(wav_err).__name__
+                                )
                                 continue
 
                         return raw_data, raw_mime

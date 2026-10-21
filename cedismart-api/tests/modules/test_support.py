@@ -212,7 +212,18 @@ async def test_multi_sms_rescue_parsing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_support_voice_mock(client: AsyncClient) -> None:
+@pytest.mark.parametrize("defer_audio", [False, True])
+async def test_support_voice_mock(client: AsyncClient, defer_audio: bool) -> None:
+    audio = "UklGRi4AAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
+    history = [{"role": "assistant", "content": "Checking your balance real quick..."}]
+    request_body = {
+        "audio_base64": audio,
+        "audio_mime_type": "audio/m4a",
+        "user_name": "Mr. Clifford",
+        "phone": "+233241234567",
+    }
+    if defer_audio:
+        request_body.update(synthesize_audio=False, messages=history)
     with patch(
         "app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock
     ) as mock_voice:
@@ -232,22 +243,22 @@ async def test_support_voice_mock(client: AsyncClient) -> None:
             },
         }
 
-        resp = await client.post(
-            "/api/v1/support/voice",
-            json={
-                "audio_base64": "UklGRi4AAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=",
-                "audio_mime_type": "audio/m4a",
-                "user_name": "Mr. Clifford",
-                "phone": "+233241234567",
-            },
-        )
+        resp = await client.post("/api/v1/support/voice", json=request_body)
         assert resp.status_code == 200
         body = resp.json()
         assert body["transcript"] == "log 50 cedis for lunch on momo"
         assert "Recorded 50 cedis" in body["response"]
         assert body["action"]["type"] == "create_transaction"
         assert body["action"]["payload"]["amount"] == 50.0
-        mock_voice.assert_called_once()
+        mock_voice.assert_awaited_once_with(
+            audio_base64=audio,
+            audio_mime_type="audio/m4a",
+            user_name="Mr. Clifford",
+            phone="+233241234567",
+            initial_context="dashboard",
+            synthesize_audio=not defer_audio,
+            messages=history if defer_audio else None,
+        )
 
 
 @pytest.mark.asyncio
@@ -271,18 +282,20 @@ async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
         mock_synth.assert_called_once_with(text="Hi Clifford, I'm listening.", voice_name="Kore")
 
 
-
-
-
-
 @pytest.mark.asyncio
 async def test_voice_recognition_failure_is_explicit(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock) as mock_voice:
+    with patch(
+        "app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock
+    ) as mock_voice:
         mock_voice.return_value = {
-            "transcript": "", "response": "Please retry.", "action": None,
+            "transcript": "",
+            "response": "Please retry.",
+            "action": None,
             "error_code": "recognition_unavailable",
         }
-        resp = await client.post("/api/v1/support/voice", json={"audio_base64": "test", "synthesize_audio": False})
+        resp = await client.post(
+            "/api/v1/support/voice", json={"audio_base64": "test", "synthesize_audio": False}
+        )
         assert resp.status_code == 200
         assert resp.json()["error_code"] == "recognition_unavailable"
         assert resp.json()["action"] is None
@@ -291,7 +304,9 @@ async def test_voice_recognition_failure_is_explicit(client: AsyncClient) -> Non
 
 @pytest.mark.asyncio
 async def test_voice_synthesis_failure_returns_503(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock) as mock_synth:
+    with patch(
+        "app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock
+    ) as mock_synth:
         mock_synth.return_value = (None, None)
         resp = await client.post("/api/v1/support/voice/synthesize", json={"text": "Hello"})
         assert resp.status_code == 503
@@ -301,9 +316,11 @@ async def test_voice_synthesis_failure_returns_503(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_missing_voice_provider_does_not_claim_to_hear_user() -> None:
     from app.modules.support.service import SupportService
-    with patch("app.modules.support.service.settings.GEMINI_API_KEY", ""), patch.object(
-        SupportService, "synthesize_neural_voice", new_callable=AsyncMock
-    ) as synth:
+
+    with (
+        patch("app.modules.support.service.settings.GEMINI_API_KEY", ""),
+        patch.object(SupportService, "synthesize_neural_voice", new_callable=AsyncMock) as synth,
+    ):
         result = await SupportService.process_voice("test")
     assert result["error_code"] == "recognition_unavailable"
     assert result["transcript"] == ""
