@@ -93,7 +93,8 @@ cedismart-api/
 │   │   ├── transactions/       # Income, expenses, transfers
 │   │   ├── categories/         # System + custom categories
 │   │   ├── budgets/            # Monthly spending targets
-│   │   └── reports/            # Spending analytics + summaries
+│   │   ├── reports/            # Spending analytics + summaries
+│   │   └── support/            # AI Support, Voice Assistant, Gemini Neural TTS & Tickets
 │   └── main.py                 # App factory, middleware, routers
 ├── tests/
 │   ├── conftest.py             # Shared fixtures (async DB, test client)
@@ -295,6 +296,26 @@ Every error returns a consistent JSON structure:
 | 409  | Conflict (duplicate resource)        |
 | 422  | Validation Error                     |
 | 429  | Rate Limited                         |
+
+### Primary Endpoints Surface
+
+| Module | Method | Path | Description |
+|---|---|---|---|
+| **Auth** | POST | `/api/v1/auth/register/clerk` | Create user profile after Clerk verification |
+| **Auth** | POST | `/api/v1/auth/login` | Phone + PIN authentication |
+| **Auth** | POST | `/api/v1/auth/token/refresh` | Rotate access token |
+| **Auth** | POST | `/api/v1/auth/logout` | Revoke refresh token |
+| **Accounts** | GET, POST | `/api/v1/accounts/` | List and create financial accounts (MoMo, Bank, Cash) |
+| **Transactions** | GET, POST | `/api/v1/transactions/` | Paginated ledger history and expense creation |
+| **Transactions** | POST | `/api/v1/transactions/parse-sms` | Gemini-powered MoMo SMS parser |
+| **Budgets** | GET, POST | `/api/v1/budgets/` | Monthly category spending limits and tracking |
+| **Reports** | GET | `/api/v1/reports/monthly` | Spending analytics and category breakdowns |
+| **Support** | POST | `/api/v1/support/chat` | Multimodal AI support chat with X-Ray diagnostics & SMS rescue |
+| **Support** | POST | `/api/v1/support/voice` | Multimodal voice understanding, intent extraction & verbal bridging |
+| **Support** | POST | `/api/v1/support/voice/synthesize` | Gemini Neural TTS voice synthesizer (`Kore` prebuilt voice) |
+| **Support** | POST | `/api/v1/support/report-ticket` | Customer problem reporting & GitHub auto-PR issue creation |
+| **Support** | GET | `/api/v1/support/tickets/{issue_number}` | Real-time 4-stage ticket tracking |
+| **Support** | POST | `/api/v1/support/feedback` | In-app user feedback dispatch to Discord |
 
 ---
 

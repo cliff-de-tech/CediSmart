@@ -26,7 +26,13 @@ A modern, offline-capable mobile app for the CediSmart fintech platform. Built w
 
 ## Features
 
-✅ **Phone-first authentication** — OTP via SMS  
+✅ **Live ChatGPT Voice Mode** — Full-screen liquid glass voice orb with dynamic physics, fluid resizing (large ↔ mini orb), and live speech-synced typography  
+✅ **Natural Neural Voice (Gemini TTS)** — Warm, authentic spoken responses using Google's prebuilt `Kore` neural voice  
+✅ **Hands-Free Conversational Turn-Taking** — Real-time Voice Activity Detection (VAD) with snappy 500ms pause turnaround, barge-in interruption, and 00:00 timestamp filtering  
+✅ **Spoken Financial Actions** — Hands-free expense logging (e.g., *"Spent 50 on fuel with MoMo"*), live multi-wallet balance checks, and monthly budget status inquiries  
+✅ **Reassuring Verbal Bridges** — Immediate active verbal bridges (*"Checking your balance real quick…"*, *"Logging that for you right away…"*) rotated dynamically across turns  
+✅ **Unified Voice & Chat Thread** — Voice turns automatically append to the shared persistent conversation thread with in-voice typing and OpenAI-style attachment popup (Camera, Photos, Files)  
+✅ **Phone-first authentication** — OTP via SMS & secure PIN entry  
 ✅ **Offline transactions** — Queue and sync when connectivity returns  
 ✅ **Multiple account types** — Bank, Mobile Money (MTN MoMo, Telecel Cash, AirtelTigo Money), Cash  
 ✅ **Budget tracking** — Real-time progress against monthly targets  
@@ -34,9 +40,10 @@ A modern, offline-capable mobile app for the CediSmart fintech platform. Built w
 ✅ **Spending analytics** — Monthly trends, category breakdown  
 ✅ **Biometric login** — Face ID / fingerprint (iOS/Android)  
 ✅ **Secure PIN storage** — Encrypted via device native storage  
-✅ **Dark mode** — Native system theme support  
+✅ **Dark mode** — Native system theme & radio-style toggling  
 ✅ **Push notifications** — Budget alerts and transaction confirmations  
-✅ **Multi-language ready** — i18n framework in place  
+✅ **Offline Help Guides & Self-Heal** — Built-in offline knowledge base cards and plain-language diagnostic checks  
+✅ **Multi-language ready** — Ghanaian Pidgin & English language intelligence  
 
 ---
 

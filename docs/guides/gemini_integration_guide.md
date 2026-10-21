@@ -211,3 +211,50 @@ We have automated integration test coverage to guarantee the parser functions co
 2. **Telecel Cash Transfer (Expense):**
    `"You have sent GHS 45.00 to Telecel Bundle."`
    *Expected Parse:* Amount: `45.00`, Type: `expense`, Description: `Telecel Bundle`
+
+---
+
+## 🎙️ 5. Gemini Voice Mode & Neural TTS Architecture
+
+Beyond text SMS parsing, CediSmart integrates Gemini for real-time multimodal audio understanding and neural text-to-speech voice synthesis.
+
+### 🏗️ Live Voice Flow
+
+```mermaid
+sequenceDiagram
+    participant User as User (Spoken Audio)
+    participant App as Expo Mobile App (expo-audio)
+    participant API as FastAPI Backend (/support/voice)
+    participant GeminiAudio as Gemini Flash-Lite Multimodal
+    participant GeminiTTS as Gemini Neural TTS (Kore)
+    participant DB as Postgres / Query Cache
+
+    User->>App: Speaks "Log 50 cedis for fuel on MoMo"
+    App->>App: 500ms silence detected via metering
+    App->>API: POST /api/v1/support/voice (audio_base64)
+    API->>GeminiAudio: Process audio + extract intent & dynamic verbal bridge
+    GeminiAudio-->>API: Intent: create_transaction, Bridge: "Logging that for you right away..."
+    API->>GeminiTTS: Synthesize bridge audio (Kore voice)
+    GeminiTTS-->>API: WAV audio (24kHz, 16-bit mono)
+    API-->>App: Return transcript, intent payload, and bridge audio
+    App->>User: Play bridge audio while executing action
+    App->>DB: POST /api/v1/transactions/ (execute expense)
+    DB-->>App: Transaction saved successfully
+    App->>API: POST /api/v1/support/voice/synthesize (confirmed text)
+    API->>GeminiTTS: Synthesize confirmed outcome
+    GeminiTTS-->>API: Confirmed audio
+    API-->>App: Confirmed outcome audio
+    App->>User: Speak verified result aloud ("Logged 50 cedis for Fuel...")
+    App->>App: Resume continuous listening loop
+```
+
+### ⚡ Key Voice Models & Latencies
+
+| Function | Primary Model | Fallback Models | Latency |
+|---|---|---|---|
+| **Speech & Intent Understanding** | `gemini-flash-lite-latest` | `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite` | ~1.2s – 1.8s |
+| **Neural TTS Audio Synthesis** | `gemini-2.5-flash-preview-tts` | `gemini-3.1-flash-tts-preview` | ~1.5s – 2.5s |
+
+### 🛡️ Conversational Truthfulness & Bridge Variety
+1. **Immediate Verbal Bridging**: Before database access begins, Gemini provides an active reassuring phrase (e.g. *"Checking your balance real quick…"*, *"Logging that for you right away…"*, *"Pulling up your budget now…"*) rotated dynamically so the voice assistant never sounds robotic or repetitive.
+2. **Post-Action Verification**: The assistant never speaks a hallucinated balance or fictitious confirmation. It executes the local ledger query, validates the numerical result, requests TTS for the verified truth, and speaks only confirmed facts aloud.

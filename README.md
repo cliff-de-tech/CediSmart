@@ -79,11 +79,14 @@ CediSmart/
 └── cedismart-web/      # Landing Page Website & APK Download Portal
 ```
 
-### 🤖 Gemini 2.5 Flash AI Superpowers
+### 🤖 Gemini AI Voice & Intelligence Superpowers
 
-CediSmart integrates Google's **Gemini 2.5 Flash** model (via Google AI Studio) to deliver advanced local features:
-* **Gemini SMS Parser**: In Africa (especially Ghana), transaction syncing via open banking APIs is unavailable. CediSmart solves this by automatically parsing Mobile Money (MTN MoMo, Telecel Cash, AirtelTigo Money) and bank transaction SMS alerts into structured ledger records. Enforced via strict API JSON schemas.
-* **Ghanaian Pidgin AI Assistant**: Provides localized, warm, and highly insightful financial coaching in Ghanaian Pidgin (with terms like *chale*, *wahala*, *dey active*), helping users understand budgets, spending, and savings without corporate jargon.
+CediSmart integrates Google's high-speed **Gemini Flash-Lite** models and **Gemini Neural TTS** (via Google AI Studio) to deliver advanced local features:
+* **Live ChatGPT-Style Voice Mode**: Real-time hands-free voice assistant featuring a liquid glass voice orb (`VoiceOrb.tsx`) with dynamic physics, fluid scaling (large ↔ mini orb), and live speech-synced typography.
+* **Natural Neural Voice (Kore)**: Warm, lifelike spoken responses synthesized using Gemini TTS models with standard WAV packaging and seamless iOS/Android audio session management.
+* **Direct Voice Action Execution**: Users can record expenses (*"Log 50 cedis for fuel on MoMo"*), query multi-wallet balances (*"What is my balance?"*), and inspect monthly budget limits hands-free. The assistant speaks dynamic reassuring verbal bridges (*"Checking your balance real quick…"*, *"Logging that for you right away…"*) while executing, then speaks the verified outcome aloud.
+* **Gemini SMS Parser & Instant Rescue**: In Ghana, transaction syncing via open banking APIs is unavailable. CediSmart solves this by automatically parsing Mobile Money (MTN MoMo, Telecel Cash, AT Money) and bank transaction SMS alerts into structured ledger records with zero manual entry.
+* **Adaptive Tone & X-Ray Diagnostics**: Intelligent support engine that provides warm, clear financial guidance in English or Ghanaian Pidgin without technical jargon, backed by plain-language diagnostic checks.
 
 ---
 
@@ -171,6 +174,13 @@ All endpoints versioned under `/api/v1/`. Every response uses a consistent error
 | GET | `/reports/monthly` | Monthly income / expense / top category |
 | GET | `/reports/categories` | Category breakdown with percentages |
 | GET | `/reports/trends` | Month-over-month income/expense trend (1–12 months) |
+| POST | `/transactions/parse-sms` | Auto-parse raw MoMo/bank SMS with Gemini |
+| POST | `/support/chat` | Multimodal AI support chat with X-Ray diagnostics & SMS rescue |
+| POST | `/support/voice` | Multimodal voice understanding, intent extraction & verbal bridging |
+| POST | `/support/voice/synthesize` | Gemini Neural TTS voice synthesizer (`Kore` prebuilt voice) |
+| POST | `/support/report-ticket` | Customer problem reporting & GitHub auto-PR issue creation |
+| GET | `/support/tickets/{id}` | Real-time 4-stage ticket resolution tracking |
+| POST | `/support/feedback` | In-app user feedback dispatch to Discord |
 
 ### Key Engineering Decisions
 

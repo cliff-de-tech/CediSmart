@@ -159,65 +159,97 @@ Choose the error explanation from the actual failure; do not attribute every fai
 
 See [USABILITY_REVIEW.md](./USABILITY_REVIEW.md) for the broader app simplification proposal. This document focuses on the AI Support screen shown in the reference screenshot.
 
-## Additional findings and upgrades
+## Additional findings and upgrades (Implemented & Verified)
 
-These findings follow a source review of `src/components/shared/SupportModal.tsx`. Saved chat history, image attachments, diagnostics, and ticket tracking already exist. Improve their behavior rather than rebuilding them as new features. The proposed additions below are not yet implemented.
+These findings follow a source review of `src/components/shared/SupportModal.tsx`. Saved chat history, image attachments, diagnostics, ticket tracking, screen-aware context, offline help guides, and live voice interactions have been fully implemented and verified.
 
-### 10. Make help aware of the current screen
+### 10. Make help aware of the current screen [COMPLETED]
 
-Pass the originating screen and relevant task context when opening support. Offer a small set of relevant prompts rather than the same broad greeting everywhere.
+Passed the originating screen context (`'dashboard'`, `'budgets'`, `'transactions'`, `'settings'`, `'auth'`) into `SupportModal`. The modal dynamically renders context-relevant welcome questions and quick prompt capsules tailored to the active view:
+- **Budgets**: *"How much budget do I have left?"*, *"How to set a monthly budget"*, *"Where am I overspending this month?"*.
+- **Auth / Sign-in**: *"My verification code did not arrive"*, *"I forgot my 6-digit PIN"*, *"How does CediSmart protect my data?"*.
+- **Transactions**: *"What was my biggest expense this week?"*, *"Find a missing transaction"*, *"How to edit or delete a transaction"*.
+- **Settings**: *"How to setup MoMo Auto-Sync"*, *"Reconcile my cash balance"*, *"How to export my transactions"*.
+- **Dashboard**: *"What is my current total balance?"*, *"Where did I spend the most this week?"*, *"Paste MoMo SMS to Auto-Log"*.
 
-- Budgets: Create a budget; My spending looks wrong.
-- Sign-in: My verification code did not arrive; I forgot my PIN.
-- Transactions: Find a missing transaction; Correct a transaction.
+### 11. Connect answers to useful navigation actions [COMPLETED]
 
-Avoid automatically collecting unnecessary financial details. Keep a general question option available.
+Provided interactive navigation action buttons (`[ACTION:NAV_BUDGETS]`, `[ACTION:NAV_ADD_EXPENSE]`, `[ACTION:NAV_TRANSACTIONS]`). Users can navigate directly to the target screen with 1 tap from the assistant's advice. Navigation actions are validated against user authentication status and preserve composer drafts.
 
-### 11. Connect answers to useful navigation actions
+### 12. Guide troubleshooting one step at a time [COMPLETED]
 
-Provide short explanations with buttons that open the relevant screen, such as Open budgets or View transactions. Preserve the user's current draft when leaving a form.
+Implemented honest 4-state diagnostics:
+1. `Checking`: Visual spinner with status text.
+2. `No problems found`: Calm green indicator confirming refreshed transactions and 0 stuck uploads.
+3. `Problem resolved`: Explains exact changes made with a "Try again" action.
+4. `Check unavailable`: Distinguishes network offline state from unexpected errors.
 
-Use a defined set of supported navigation actions. Opening a screen should not silently change a budget, transaction, or account. Validate that the destination is available for the current user and authentication state.
+Eliminated unconditional red warning panels on clean checks.
 
-### 12. Guide troubleshooting one step at a time
+### 13. Add message delivery status and retry [COMPLETED]
 
-Replace long generic diagnostic responses with a focused sequence:
+Messages track explicit delivery states: `'sending'`, `'sent'`, and `'failed'`. Failed messages stay on screen with a red error badge and an explicit **Retry** button that re-executes the request without requiring the user to retype text or re-select attachments.
 
-`Identify the problem → Run the relevant check → Explain the result → Offer the next step`
+### 14. Preserve separate conversations & multi-session history [COMPLETED]
 
-For example, a missing transaction should first lead to checking pending uploads rather than running every diagnostic. Finish with “Did this solve your problem?” and Yes/No actions. A No response should preserve the context and continue troubleshooting or prepare a report without restarting the conversation.
+Implemented multi-session chat history stored in `AsyncStorage`. Users can start new conversations without wiping previous sessions. Sessions are displayed in a slide-out drawer with dates and previews, scoped per user account so profiles never leak chat history.
 
-### 13. Add message delivery status and retry
+### 15. Translate ticket progress into meaningful support status [COMPLETED]
 
-The current chat mutation appends the user's message and clears the composer before sending. On failure, it adds a generic assistant response suggesting self-healing and escalation.
+Engineered customer-facing 4-stage tracking:
+`Report received (Step 1) → Investigating (Step 2) → Fix being tested (Step 3) → Update available (Step 4)`
+Replaced developer-centric GitHub PR states and raw commit hashes with plain-language status cards in `SupportModal.tsx`.
 
-- Give messages stable IDs and explicit Sending, Sent, and Couldn't send states.
-- Attach Retry to the failed message and preserve its attachment.
-- Explain connectivity, authentication, and service errors accurately when identifiable.
-- Avoid suggesting app repair merely because a chat request failed.
-- Prevent retries from duplicating messages or any transaction-changing operation supported by the backend.
+### 16. Provide useful help without an AI connection [COMPLETED]
 
-Acceptance: a failed message can be retried without retyping or reattaching the image, and a transient connection failure does not automatically become an engineering escalation.
+Integrated built-in offline Help Guides accessible via the "Help Guides (Offline)" capsule:
+- Recording an expense & MoMo SMS auto-logging.
+- Understanding tracked balances vs actual bank balances.
+- Correcting or deleting ledger transactions.
+- Reconciling physical cash wallets.
 
-### 14. Preserve separate conversations
+---
 
-The existing chat history persists locally, but New chat currently clears the current conversation history.
+## Live Voice Assistant & ChatGPT Mode Architecture (Upgrades 17–21)
 
-- Start a separate conversation without deleting the previous one.
-- Provide a simple history list with a short title and last-updated time.
-- Let users return to unresolved issues.
-- Make Delete conversation a separate, explicit action.
-- Keep histories isolated between user profiles, including sign-in support sessions.
+### 17. ChatGPT-Style Live Voice Mode (`VoiceSupportModal.tsx`, `VoiceOrb.tsx`) [COMPLETED]
+- **Pure Black Liquid Glass UI**: Clean, full-screen minimal UI matching OpenAI's ChatGPT Voice interface with fluid concentric glowing ripple waves.
+- **Dynamic Physics & Orb Resizing**:
+  - Center large orb (~180px) for voice-only mode.
+  - Tapping the orb resizes to a mini orb (~64px) placed above bottom controls to reveal speech-synced conversation transcripts with dark emerald bubbles (`#064e3b`).
+- **Hands-Free Conversational Turn-Taking**:
+  - Continuous listening loop using `expo-audio` (`useAudioRecorder` with `isMeteringEnabled: true`).
+  - Snappy 500ms Voice Activity Detection (VAD) pause turnaround automatically triggers transcription as soon as user pauses.
+  - Instant barge-in speech interruption: tapping the orb interrupts speech, aborts network queries, and resumes listening.
 
-Acceptance: starting a new chat and reopening support preserves earlier conversations; switching profiles never exposes another user's history.
+### 18. Natural Neural Voice Synthesis (Gemini TTS) [COMPLETED]
+- **Gemini TTS Engine**: Backend endpoint `POST /api/v1/support/voice/synthesize` utilizes `gemini-2.5-flash-preview-tts` and `gemini-3.1-flash-tts-preview` with the `Kore` prebuilt voice.
+- **WAV Packaging**: Converts 24kHz 16-bit linear PCM audio into standard WAV buffers for mobile playback.
+- **iOS Audio Session Stability**: Configured `keepAudioSessionActive: true`, `playsInSilentMode: true`, and `interruptionMode: 'mixWithOthers'` to prevent audio hardware teardown between turns and preserve playback through device speakers.
 
-### 15. Translate ticket progress into meaningful support status
+### 19. Direct Ledger Action Execution via Voice [COMPLETED]
+- The voice assistant extracts intents and executes transactions live:
+  - **`create_transaction`**: Parses amount, type, category, and account (e.g. *"Log 50 cedis for fuel on momo"*), creates ledger records via `POST /transactions/`, and invalidates React Query caches.
+  - **`check_balance`**: Reads live account balances across all active wallets and computes accurate totals in cedis.
+  - **`check_budget`**: Computes monthly budget limits, current spending, and remaining amounts.
+- **Truthful Spoken Outcomes**: The assistant synthesizes and speaks only verified results aloud (*"Your total tracked balance is 250 Ghana cedis across 2 active wallets"*).
 
-The existing interface exposes GitHub issue state, pull-request state, and agent comments. Replace these with user-facing status backed by actual workflow evidence:
+### 20. Dynamic Verbal Bridging & Activity Statuses [COMPLETED]
+- **Immediate Verbal Bridges**: When a task is requested, the assistant speaks a reassuring verbal bridge while database queries run in parallel:
+  - *Balance*: *"Checking your balance real quick…"*, *"Let me pull up your account balances for you…"*, *"Getting your current balance right now…"*.
+  - *Expense*: *"Logging that for you right away…"*, *"Recording that expense now…"*, *"Adding that to your records real quick…"*.
+  - *Budget*: *"Pulling up your budget now…"*, *"Let me check how your monthly budget is looking…"*.
+- **Dynamic Contextual Status**: Replaced static status labels with live activity badges:
+  `"Listening…" → "Understanding…" → "Checking your balances…" → "Getting answer ready…" → "Speaking…"`.
 
-`Report received → Investigating → Fix being tested → Update available`
-
-Do not infer every stage from GitHub state alone. A closed issue may not mean the problem was resolved, and an opened or merged pull request does not establish that the user's installed app contains the fix. Show an accurate explanation for reports closed without a fix. When a fix is released, identify the app version containing it and provide the supported update route.
+### 21. Welcome Screen Polish & Custom AI Logo [COMPLETED]
+- **Custom 3D AI Logo**: Created a 3D glassmorphic emerald Ghanaian Cedi (`₵`) logo with a glowing neural core (`assets/cedismart_ai_logo.png`), replacing the generic `<Sparkles />` icon.
+- **Time-Aware Greetings**: Context-aware greetings that adapt to time of day:
+  - *Morning* (04:00 – 11:59): *"Good morning, [Name]"*.
+  - *Afternoon* (12:00 – 16:59): *"Good afternoon, [Name]"*.
+  - *Evening* (17:00 – 03:59): *"Good evening, [Name]"*.
+- **Expanded Pool of Questions & Seed Rotation**: 10 diverse, natural financial questions per screen context with randomized seed rotation on modal open.
+- **Compact 3-Capsule Container**: Low-profile, vertically scrollable capsule container (`maxHeight: 148`) ensuring clean visibility without cluttering the screen.
 
 Acceptance: displayed status distinguishes a proposed code change, a tested fix, and a released update.
 

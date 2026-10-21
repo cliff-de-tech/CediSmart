@@ -195,4 +195,20 @@ Do not average away critical failures: losing a record, blocking a fresh user, o
 2. Confirm that the friend evaluated a build containing the reviewed flows; record version/build identifier for future feedback.
 3. Test the minimal label/form changes before committing to a larger navigation change.
 
+---
+
+## Implementation Status (October 2026)
+
+The usability upgrades for AI Support, conversational intelligence, and hands-free voice operations have been fully implemented and verified in `src/components/shared/SupportModal.tsx` and `src/components/voice/VoiceSupportModal.tsx`:
+- **Plain-language honest diagnostics**: Replaced technical jargon with a 4-state diagnostic engine (Checking, No problems found, Problem resolved, Check unavailable).
+- **Screen-aware contextual help & 1-tap navigation**: Dynamically renders context-tailored prompts based on active screen and connects assistant advice directly to navigation action cards (`[ACTION:NAV_BUDGETS]`, `[ACTION:NAV_ADD_EXPENSE]`, `[ACTION:NAV_TRANSACTIONS]`).
+- **Live Voice Mode & Dynamic Voice Orb**: Liquid glass voice orb with dynamic physics, fluid resizing (large ↔ mini orb), and live speech-synced typography.
+- **Direct voice action execution**: Spoken expense logging, multi-wallet balance checks, and budget status inquiries with dynamic verbal bridging.
+- **Message delivery states & retry**: Messages track `'sending'`, `'sent'`, and `'failed'` states with 1-tap retry preserving attachments.
+- **Multi-session chat history**: Persistent session history stored in `AsyncStorage` with profile isolation.
+- **Offline FAQ help guides**: Built-in knowledge base cards for recording expenses, balance explanations, and MoMo auto-sync.
+- **Appearance & trial countdown**: Mutually-exclusive radio toggles for Dark Theme and Device Theme, and dynamic 7-day trial countdown calculation.
+
+---
+
 Method references: [Nielsen Norman Group usability heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) informed the focus on familiar language, consistent controls, visible status, and recovery. [Expo SDK 57 documentation](https://docs.expo.dev/versions/v57.0.0/) was read as required by the project instructions; implementation should consult the exact versioned pages for affected components.
