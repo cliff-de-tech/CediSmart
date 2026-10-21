@@ -47,10 +47,49 @@ import { VoiceOrb, VoiceState } from './VoiceOrb';
 import { voiceService, VoicePlaybackFeedback } from '../../services/voiceService';
 import { GlassSurface } from '../glass/GlassSurface';
 import { useThemeStore } from '../../stores/themeStore';
+import { useAuthStore } from '../../stores/authStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import { Message } from '../shared/SupportModal';
 import uuid from 'react-native-uuid';
+
+// Rich pools of Ghanaian English verbal bridges to prevent robotic repetition
+const BALANCE_BRIDGES = [
+  'Checking your balance real quick…',
+  'Let me pull up your account balances for you…',
+  'Getting your current balance right now…',
+  'Let me look at your wallets real quick…',
+  'Checking how much you have across your accounts…',
+  'Pulling up your total balance right away…',
+  'Let me check your available funds real quick…',
+  'Looking into your active wallets now…',
+];
+
+const EXPENSE_BRIDGES = [
+  'Logging that for you right away…',
+  'Recording that expense now…',
+  'Adding that to your records real quick…',
+  'Got it, saving that transaction for you…',
+  'Putting that into your ledger now…',
+  'Recording that right now…',
+  'Let me log that for you real quick…',
+];
+
+const BUDGET_BRIDGES = [
+  'Pulling up your budget now…',
+  'Let me check how your monthly budget is looking…',
+  'Checking your budget limits real quick…',
+  'Looking up your budget status for you…',
+  'Let me inspect your spending limits right away…',
+];
+
+let lastClientBridge = '';
+const pickDynamicBridge = (pool: string[]): string => {
+  const choices = pool.filter((p) => p !== lastClientBridge);
+  const picked = choices[Math.floor(Math.random() * choices.length)] || pool[0];
+  lastClientBridge = picked;
+  return picked;
+};
 
 // Helper to filter out silence artifacts, background noise, or model timestamp hallucinations (e.g. "00:00")
 const isInvalidTranscript = (text: string) => {
@@ -95,6 +134,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   navigation,
 }) => {
   const theme = useThemeStore((state) => state.theme);
+  const user = useAuthStore((state) => state.user);
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -427,10 +467,16 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     return new Promise<void>((resolve) => {
       if (!isCurrentTurn(turn)) { resolve(); return; }
       setVoiceState('speaking');
+      setDynamicStatus('Speaking…');
       setStreamingAiText(text);
       void voiceService.speakNeural(
         audioB64,
-        () => { if (isCurrentTurn(turn)) setVoiceState('speaking'); },
+        () => {
+          if (isCurrentTurn(turn)) {
+            setVoiceState('speaking');
+            setDynamicStatus('Speaking…');
+          }
+        },
         () => { resolve(); },
         () => { resolve(); }
       );
@@ -447,7 +493,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       },
       onAudioLevel: (level) => { if (isCurrentTurn(turn)) setAudioLevel(level); },
     };
-    const started = () => { if (isCurrentTurn(turn)) setVoiceState('speaking'); };
+    const started = () => {
+      if (isCurrentTurn(turn)) {
+        setVoiceState('speaking');
+        setDynamicStatus('Speaking…');
+      }
+    };
     const done = () => {
       if (!isCurrentTurn(turn)) return;
       setStreamingAiText(reply);
@@ -565,6 +616,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
       // Execute detected voice action (e.g. create transaction or check balance)
       if (action && action.type === 'create_transaction' && action.payload) {
+        if (!reply || reply === "I'm listening, go ahead." || reply === "I heard you, there.") {
+          reply = pickDynamicBridge(EXPENSE_BRIDGES);
+        }
         setDynamicStatus('Recording expense…');
         if (neuralAudioB64) {
           await playBridgePhrase(reply, neuralAudioB64, turn);
@@ -574,6 +628,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         neuralAudioB64 = null;
         if (!isCurrentTurn(turn)) return;
       } else if (action && action.type === 'check_balance') {
+        if (!reply || reply === "I'm listening, go ahead." || reply === "I heard you, there.") {
+          reply = pickDynamicBridge(BALANCE_BRIDGES);
+        }
         setDynamicStatus('Checking your balances…');
         if (neuralAudioB64) {
           await playBridgePhrase(reply, neuralAudioB64, turn);
@@ -616,7 +673,51 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         } catch {
           reply = "I couldn't retrieve your balance right now. Please check your connection and try again.";
         }
-
+        neuralAudioB64 = null;
+        if (!isCurrentTurn(turn)) return;
+      } else if (action && action.type === 'check_budget') {
+        if (!reply || reply === "I'm listening, go ahead." || reply === "I heard you, there.") {
+          reply = pickDynamicBridge(BUDGET_BRIDGES);
+        }
+        setDynamicStatus('Checking your budgets…');
+        if (neuralAudioB64) {
+          await playBridgePhrase(reply, neuralAudioB64, turn);
+        }
+        if (!isCurrentTurn(turn)) return;
+        setActionToast(null);
+        try {
+          const latestBudgets = await queryClient.fetchQuery<any[]>({
+            queryKey: ['budgets', user?.id],
+            queryFn: async () => {
+              const res = await apiClient.get('/budgets/');
+              return res.data;
+            },
+            staleTime: 0,
+            retry: false,
+          });
+          if (!isCurrentTurn(turn)) return;
+          if (!Array.isArray(latestBudgets) || latestBudgets.length === 0) {
+            reply = "You don't have any budgets set for this month yet. You can set one up in the Budgets tab.";
+          } else {
+            const totals = latestBudgets.reduce(
+              (acc, curr) => ({
+                budgeted: acc.budgeted + Number(curr.amount_limit || curr.amount || 0),
+                spent: acc.spent + Number(curr.current_spend || curr.spent || 0),
+              }),
+              { budgeted: 0, spent: 0 }
+            );
+            const remaining = Math.max(0, totals.budgeted - totals.spent);
+            const pct = totals.budgeted > 0 ? Math.round((totals.spent / totals.budgeted) * 100) : 0;
+            const spentSpoken = formatGHS(totals.spent).replace(/[₵\s]/g, '');
+            const budgetedSpoken = formatGHS(totals.budgeted).replace(/[₵\s]/g, '');
+            const remainingSpoken = formatGHS(remaining).replace(/[₵\s]/g, '');
+            reply = `You have spent ${spentSpoken} Ghana cedis out of your ${budgetedSpoken} budget, which is ${pct} percent. You have ${remainingSpoken} cedis remaining.`;
+          }
+        } catch {
+          reply = "I couldn't retrieve your budget right now. Please check your connection and try again.";
+        }
+        neuralAudioB64 = null;
+        if (!isCurrentTurn(turn)) return;
       }
 
       if (!isCurrentTurn(turn)) return;

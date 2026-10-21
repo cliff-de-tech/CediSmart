@@ -147,19 +147,23 @@ export const getScreenQuickPrompts = (ctx?: string, type?: string) => {
       'My verification code did not arrive',
       'I forgot my 6-digit PIN',
       'How does phone verification work?',
+      'How does CediSmart protect my data?',
       'Check for problems',
     ];
   }
   switch (ctx) {
     case 'budgets':
       return [
+        'How much budget do I have left?',
         'How to set a monthly budget',
+        'Where am I overspending this month?',
         'My spending looks wrong',
         'Check for problems',
         'Help Guides (Offline)',
       ];
     case 'transactions':
       return [
+        'What was my biggest expense this week?',
         'Find a missing transaction',
         'How to edit or delete a transaction',
         'What are pending uploads?',
@@ -170,15 +174,18 @@ export const getScreenQuickPrompts = (ctx?: string, type?: string) => {
       return [
         'How to setup MoMo Auto-Sync',
         'Reconcile my cash balance',
+        'How to export my transactions',
         'Check for problems',
         'Help Guides (Offline)',
       ];
     case 'dashboard':
     default:
       return [
+        'What is my current total balance?',
+        'Where did I spend the most this week?',
         'Paste MoMo SMS to Auto-Log',
-        'Explain my tracked balance',
         'Record an expense',
+        'How much can I spend today?',
         'Check for problems',
         'Help Guides (Offline)',
       ];
@@ -189,33 +196,60 @@ export const getScreenQuickPrompts = (ctx?: string, type?: string) => {
 const WELCOME_QUESTIONS = {
   dashboard: [
     'What would you like to do with your money today?',
+    'Want to review your balance across all your accounts?',
+    'Wondering where most of your money went this week?',
+    'Did you make any cash or Mobile Money transactions today?',
+    'Want to see how your spending compares to last week?',
+    'Ready to log an expense or paste a MoMo SMS?',
+    'How is your financial plan holding up this month?',
+    'Need a quick breakdown of your available funds?',
+    'Want any tips to save on daily expenses?',
     'What can I help you make sense of today?',
-    'Shall we look at your spending together?',
-    'What’s on your mind about money?',
   ],
   budgets: [
     'What would you like to plan for?',
     'How can I help with your budget today?',
+    'Want to check how much budget you have left for food?',
     'Which spending goal shall we work on?',
     'Want to make a plan for the month ahead?',
+    'Looking for categories where you might be overspending?',
+    'Need help setting a daily spending target?',
+    'Shall we review your progress toward your savings goal?',
+    'How are your transport and utility budgets doing?',
+    'Want to adjust your budget limits for the rest of the month?',
   ],
   transactions: [
     'What would you like to track today?',
-    'Need a hand finding a transaction?',
+    'Need a hand finding a specific transaction?',
     'Which expense shall we look at together?',
+    'Want to see your biggest expense so far this month?',
+    'Need help verifying a recent Mobile Money transfer?',
+    'Have a receipt or SMS you would like to log?',
+    'Looking for a transaction that seems out of place?',
+    'Want a summary of your spending by category?',
     'What would you like to understand about your spending?',
+    'Need to categorize any uncategorized transactions?',
   ],
   settings: [
-    'What can I help you set up today?',
-    'Need a hand with your accounts or MoMo?',
-    'What would you like to fine-tune?',
+    'What can I help you configure today?',
+    'Need a hand linking or managing your MoMo accounts?',
+    'Want to reconcile your physical cash wallet with your records?',
+    'What would you like to fine-tune in your preferences?',
+    'Need guidance setting up automated SMS tracking?',
+    'Want to back up your data or check your sync status?',
+    'Need help updating your profile or currency preferences?',
+    'Curious about security, PIN protection, or biometric login?',
     'How can I make CediSmart easier for you?',
   ],
   auth: [
     'How can I help you get started?',
-    'Need a hand signing in?',
-    'What can I help with on your account?',
-    'Shall we get you settled in?',
+    'Need a hand signing in to your account?',
+    'Did not receive your verification SMS or OTP code?',
+    'Having trouble remembering your 6-digit PIN?',
+    'What can I help with on your onboarding?',
+    'Want to know how CediSmart protects your financial data?',
+    'Need help recovering or verifying your Ghanaian phone number?',
+    'Shall we get you settled in with CediSmart?',
   ],
 };
 
@@ -393,14 +427,17 @@ export const SupportModal: React.FC<SupportModalProps> = ({
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historySearch, setHistorySearch] = useState('');
-  const [welcomeMoment, setWelcomeMoment] = useState(() => ({ hour: new Date().getHours(), variation: 0 }));
+  const [welcomeMoment, setWelcomeMoment] = useState(() => ({
+    hour: new Date().getHours(),
+    variation: Math.floor(Math.random() * 20),
+  }));
 
   // Refresh on opening or switching chats, never on typing or other UI updates.
   useEffect(() => {
     if (!visible || !activeSessionId) return;
     setWelcomeMoment((previous) => ({
       hour: new Date().getHours(),
-      variation: previous.variation + 1,
+      variation: previous.variation + 1 + Math.floor(Math.random() * 3),
     }));
   }, [visible, activeSessionId]);
 
@@ -1379,7 +1416,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                   >
                     {getScreenQuickPrompts(screenContext, supportType).map((promptText) => {
                       const Icon = promptText.includes('budget') ? PieChart
-                        : promptText.includes('balance') ? Landmark
+                        : promptText.includes('balance') || promptText.includes('spend today') ? Landmark
+                        : promptText.includes('expense') || promptText.includes('spent') || promptText.includes('overspending') ? ArrowUpRight
                         : promptText === 'Check for problems' ? Stethoscope
                         : promptText === 'Help Guides (Offline)' ? BookOpen
                         : promptText.includes('MoMo') ? Zap : MessageSquare;
@@ -1921,7 +1959,7 @@ const chatStyles = StyleSheet.create({
   eyebrow: { fontSize: 14, marginBottom: 10 },
   welcomeTitle: { fontSize: 28, lineHeight: 35, fontWeight: '600', letterSpacing: -0.8, textAlign: 'center', maxWidth: 340 },
   welcomeSubtitle: { fontSize: 14, lineHeight: 21, textAlign: 'center', maxWidth: 300, marginTop: 12 },
-  capsuleContainer: { width: '100%', maxWidth: 380, maxHeight: 96, marginTop: 24 },
+  capsuleContainer: { width: '100%', maxWidth: 380, maxHeight: 148, marginTop: 20 },
   capsuleList: { gap: 8 },
   capsulePill: { flexDirection: 'row', alignItems: 'center', height: 44, borderRadius: 22, borderWidth: 1, paddingHorizontal: 16, gap: 10 },
   capsuleText: { fontSize: 13, fontWeight: '500', flexShrink: 1 },
