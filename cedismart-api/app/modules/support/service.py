@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -1207,7 +1208,8 @@ class SupportService:
                 }
                 try:
                     async with httpx.AsyncClient(timeout=8.0) as client:
-                        resp = await client.post(url, json=payload)
+                        async with asyncio.timeout(8.0):
+                            resp = await client.post(url, json=payload)
                         if resp.status_code == 200:
                             data = resp.json()
                             candidates = data.get("candidates") or []
@@ -1235,7 +1237,7 @@ class SupportService:
                             # Synthesize natural neural voice audio via Gemini TTS if requested
                             audio_b64, audio_mime = (
                                 await SupportService.synthesize_neural_voice(reply_text)
-                                if synthesize_audio
+                                if synthesize_audio and transcript
                                 else (None, "audio/wav")
                             )
 
@@ -1247,27 +1249,21 @@ class SupportService:
                                 "audio_mime_type": audio_mime or "audio/wav",
                             }
                         logger.warning(
-                            "Gemini audio recognition error (%s status %d): %s",
+                            "Gemini audio recognition error (%s status %d)",
                             model_name,
                             resp.status_code,
-                            resp.text[:200],
                         )
                 except Exception as exc:
-                    logger.warning("Gemini audio request failed (%s): %s", model_name, str(exc))
+                    logger.warning("Gemini audio request failed (%s): %s", model_name, type(exc).__name__)
 
-        # 2. Fallback response
-        fallback_text = f"I heard you, {first_name}. Could you please say that again?"
-        fb_audio, fb_mime = (
-            await SupportService.synthesize_neural_voice(fallback_text)
-            if synthesize_audio
-            else (None, "audio/wav")
-        )
+        # Provider failures must not masquerade as silence or successful recognition.
         return {
-            "transcript": "Voice note received",
-            "response": fallback_text,
-            "action": {"type": "general_reply", "payload": None},
-            "audio_base64": fb_audio,
-            "audio_mime_type": fb_mime or "audio/wav",
+            "transcript": "",
+            "response": "Speech recognition is unavailable. Please retry or type your message.",
+            "action": None,
+            "audio_base64": None,
+            "audio_mime_type": "audio/wav",
+            "error_code": "recognition_unavailable",
         }
 
     @staticmethod
@@ -1301,16 +1297,21 @@ class SupportService:
             }
             try:
                 async with httpx.AsyncClient(timeout=9.5) as client:
-                    resp = await client.post(url, json=payload)
+                    async with asyncio.timeout(9.5):
+                        resp = await client.post(url, json=payload)
                     if resp.status_code == 200:
                         data = resp.json()
                         candidates = data.get("candidates") or []
                         if not candidates:
                             continue
                         parts = (candidates[0].get("content") or {}).get("parts") or []
-                        if not parts or "inlineData" not in parts[0]:
+                        inline_data = next(
+                            (part["inlineData"] for part in parts
+                             if part.get("inlineData", {}).get("data")),
+                            None,
+                        )
+                        if not inline_data:
                             continue
-                        inline_data = parts[0]["inlineData"]
                         raw_data = inline_data.get("data")
                         raw_mime = inline_data.get("mimeType", "audio/wav")
 
@@ -1330,11 +1331,13 @@ class SupportService:
                                 raw_data = base64.b64encode(wav_io.getvalue()).decode("utf-8")
                                 raw_mime = "audio/wav"
                             except Exception as wav_err:
-                                logger.warning("PCM to WAV packaging error: %s", str(wav_err))
+                                logger.warning("PCM to WAV packaging error: %s", type(wav_err).__name__)
+                                continue
 
                         return raw_data, raw_mime
+                    logger.warning("Gemini TTS unavailable (%s status %d)", model, resp.status_code)
             except Exception as e:
-                logger.warning("Gemini TTS synthesis failed on %s: %s", model, str(e))
+                logger.warning("Gemini TTS synthesis failed on %s: %s", model, type(e).__name__)
         return None, None
 
 

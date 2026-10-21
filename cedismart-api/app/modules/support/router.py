@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
+from app.core.exceptions import AppException
 from app.modules.auth.router import limiter
 from app.modules.support.schemas import (
     ChatRequest,
@@ -88,6 +89,12 @@ async def synthesize_voice(request: Request, body: VoiceSynthesizeRequest) -> Vo
         text=body.text,
         voice_name=body.voice_name,
     )
+    if not audio_b64:
+        raise AppException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            error_code="synthesis_unavailable",
+            message="Natural voice is unavailable. Please retry.",
+        )
     return VoiceSynthesizeResponse(audio_base64=audio_b64, audio_mime_type=mime or "audio/wav")
 
 

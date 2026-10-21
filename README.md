@@ -178,8 +178,8 @@ All endpoints versioned under `/api/v1/`. Every response uses a consistent error
 | POST | `/support/chat` | Multimodal AI support chat with X-Ray diagnostics & SMS rescue |
 | POST | `/support/voice` | Multimodal voice understanding, intent extraction & verbal bridging |
 | POST | `/support/voice/synthesize` | Gemini Neural TTS voice synthesizer (`Kore` prebuilt voice) |
-| POST | `/support/report-ticket` | Customer problem reporting & GitHub auto-PR issue creation |
-| GET | `/support/tickets/{id}` | Real-time 4-stage ticket resolution tracking |
+| POST | `/support/escalate` | Customer problem reporting & GitHub auto-PR issue creation |
+| GET | `/support/ticket-status/{issue_number}` | Real-time 4-stage ticket resolution tracking |
 | POST | `/support/feedback` | In-app user feedback dispatch to Discord |
 
 ### Key Engineering Decisions

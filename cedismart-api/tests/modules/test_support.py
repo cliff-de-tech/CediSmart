@@ -254,3 +254,38 @@ async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
 
 
 
+
+@pytest.mark.asyncio
+async def test_voice_recognition_failure_is_explicit(client: AsyncClient) -> None:
+    with patch("app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock) as mock_voice:
+        mock_voice.return_value = {
+            "transcript": "", "response": "Please retry.", "action": None,
+            "error_code": "recognition_unavailable",
+        }
+        resp = await client.post("/api/v1/support/voice", json={"audio_base64": "test", "synthesize_audio": False})
+        assert resp.status_code == 200
+        assert resp.json()["error_code"] == "recognition_unavailable"
+        assert resp.json()["action"] is None
+        assert mock_voice.call_args.kwargs["synthesize_audio"] is False
+
+
+@pytest.mark.asyncio
+async def test_voice_synthesis_failure_returns_503(client: AsyncClient) -> None:
+    with patch("app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock) as mock_synth:
+        mock_synth.return_value = (None, None)
+        resp = await client.post("/api/v1/support/voice/synthesize", json={"text": "Hello"})
+        assert resp.status_code == 503
+        assert resp.json()["error"]["code"] == "synthesis_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_missing_voice_provider_does_not_claim_to_hear_user() -> None:
+    from app.modules.support.service import SupportService
+    with patch("app.modules.support.service.settings.GEMINI_API_KEY", ""), patch.object(
+        SupportService, "synthesize_neural_voice", new_callable=AsyncMock
+    ) as synth:
+        result = await SupportService.process_voice("test")
+    assert result["error_code"] == "recognition_unavailable"
+    assert result["transcript"] == ""
+    assert result["action"] is None
+    synth.assert_not_called()

@@ -1,5 +1,4 @@
-import * as Speech from 'expo-speech';
-import { createAudioPlayer, AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 
 export interface VoiceAction {
@@ -24,10 +23,13 @@ class VoiceService {
   private activeFile: string | null = null;
   private subscriptions: { remove(): void }[] = [];
   private loadTimer: ReturnType<typeof setTimeout> | null = null;
+  private stallTimer: ReturnType<typeof setInterval> | null = null;
 
   private releasePlayer() {
     if (this.loadTimer) clearTimeout(this.loadTimer);
     this.loadTimer = null;
+    if (this.stallTimer) clearInterval(this.stallTimer);
+    this.stallTimer = null;
     this.subscriptions.forEach((subscription) => subscription.remove());
     this.subscriptions = [];
     const player = this.activePlayer;
@@ -41,7 +43,6 @@ class VoiceService {
   private async clearPlayback() {
     this.isSpeaking = false;
     this.releasePlayer();
-    try { await Speech.stop(); } catch {}
   }
 
   /** Play neural audio; cancellation invalidates pending file writes and stale callbacks. */
@@ -66,6 +67,14 @@ class VoiceService {
       else { feedback?.onProgress?.(1); onDone?.(); }
     };
     try {
+      // PCM capture uses iOS's record-only session. Restore speaker playback after it stops.
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        shouldRouteThroughEarpiece: false,
+        interruptionMode: 'mixWithOthers',
+      });
+      if (generation !== this.generation) return;
       const tempUri = `${FileSystem.cacheDirectory}neural_${Date.now()}_${generation}.wav`;
       this.activeFile = tempUri;
       await FileSystem.writeAsStringAsync(tempUri, audioBase64, { encoding: FileSystem.EncodingType.Base64 });
@@ -76,6 +85,8 @@ class VoiceService {
       const player = createAudioPlayer({ uri: tempUri }, { updateInterval: 100, keepAudioSessionActive: true });
       this.activePlayer = player;
       let started = false;
+      let lastPosition = 0;
+      let lastProgressAt = Date.now();
       this.subscriptions.push(player.addListener('playbackStatusUpdate', (status) => {
         if (generation !== this.generation || settled) return;
         if (status.error) { finish(new Error(status.error)); return; }
@@ -85,6 +96,10 @@ class VoiceService {
           this.loadTimer = null;
           this.isSpeaking = true;
           onStart?.();
+        }
+        if (status.currentTime > lastPosition) {
+          lastPosition = status.currentTime;
+          lastProgressAt = Date.now();
         }
         if (status.duration > 0) feedback?.onProgress?.(Math.min(1, status.currentTime / status.duration));
         if (
@@ -97,55 +112,15 @@ class VoiceService {
       this.loadTimer = setTimeout(() => {
         if (!started) finish(new Error('Audio playback could not start'));
       }, 10000);
+      this.stallTimer = setInterval(() => {
+        if (started && Date.now() - lastProgressAt > 15000) {
+          finish(new Error('Audio playback stalled'));
+        }
+      }, 1000);
       player.play();
     } catch (error) {
       finish(error);
     }
-  }
-
-  /** Device speech fallback shares cancellation and playback feedback with neural audio. */
-  async speak(
-    text: string,
-    onStart?: () => void,
-    onDone?: () => void,
-    onError?: (error: any) => void,
-    feedback?: VoicePlaybackFeedback
-  ): Promise<void> {
-    const generation = ++this.generation;
-    await this.clearPlayback();
-    if (generation !== this.generation) return;
-    let settled = false;
-    const finish = (error?: unknown) => {
-      if (settled || generation !== this.generation) return;
-      settled = true;
-      this.isSpeaking = false;
-      feedback?.onAudioLevel?.(0);
-      if (error) onError?.(error);
-      else { feedback?.onProgress?.(1); onDone?.(); }
-    };
-    try {
-      const cleanText = text
-        .replace(/\[ACTION:[^\]]+\]/g, '')
-        .replace(/\[VOICE_ACTION:[^\]]+\]/g, '')
-        .replace(/[*#_`]/g, '')
-        .trim();
-      if (!cleanText) { finish(); return; }
-      Speech.speak(cleanText, {
-        language: 'en-US', pitch: 1, rate: 0.98,
-        onStart: () => {
-          if (generation !== this.generation || settled) return;
-          this.isSpeaking = true;
-          onStart?.();
-        },
-        onBoundary: (event: { charIndex: number; charLength?: number }) => {
-          if (generation !== this.generation || settled) return;
-          feedback?.onProgress?.(Math.min(1, (event.charIndex + (event.charLength || 0)) / cleanText.length));
-        },
-        onDone: () => finish(),
-        onStopped: () => finish(),
-        onError: (error) => finish(error),
-      });
-    } catch (error) { finish(error); }
   }
 
   /** Stop without firing callbacks from the interrupted response. */

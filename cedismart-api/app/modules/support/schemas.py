@@ -119,6 +119,7 @@ class VoiceRequest(BaseModel):
 
 
 class VoiceResponse(BaseModel):
+    error_code: str | None = None
     transcript: str = Field(..., description="Transcribed user speech")
     response: str = Field(..., description="Spoken AI reply")
     action: VoiceAction | None = None

@@ -36,15 +36,20 @@ import {
   RefreshCw,
 } from 'lucide-react-native';
 import {
-  useAudioRecorder,
-  useAudioRecorderState,
+  useAudioStream,
+  AudioStreamBuffer,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
-  RecordingPresets,
 } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { VoiceOrb, VoiceState } from './VoiceOrb';
 import { voiceService, VoicePlaybackFeedback } from '../../services/voiceService';
+import {
+  recognitionError,
+  VOICE_RECOGNITION_TIMEOUT_MS,
+  VOICE_SYNTHESIS_TIMEOUT_MS,
+} from '../../services/voiceSession';
+import { VoiceCapture } from '../../services/voiceCapture';
 import { GlassSurface } from '../glass/GlassSurface';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -52,44 +57,6 @@ import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import { Message } from '../shared/SupportModal';
 import uuid from 'react-native-uuid';
-
-// Rich pools of Ghanaian English verbal bridges to prevent robotic repetition
-const BALANCE_BRIDGES = [
-  'Checking your balance real quick…',
-  'Let me pull up your account balances for you…',
-  'Getting your current balance right now…',
-  'Let me look at your wallets real quick…',
-  'Checking how much you have across your accounts…',
-  'Pulling up your total balance right away…',
-  'Let me check your available funds real quick…',
-  'Looking into your active wallets now…',
-];
-
-const EXPENSE_BRIDGES = [
-  'Logging that for you right away…',
-  'Recording that expense now…',
-  'Adding that to your records real quick…',
-  'Got it, saving that transaction for you…',
-  'Putting that into your ledger now…',
-  'Recording that right now…',
-  'Let me log that for you real quick…',
-];
-
-const BUDGET_BRIDGES = [
-  'Pulling up your budget now…',
-  'Let me check how your monthly budget is looking…',
-  'Checking your budget limits real quick…',
-  'Looking up your budget status for you…',
-  'Let me inspect your spending limits right away…',
-];
-
-let lastClientBridge = '';
-const pickDynamicBridge = (pool: string[]): string => {
-  const choices = pool.filter((p) => p !== lastClientBridge);
-  const picked = choices[Math.floor(Math.random() * choices.length)] || pool[0];
-  lastClientBridge = picked;
-  return picked;
-};
 
 // Helper to filter out silence artifacts, background noise, or model timestamp hallucinations (e.g. "00:00")
 const isInvalidTranscript = (text: string) => {
@@ -114,14 +81,6 @@ export interface VoiceSupportModalProps {
 }
 
 const { width } = Dimensions.get('window');
-// Speech does not need stereo music-quality recordings: use a smaller mono upload.
-const VOICE_RECORDING_OPTIONS = {
-  ...RecordingPresets.HIGH_QUALITY,
-  numberOfChannels: 1,
-  sampleRate: 24000,
-  bitRate: 48000,
-  isMeteringEnabled: true,
-};
 
 export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   visible,
@@ -140,9 +99,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const scrollViewRef = useRef<ScrollView>(null);
   const voiceInputRef = useRef<TextInput>(null);
 
-  // Audio Recorder from expo-audio (SDK 57)
-  const audioRecorder = useAudioRecorder(VOICE_RECORDING_OPTIONS);
-  const recorderState = useAudioRecorderState(audioRecorder, 100);
+  const { stream } = useAudioStream({
+    sampleRate: 16000,
+    channels: 1,
+    encoding: 'float32',
+    onBuffer: (buffer) => handleMicrophoneBuffer(buffer),
+  });
 
   // Voice Interaction States
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
@@ -261,22 +223,21 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
   // Playback-driven captions and session guards; no synthetic typewriter timer.
   const [streamingAiText, setStreamingAiText] = useState('');
-  const hasSpokenRef = useRef(false);
-  const speechTicksRef = useRef(0);
-  const silenceTicksRef = useRef(0);
+  const captureRef = useRef(new VoiceCapture());
+  const captureActiveRef = useRef(false);
+  const lastBufferAtRef = useRef(0);
+  const microphoneRestartsRef = useRef(0);
+  const retryReplyRef = useRef<string | null>(null);
   const isProcessingRef = useRef(false);
   const activeRef = useRef(false);
   const turnRef = useRef(0);
   const requestRef = useRef<AbortController | null>(null);
-  const recorderStartingRef = useRef<Promise<void> | null>(null);
+  const microphoneStartingRef = useRef<Promise<void> | null>(null);
   const microphonePermissionRef = useRef(false);
   const mutedRef = useRef(isMuted);
   const typingRef = useRef(isTypingInVoice);
   const messagesRef = useRef(messages);
   const voiceStateRef = useRef(voiceState);
-  const lastSpeechAtRef = useRef(0);
-  const noiseFloorRef = useRef(-60);
-  const lastMeterTimeRef = useRef(-1);
   const retryAudioRef = useRef<string | null>(null);
   const microphoneStopRef = useRef<Promise<void> | null>(null);
   mutedRef.current = isMuted;
@@ -306,12 +267,13 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     enabled: visible,
   });
 
-  const stopRecorder = () => {
+  const stopMicrophone = () => {
+    captureActiveRef.current = false;
     if (microphoneStopRef.current) return microphoneStopRef.current;
     const stopping = (async () => {
       try {
-        await recorderStartingRef.current;
-        if (audioRecorder.isRecording) await audioRecorder.stop();
+        await microphoneStartingRef.current;
+        stream.stop();
       } catch {}
       setAudioLevel(0);
     })();
@@ -329,16 +291,17 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     requestRef.current = null;
     isProcessingRef.current = false;
     setDynamicStatus(null);
-    hasSpokenRef.current = false;
+    captureRef.current = new VoiceCapture();
     retryAudioRef.current = null;
+    retryReplyRef.current = null;
     void voiceService.stop();
-    await stopRecorder();
+    await stopMicrophone();
   };
 
   const startListeningLoop = async () => {
     if (!canListen()) return;
     await microphoneStopRef.current;
-    if (!canListen() || recorderStartingRef.current || audioRecorder.isRecording) return;
+    if (!canListen() || microphoneStartingRef.current || stream.isStreaming) return;
     const turn = turnRef.current;
     const start = async () => {
       try {
@@ -360,27 +323,29 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
           interruptionMode: 'mixWithOthers',
         });
         if (!isCurrentTurn(turn) || !canListen()) return;
-        await audioRecorder.prepareToRecordAsync(VOICE_RECORDING_OPTIONS);
-        if (!isCurrentTurn(turn) || !canListen()) return;
-        hasSpokenRef.current = false;
-        speechTicksRef.current = 0;
-        silenceTicksRef.current = 0;
-        lastSpeechAtRef.current = 0;
-        lastMeterTimeRef.current = -1;
-        noiseFloorRef.current = -60;
-        audioRecorder.record();
+        captureRef.current = new VoiceCapture();
+        captureActiveRef.current = true;
+        lastBufferAtRef.current = Date.now();
+        await stream.start();
+        if (!isCurrentTurn(turn) || !canListen()) {
+          captureActiveRef.current = false;
+          stream.stop();
+          return;
+        }
         setVoiceError(null);
         setVoiceState('listening');
-      } catch {
+      } catch (error: any) {
         if (!isCurrentTurn(turn)) return;
+        captureActiveRef.current = false;
+        console.warn('[VoiceSupport] Microphone start failed', { code: error.code });
         setVoiceState('idle');
         setVoiceError('The microphone could not start. Try again, or type your message.');
       }
     };
     const pending = start();
-    recorderStartingRef.current = pending;
+    microphoneStartingRef.current = pending;
     try { await pending; } finally {
-      if (recorderStartingRef.current === pending) recorderStartingRef.current = null;
+      if (microphoneStartingRef.current === pending) microphoneStartingRef.current = null;
     }
   };
 
@@ -392,11 +357,13 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     typingRef.current = false;
     isProcessingRef.current = false;
     setIsMuted(false);
+    microphoneRestartsRef.current = 0;
     setIsTypingInVoice(false);
     setIsCompactView(false);
     setVoiceError(null);
     setActionToast(null);
     retryAudioRef.current = null;
+    retryReplyRef.current = null;
     setStreamingAiText('');
     setVoiceState('idle');
     void startListeningLoop();
@@ -406,14 +373,14 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   // Do not leave a microphone or a delayed response running when the app is backgrounded.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active' || !activeRef.current) return;
+      if (state !== 'background' || !activeRef.current) return;
       mutedRef.current = true;
       setIsMuted(true);
       ++turnRef.current;
       requestRef.current?.abort();
       isProcessingRef.current = false;
       void voiceService.stop();
-      void stopRecorder();
+      void stopMicrophone();
       setVoiceState('idle');
     });
     return () => subscription.remove();
@@ -423,45 +390,72 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   useEffect(() => {
     if (isTypingInVoice || showAttachMenu) {
       typingRef.current = true;
-      void stopRecorder();
+      void stopMicrophone();
     } else {
       typingRef.current = false;
       void startListeningLoop();
     }
   }, [isTypingInVoice, showAttachMenu]);
 
-  // Wait for a real pause in speech; elapsed recording time avoids counting duplicate renders.
-  useEffect(() => {
-    if (voiceState !== 'listening' || !recorderState.isRecording || !canListen()) return;
-    const time = recorderState.durationMillis ?? 0;
-    if (time === lastMeterTimeRef.current) return;
-    lastMeterTimeRef.current = time;
-    const metering = recorderState.metering ?? -160;
-    const threshold = Math.max(-50, Math.min(-32, noiseFloorRef.current + 12));
-    setAudioLevel(Math.max(0, Math.min(1, (metering + 65) / 50)));
-    if (metering > threshold) {
-      speechTicksRef.current += 1;
-      lastSpeechAtRef.current = time;
-      if (speechTicksRef.current >= 2) hasSpokenRef.current = true;
-    } else {
-      speechTicksRef.current = 0;
-      if (!hasSpokenRef.current && metering > -100) {
-        noiseFloorRef.current = noiseFloorRef.current * 0.9 + metering * 0.1;
-      }
-      if (hasSpokenRef.current && time - lastSpeechAtRef.current >= 800) {
+  // Process real PCM samples directly: React renders cannot consume microphone levels.
+  const handleMicrophoneBuffer = (buffer: AudioStreamBuffer) => {
+    if (!captureActiveRef.current || !canListen()) return;
+    lastBufferAtRef.current = Date.now();
+    try {
+      const detection = captureRef.current.append(buffer);
+      setAudioLevel(detection.level);
+      if (detection.shouldSend) {
+        console.info('[VoiceSupport] Automatic speech submission', {
+          durationMs: Math.round(detection.durationMillis), sampleRate: buffer.sampleRate,
+        });
         void stopAndProcessAudio();
-        return;
+      } else if (detection.timedOut) {
+        // Stay hands-free through silence. Bound memory without turning off listening.
+        captureRef.current = new VoiceCapture();
       }
-    }
-    // Give longer thoughts room, and avoid indefinite silent recordings.
-    if (hasSpokenRef.current && time >= 45000) void stopAndProcessAudio();
-    else if (!hasSpokenRef.current && time >= 60000) {
-      mutedRef.current = true;
-      setIsMuted(true);
-      void stopRecorder();
+    } catch {
+      void stopMicrophone();
       setVoiceState('idle');
+      setVoiceError('The microphone audio could not be read. Please reopen voice mode.');
     }
-  }, [recorderState.metering, recorderState.durationMillis, recorderState.isRecording, voiceState, isMuted, isTypingInVoice]);
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    const watchdog = setInterval(() => {
+      if (!captureActiveRef.current || !canListen() || microphoneStartingRef.current ||
+          Date.now() - lastBufferAtRef.current < 4000) return;
+      captureActiveRef.current = false;
+      console.warn('[VoiceSupport] Microphone stopped delivering audio');
+      void stopMicrophone().then(() => {
+        if (!canListen()) return;
+        if (microphoneRestartsRef.current++ < 2) {
+          void startListeningLoop();
+        } else {
+          setVoiceState('idle');
+          setVoiceError('The microphone is not delivering audio. Check microphone access and close other apps using it.');
+        }
+      });
+    }, 1000);
+    return () => clearInterval(watchdog);
+  }, [visible]);
+
+  const synthesizeReply = async (reply: string, signal: AbortSignal): Promise<string | null> => {
+    const startedAt = Date.now();
+    try {
+      const response = await apiClient.post('/support/voice/synthesize', {
+        text: reply,
+        voice_name: 'Kore',
+      }, { timeout: VOICE_SYNTHESIS_TIMEOUT_MS, signal });
+      if (!response.data?.audio_base64) throw new Error('missing_audio');
+      return response.data.audio_base64;
+    } catch (error: any) {
+      if (!signal.aborted) console.warn('[VoiceSupport] Synthesis failed', {
+        status: error.response?.status, code: error.code, elapsedMs: Date.now() - startedAt,
+      });
+      return null;
+    }
+  };
 
   const playBridgePhrase = (text: string, audioB64: string, turn: number): Promise<void> => {
     return new Promise<void>((resolve) => {
@@ -501,6 +495,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     };
     const done = () => {
       if (!isCurrentTurn(turn)) return;
+      retryReplyRef.current = null;
       setStreamingAiText(reply);
       isProcessingRef.current = false;
       setDynamicStatus(null);
@@ -513,15 +508,31 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       isProcessingRef.current = false;
       setDynamicStatus(null);
       setVoiceState('idle');
-      setVoiceError('Audio playback is unavailable. Your answer is in the transcript.');
+      retryReplyRef.current = reply;
+      setStreamingAiText(reply);
+      setVoiceError('Natural voice is unavailable. Your answer is below. Tap Retry voice to try again.');
       setIsCompactView(true);
     };
-    const deviceSpeech = () => {
-      if (isCurrentTurn(turn)) void voiceService.speak(reply, started, done, failed, feedback);
-    };
     setStreamingAiText('');
-    if (neuralAudio) void voiceService.speakNeural(neuralAudio, started, done, deviceSpeech, feedback);
-    else deviceSpeech();
+    if (neuralAudio) void voiceService.speakNeural(neuralAudio, started, done, failed, feedback);
+    else failed();
+  };
+
+  const retryNaturalVoice = async () => {
+    const reply = retryReplyRef.current;
+    if (!reply || !activeRef.current || isProcessingRef.current) return;
+    isProcessingRef.current = true;
+    const turn = ++turnRef.current;
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setVoiceError(null);
+    setVoiceState('thinking');
+    setDynamicStatus('Getting voice ready…');
+    await stopMicrophone();
+    if (!isCurrentTurn(turn)) return;
+    const audio = await synthesizeReply(reply, controller.signal);
+    if (isCurrentTurn(turn)) await playResponse(reply, audio, turn);
   };
 
   /**
@@ -535,10 +546,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     const controller = new AbortController();
     requestRef.current = controller;
     setVoiceError(null);
-
-    speechTicksRef.current = 0;
-    silenceTicksRef.current = 0;
-    hasSpokenRef.current = false;
+    retryReplyRef.current = null;
+    const requestStartedAt = Date.now();
 
     setVoiceState('thinking');
     setDynamicStatus('Understanding…');
@@ -546,43 +555,34 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
 
     try {
-      await stopRecorder();
+      await stopMicrophone();
       if (!isCurrentTurn(turn)) return;
-      let base64Audio = retryAudio;
-      if (!base64Audio) {
-        const uri = audioRecorder.uri;
-        if (!uri) {
-          isProcessingRef.current = false;
-          setDynamicStatus(null);
-          void startListeningLoop();
-          return;
-        }
-        base64Audio = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        void FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-      }
+      const base64Audio = retryAudio || captureRef.current.toWavBase64();
+      captureRef.current = new VoiceCapture();
       if (!isCurrentTurn(turn)) return;
-      if (!base64Audio || base64Audio.length < 200) {
-        isProcessingRef.current = false;
-        setDynamicStatus(null);
-        void startListeningLoop();
-        return;
-      }
       retryAudioRef.current = base64Audio;
 
       // Send to backend /support/voice endpoint
       const cleanName = (userName || '').replace(/^(mr|mrs|ms|dr|rev|prof)\.?\s+/i, '').trim().split(' ')[0];
       const res = await apiClient.post('/support/voice', {
         audio_base64: base64Audio,
-        audio_mime_type: 'audio/m4a',
+        audio_mime_type: 'audio/wav',
         user_name: cleanName || userName,
         phone: phone || 'Anonymous',
         initial_context: initialContext,
         synthesize_audio: true,
         messages: messagesRef.current.slice(-12).map(({ role, content }) => ({ role, content })),
-      }, { signal: controller.signal });
+      }, { signal: controller.signal, timeout: VOICE_RECOGNITION_TIMEOUT_MS });
       if (!isCurrentTurn(turn)) return;
 
-      if (res.data?.error_code) throw new Error('Voice processing is unavailable');
+      const recognitionFailure = recognitionError(res.data);
+      if (recognitionFailure) {
+        isProcessingRef.current = false;
+        setDynamicStatus(null);
+        setVoiceState('idle');
+        setVoiceError(recognitionFailure);
+        return;
+      }
       // Clear the retry buffer before executing any action; never replay financial actions.
       retryAudioRef.current = null;
       const transcript = res.data?.transcript || '';
@@ -594,11 +594,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       const hasValidSpeech = !isInvalidTranscript(transcript);
 
       if (!hasValidSpeech) {
-        // Only ambient room silence or hallucinated timestamp was received; quietly continue listening
+        // Do not mistake an empty transcript for a successful conversation.
         isProcessingRef.current = false;
         setDynamicStatus(null);
-        setVoiceState('listening');
-        startListeningLoop();
+        setVoiceState('idle');
+        // A noise-only turn should not require the user to touch the screen.
+        void startListeningLoop();
         return;
       }
 
@@ -614,110 +615,105 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         onAddMessage(userMsg);
       }
 
-      // Execute detected voice action (e.g. create transaction or check balance)
+      // Execute detected voice action with parallel verbal bridge playback
       if (action && action.type === 'create_transaction' && action.payload) {
-        if (!reply || reply === "I'm listening, go ahead." || reply === "I heard you, there.") {
-          reply = pickDynamicBridge(EXPENSE_BRIDGES);
-        }
         setDynamicStatus('Recording expense…');
-        if (neuralAudioB64) {
-          await playBridgePhrase(reply, neuralAudioB64, turn);
-        }
+        const bridgePromise = neuralAudioB64 ? playBridgePhrase(reply, neuralAudioB64, turn) : Promise.resolve();
+        const actionPromise = handleExecuteVoiceTransaction(action.payload, turn);
+        const [_, outcomeText] = await Promise.all([bridgePromise, actionPromise]);
         if (!isCurrentTurn(turn)) return;
-        reply = await handleExecuteVoiceTransaction(action.payload, turn);
+        reply = outcomeText;
         neuralAudioB64 = null;
-        if (!isCurrentTurn(turn)) return;
       } else if (action && action.type === 'check_balance') {
-        if (!reply || reply === "I'm listening, go ahead." || reply === "I heard you, there.") {
-          reply = pickDynamicBridge(BALANCE_BRIDGES);
-        }
         setDynamicStatus('Checking your balances…');
-        if (neuralAudioB64) {
-          await playBridgePhrase(reply, neuralAudioB64, turn);
-        }
-        if (!isCurrentTurn(turn)) return;
-        setActionToast(null);
-        try {
-          const latestAccounts = await queryClient.fetchQuery<any[]>({
-            queryKey: ['accounts'],
-            queryFn: async () => {
-              const accountResponse = await apiClient.get('/accounts/');
-              return accountResponse.data;
-            },
-            staleTime: 0,
-            retry: false,
-          });
-          if (!isCurrentTurn(turn)) return;
-          if (!Array.isArray(latestAccounts)) throw new Error('Invalid accounts response');
-          const activeAccounts = latestAccounts.filter((account) => account.is_active !== false);
-          const totalBalance = activeAccounts.reduce((sum, account) => {
-            const rawBalance = account.balance;
-            const balance = Number(rawBalance);
-            if (
-              (typeof rawBalance !== 'number' && typeof rawBalance !== 'string') ||
-              (typeof rawBalance === 'string' && !rawBalance.trim()) ||
-              !Number.isFinite(balance)
-            ) throw new Error('Invalid account balance');
-            return sum + balance;
-          }, 0);
-          if (!Number.isFinite(totalBalance)) throw new Error('Invalid total balance');
+        const bridgePromise = neuralAudioB64 ? playBridgePhrase(reply, neuralAudioB64, turn) : Promise.resolve();
+        const fetchPromise = (async () => {
+          setActionToast(null);
+          try {
+            const latestAccounts = await queryClient.fetchQuery<any[]>({
+              queryKey: ['accounts'],
+              queryFn: async () => {
+                const accountResponse = await apiClient.get('/accounts/');
+                return accountResponse.data;
+              },
+              staleTime: 0,
+              retry: false,
+            });
+            if (!Array.isArray(latestAccounts)) throw new Error('Invalid accounts response');
+            const activeAccounts = latestAccounts.filter((account) => account.is_active !== false);
+            const totalBalance = activeAccounts.reduce((sum, account) => {
+              const rawBalance = account.balance;
+              const balance = Number(rawBalance);
+              if (
+                (typeof rawBalance !== 'number' && typeof rawBalance !== 'string') ||
+                (typeof rawBalance === 'string' && !rawBalance.trim()) ||
+                !Number.isFinite(balance)
+              ) throw new Error('Invalid account balance');
+              return sum + balance;
+            }, 0);
+            if (!Number.isFinite(totalBalance)) throw new Error('Invalid total balance');
 
-          const walletCount = activeAccounts.length;
-          const walletLabel = walletCount === 1 ? 'wallet' : 'wallets';
-          const formattedBalance = formatGHS(totalBalance);
-          // Spell out the currency so speech engines don't read the cedi symbol as cents.
-          const spokenAmount = formattedBalance.replace(/[₵\s]/g, '').replace(/^-/, 'minus ');
-          reply = walletCount === 0
-            ? "You don't have any active wallets set up yet."
-            : `Your total tracked balance is ${spokenAmount} Ghana cedis across ${walletCount} active ${walletLabel}.`;
-        } catch {
-          reply = "I couldn't retrieve your balance right now. Please check your connection and try again.";
-        }
+            const walletCount = activeAccounts.length;
+            const walletLabel = walletCount === 1 ? 'wallet' : 'wallets';
+            const formattedBalance = formatGHS(totalBalance);
+            // Spell out the currency so speech engines don't read the cedi symbol as cents.
+            const spokenAmount = formattedBalance.replace(/[₵\s]/g, '').replace(/^-/, 'minus ');
+            return walletCount === 0
+              ? "You don't have any active wallets set up yet."
+              : `Your total tracked balance is ${spokenAmount} Ghana cedis across ${walletCount} active ${walletLabel}.`;
+          } catch {
+            return "I couldn't retrieve your balance right now. Please check your connection and try again.";
+          }
+        })();
+        const [_, balanceText] = await Promise.all([bridgePromise, fetchPromise]);
+        if (!isCurrentTurn(turn)) return;
+        reply = balanceText;
         neuralAudioB64 = null;
-        if (!isCurrentTurn(turn)) return;
       } else if (action && action.type === 'check_budget') {
-        if (!reply || reply === "I'm listening, go ahead." || reply === "I heard you, there.") {
-          reply = pickDynamicBridge(BUDGET_BRIDGES);
-        }
         setDynamicStatus('Checking your budgets…');
-        if (neuralAudioB64) {
-          await playBridgePhrase(reply, neuralAudioB64, turn);
-        }
-        if (!isCurrentTurn(turn)) return;
-        setActionToast(null);
-        try {
-          const latestBudgets = await queryClient.fetchQuery<any[]>({
-            queryKey: ['budgets', user?.id],
-            queryFn: async () => {
-              const res = await apiClient.get('/budgets/');
-              return res.data;
-            },
-            staleTime: 0,
-            retry: false,
-          });
-          if (!isCurrentTurn(turn)) return;
-          if (!Array.isArray(latestBudgets) || latestBudgets.length === 0) {
-            reply = "You don't have any budgets set for this month yet. You can set one up in the Budgets tab.";
-          } else {
+        const bridgePromise = neuralAudioB64 ? playBridgePhrase(reply, neuralAudioB64, turn) : Promise.resolve();
+        const budgetPromise = (async () => {
+          setActionToast(null);
+          try {
+            const latestBudgets = await queryClient.fetchQuery<any[]>({
+              queryKey: ['budgets', user?.id],
+              queryFn: async () => {
+                const res = await apiClient.get('/budgets/');
+                return res.data;
+              },
+              staleTime: 0,
+              retry: false,
+            });
+            if (!Array.isArray(latestBudgets) || latestBudgets.length === 0) {
+              return "You don't have any budgets set for this month yet. You can set one up in the Budgets tab.";
+            }
+            // Field names match BudgetResponse in cedismart-api/app/modules/budgets/schemas.py.
             const totals = latestBudgets.reduce(
-              (acc, curr) => ({
-                budgeted: acc.budgeted + Number(curr.amount_limit || curr.amount || 0),
-                spent: acc.spent + Number(curr.current_spend || curr.spent || 0),
-              }),
+              (acc, curr) => {
+                const budgeted = Number(curr.budgeted_amount);
+                const spent = Number(curr.spent_amount);
+                if (!Number.isFinite(budgeted) || !Number.isFinite(spent)) throw new Error('Invalid budget amounts');
+                return { budgeted: acc.budgeted + budgeted, spent: acc.spent + spent };
+              },
               { budgeted: 0, spent: 0 }
             );
-            const remaining = Math.max(0, totals.budgeted - totals.spent);
             const pct = totals.budgeted > 0 ? Math.round((totals.spent / totals.budgeted) * 100) : 0;
-            const spentSpoken = formatGHS(totals.spent).replace(/[₵\s]/g, '');
-            const budgetedSpoken = formatGHS(totals.budgeted).replace(/[₵\s]/g, '');
-            const remainingSpoken = formatGHS(remaining).replace(/[₵\s]/g, '');
-            reply = `You have spent ${spentSpoken} Ghana cedis out of your ${budgetedSpoken} budget, which is ${pct} percent. You have ${remainingSpoken} cedis remaining.`;
+            const toSpoken = (value: number) => formatGHS(value).replace(/[₵\s]/g, '');
+            const spentSpoken = toSpoken(totals.spent);
+            const budgetedSpoken = toSpoken(totals.budgeted);
+            if (totals.spent > totals.budgeted) {
+              return `You have spent ${spentSpoken} Ghana cedis against a ${budgetedSpoken} cedi budget this month. That is ${toSpoken(totals.spent - totals.budgeted)} cedis over.`;
+            } else {
+              return `You have spent ${spentSpoken} Ghana cedis of your ${budgetedSpoken} cedi budget this month, about ${pct} percent. ${toSpoken(totals.budgeted - totals.spent)} cedis remain.`;
+            }
+          } catch {
+            return "I couldn't retrieve your budget right now. Please check your connection and try again.";
           }
-        } catch {
-          reply = "I couldn't retrieve your budget right now. Please check your connection and try again.";
-        }
-        neuralAudioB64 = null;
+        })();
+        const [_, budgetText] = await Promise.all([bridgePromise, budgetPromise]);
         if (!isCurrentTurn(turn)) return;
+        reply = budgetText;
+        neuralAudioB64 = null;
       }
 
       if (!isCurrentTurn(turn)) return;
@@ -733,22 +729,17 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       // Generate speech only after any action result is known.
       if (!isCurrentTurn(turn)) return;
       if (!neuralAudioB64) {
-        setDynamicStatus('Getting answer ready…');
-        try {
-          const synthRes = await apiClient.post('/support/voice/synthesize', {
-            text: reply,
-            voice_name: 'Kore',
-          }, { timeout: 12000, signal: controller.signal });
-          neuralAudioB64 = synthRes.data?.audio_base64 || null;
-        } catch {
-          // The existing device-speech fallback below reads the same confirmed reply.
-        }
+        setDynamicStatus('Getting voice ready…');
+        neuralAudioB64 = await synthesizeReply(reply, controller.signal);
       }
 
       if (!isCurrentTurn(turn)) return;
       await playResponse(reply, neuralAudioB64, turn);
-    } catch (error) {
+    } catch (error: any) {
       if (!isCurrentTurn(turn) || controller.signal.aborted) return;
+      console.warn('[VoiceSupport] Recognition failed', {
+        status: error.response?.status, code: error.code, elapsedMs: Date.now() - requestStartedAt,
+      });
       isProcessingRef.current = false;
       setDynamicStatus(null);
       setVoiceState('idle');
@@ -772,8 +763,10 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     const controller = new AbortController();
     requestRef.current = controller;
     setVoiceError(null);
+    retryReplyRef.current = null;
+    retryAudioRef.current = null;
     await voiceService.stop();
-    await stopRecorder();
+    await stopMicrophone();
     if (!isCurrentTurn(turn)) return;
     setVoiceInputText('');
     setIsTypingInVoice(false);
@@ -812,17 +805,6 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
       const reply = chatRes.data?.response || "I'm listening, go ahead.";
 
-      // 3. Synthesize natural neural voice
-      let neuralAudioB64: string | null = null;
-      try {
-        const synthRes = await apiClient.post('/support/voice/synthesize', {
-          text: reply,
-          voice_name: 'Kore',
-        }, { signal: controller.signal, timeout: 8000 });
-        neuralAudioB64 = synthRes.data?.audio_base64 || null;
-      } catch {}
-
-      if (!isCurrentTurn(turn)) return;
       // 4. Add AI response to shared conversation thread
       const aiMsg: Message = {
         id: 'ai-' + Date.now(),
@@ -832,10 +814,14 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         actions: [],
       };
       onAddMessage(aiMsg);
+      setDynamicStatus('Getting voice ready…');
+      const neuralAudioB64 = await synthesizeReply(reply, controller.signal);
+      if (!isCurrentTurn(turn)) return;
       await playResponse(reply, neuralAudioB64, turn);
     } catch {
       if (!isCurrentTurn(turn) || controller.signal.aborted) return;
       isProcessingRef.current = false;
+      setDynamicStatus(null);
       setVoiceState('idle');
       setVoiceInputText(text);
       setAttachedImage(currentAttachment);
@@ -960,8 +946,6 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     Haptics.selectionAsync().catch(() => {});
     if (voiceState === 'speaking' || voiceState === 'thinking') {
       void interruptResponse();
-    } else if (voiceState === 'listening' && hasSpokenRef.current) {
-      void stopAndProcessAudio();
     } else if (voiceState === 'idle' && !isMuted) {
       void startListeningLoop();
     }
@@ -977,7 +961,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     mutedRef.current = next;
     setIsMuted(next);
     if (next) {
-      void stopRecorder();
+      void stopMicrophone();
       if (voiceStateRef.current === 'listening') setVoiceState('idle');
     } else {
       void startListeningLoop();
@@ -988,7 +972,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     typingRef.current = true;
     setIsTypingInVoice(true);
     setIsCompactView(true);
-    void stopRecorder();
+    void stopMicrophone();
     if (isProcessingRef.current) void interruptResponse();
   };
 
@@ -998,7 +982,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     : dynamicStatus ? `${dynamicStatus} · tap to cancel`
     : voiceState === 'thinking' ? 'Understanding · tap the orb to cancel'
     : isMuted ? 'Microphone muted'
-    : voiceState === 'listening' ? 'Listening'
+    : voiceState === 'listening' ? 'Listening · speak naturally'
     : 'Getting ready…';
 
   return (
@@ -1025,13 +1009,15 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
               <Text style={{ color: theme === 'dark' ? '#e1e3e0' : '#1c1b1f', flex: 1, fontSize: 13, lineHeight: 20 }}>{voiceError}</Text>
               <TouchableOpacity onPress={() => {
                 if (permissionDenied) { void Linking.openSettings(); return; }
+                if (retryReplyRef.current) { void retryNaturalVoice(); return; }
                 if (retryAudioRef.current) { void stopAndProcessAudio(retryAudioRef.current); return; }
                 setVoiceError(null);
                 mutedRef.current = false;
                 setIsMuted(false);
                 void startListeningLoop();
-              }} style={styles.transcriptToggle} accessibilityRole="button" accessibilityLabel={permissionDenied ? 'Open microphone settings' : retryAudioRef.current ? 'Retry voice request' : 'Retry microphone'}>
+              }} style={[styles.transcriptToggle, retryReplyRef.current ? { width: 76, height: 52 } : undefined]} accessibilityRole="button" accessibilityLabel={permissionDenied ? 'Open microphone settings' : retryReplyRef.current ? 'Retry voice' : retryAudioRef.current ? 'Retry voice request' : 'Retry microphone'}>
                 <RefreshCw size={20} color={theme === 'dark' ? '#4ade80' : '#0d631b'} />
+                {retryReplyRef.current && <Text style={{ color: theme === 'dark' ? '#4ade80' : '#0d631b', fontSize: 12 }}>Retry voice</Text>}
               </TouchableOpacity>
             </View>
           )}
@@ -1044,7 +1030,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                 activeOpacity={0.9}
                 onPress={handleOrbPress}
                 accessibilityRole="button"
-                accessibilityLabel={voiceState === 'speaking' ? 'Interrupt response' : voiceState === 'thinking' ? 'Cancel response' : 'Send current speech'}
+                accessibilityLabel={voiceState === 'speaking' ? 'Interrupt response' : voiceState === 'thinking' ? 'Cancel response' : 'Listening automatically'}
               >
                 <VoiceOrb state={voiceState} audioLevel={audioLevel} size={210} />
               </TouchableOpacity>
@@ -1086,7 +1072,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                   activeOpacity={0.88}
                   onPress={handleOrbPress}
                   accessibilityRole="button"
-                  accessibilityLabel={voiceState === 'speaking' ? 'Interrupt response' : 'Send current speech'}
+                  accessibilityLabel={voiceState === 'speaking' ? 'Interrupt response' : voiceState === 'thinking' ? 'Cancel response' : 'Listening automatically'}
                 >
                   <VoiceOrb state={voiceState} audioLevel={audioLevel} size={64} />
                 </TouchableOpacity>

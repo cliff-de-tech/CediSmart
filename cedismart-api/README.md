@@ -313,8 +313,8 @@ Every error returns a consistent JSON structure:
 | **Support** | POST | `/api/v1/support/chat` | Multimodal AI support chat with X-Ray diagnostics & SMS rescue |
 | **Support** | POST | `/api/v1/support/voice` | Multimodal voice understanding, intent extraction & verbal bridging |
 | **Support** | POST | `/api/v1/support/voice/synthesize` | Gemini Neural TTS voice synthesizer (`Kore` prebuilt voice) |
-| **Support** | POST | `/api/v1/support/report-ticket` | Customer problem reporting & GitHub auto-PR issue creation |
-| **Support** | GET | `/api/v1/support/tickets/{issue_number}` | Real-time 4-stage ticket tracking |
+| **Support** | POST | `/api/v1/support/escalate` | Customer problem reporting & GitHub auto-PR issue creation |
+| **Support** | GET | `/api/v1/support/ticket-status/{issue_number}` | Real-time 4-stage ticket tracking |
 | **Support** | POST | `/api/v1/support/feedback` | In-app user feedback dispatch to Discord |
 
 ---
