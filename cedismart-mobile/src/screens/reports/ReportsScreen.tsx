@@ -275,8 +275,8 @@ const ReportsScreen = () => {
                       xAxisThickness={0}
                       yAxisLabelWidth={38}
                       hideRules
-                      xAxisLabelTextStyle={{ color: isDark ? '#9CA3AF' : '#6B7280', fontSize: 10 }}
-                      yAxisTextStyle={{ color: isDark ? '#9CA3AF' : '#707a6c', fontSize: 10 }}
+                      xAxisLabelTextStyle={{ color: isDark ? '#e1e3e0' : '#1c221e', fontSize: 10, fontWeight: '600' }}
+                      yAxisTextStyle={{ color: isDark ? '#c4cec6' : '#40493d', fontSize: 10, fontWeight: '600' }}
                       isAnimated
                     />
                   </View>
@@ -321,8 +321,8 @@ const ReportsScreen = () => {
                       areaChart
                       curved
                       isAnimated
-                      xAxisLabelTextStyle={{ color: isDark ? '#9CA3AF' : '#6B7280', fontSize: 10, width: 32, textAlign: 'center' }}
-                      yAxisTextStyle={{ color: isDark ? '#9CA3AF' : '#707a6c', fontSize: 10 }}
+                      xAxisLabelTextStyle={{ color: isDark ? '#e1e3e0' : '#1c221e', fontSize: 10, fontWeight: '600', width: 34, textAlign: 'center' }}
+                      yAxisTextStyle={{ color: isDark ? '#c4cec6' : '#40493d', fontSize: 10, fontWeight: '600' }}
                     />
                   </View>
                 ) : (

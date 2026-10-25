@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback, useState } from 'react';
 import { GlassSheetBackground } from '../glass/GlassSheetBackground';
-import { GlassSurface } from '../glass/GlassSurface';
 import { View, Text, TouchableOpacity, ActivityIndicator, TextInput, Alert } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -143,7 +142,17 @@ const AccountPicker: React.FC<AccountPickerProps> = ({ bottomSheetRef, onSelect 
         </View>
 
         {showQuickCreate && (
-          <GlassSurface radius={22} style={{ padding: 16, marginBottom: 16 }}>
+          <View
+            style={{
+              padding: 16,
+              marginBottom: 16,
+              borderRadius: 22,
+              borderWidth: 1,
+              backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.03)',
+              borderColor: isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.06)',
+              overflow: 'hidden',
+            }}
+          >
             <Text className={`font-bold text-sm mb-3 ${isDark ? 'text-white' : 'text-charcoal'}`}>
               Add Tracked Account (Preserves Draft)
             </Text>
@@ -223,7 +232,7 @@ const AccountPicker: React.FC<AccountPickerProps> = ({ bottomSheetRef, onSelect 
                 </>
               )}
             </TouchableOpacity>
-          </GlassSurface>
+          </View>
         )}
 
         {isLoading ? (
@@ -235,7 +244,16 @@ const AccountPicker: React.FC<AccountPickerProps> = ({ bottomSheetRef, onSelect 
             renderItem={({ item }) => {
               const IconComp = getAccountIcon(item.account_type);
               return (
-                <GlassSurface variant="clear" radius={18} style={{ marginBottom: 10 }}>
+                <View
+                  style={{
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    marginBottom: 10,
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.03)',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.09)' : 'rgba(0, 0, 0, 0.06)',
+                    overflow: 'hidden',
+                  }}
+                >
                   <TouchableOpacity
                     onPress={() => handleSelect(item.id, item.name)}
                     className="flex-row items-center p-4"
@@ -267,7 +285,7 @@ const AccountPicker: React.FC<AccountPickerProps> = ({ bottomSheetRef, onSelect 
                       {formatGHS(item.balance || 0)}
                     </Text>
                   </TouchableOpacity>
-                </GlassSurface>
+                </View>
               );
             }}
             contentContainerStyle={{ paddingBottom: 40 }}

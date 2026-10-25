@@ -3,7 +3,7 @@ import { GlassSheetBackground } from '../../components/glass/GlassSheetBackgroun
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
-import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image, Dimensions, Linking, Alert, TextInput, Modal, RefreshControl, Keyboard, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image, Dimensions, Linking, Alert, TextInput, Modal, RefreshControl, Keyboard, TouchableWithoutFeedback, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -708,7 +708,15 @@ const DashboardScreen = ({ navigation }: any) => {
   const transactions = transactionsData?.data || [];
 
   const renderTransactionItem = ({ item }: { item: Transaction }) => (
-    <GlassSurface radius={24} style={{ marginBottom: 12 }}>
+    <View
+      style={[
+        styles.transactionItemCard,
+        {
+          backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+          borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+        },
+      ]}
+    >
       <TouchableOpacity
         onPress={() => openTransactionDetail(item)}
         className="flex-row items-center justify-between p-4 active:opacity-80"
@@ -737,7 +745,7 @@ const DashboardScreen = ({ navigation }: any) => {
           <Text className={`text-[9px] mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Tap to edit</Text>
         </View>
       </TouchableOpacity>
-    </GlassSurface>
+    </View>
   );
 
   const BudgetCard = ({ item }: { item: Budget }) => (
@@ -1192,7 +1200,16 @@ const DashboardScreen = ({ navigation }: any) => {
                   )
                 },
               ].map((op, idx) => (
-                <GlassSurface key={idx} radius={22} style={{ marginBottom: 12 }}>
+                <View
+                  key={idx}
+                  style={[
+                    styles.sheetSolidCard,
+                    {
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.03)',
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.09)' : 'rgba(0, 0, 0, 0.06)',
+                    },
+                  ]}
+                >
                   <TouchableOpacity 
                     onPress={async () => {
                       const dialUrl = `tel:${op.code.replace('#', '%23')}`;
@@ -1218,7 +1235,7 @@ const DashboardScreen = ({ navigation }: any) => {
                       <Text className={`${isDark ? 'text-gray-300' : 'text-gray-500'} text-xs leading-relaxed`}>{op.desc}</Text>
                     </View>
                   </TouchableOpacity>
-                </GlassSurface>
+                </View>
               ))}
             </View>
           </View>
@@ -1244,7 +1261,7 @@ const DashboardScreen = ({ navigation }: any) => {
             </View>
 
             {/* Profile Avatar Card */}
-            <GlassSurface radius={26} style={{ width: '100%', marginBottom: 20 }}>
+            <GlassSurface solidFallback radius={26} style={{ width: '100%', marginBottom: 20 }}>
               <View className="p-6 items-center">
                 <TouchableOpacity onPress={handleAvatarPress} className="relative mb-4">
                   <View className={`w-20 h-20 rounded-full bg-primary-container overflow-hidden border-2 ${isDark ? 'border-[#4ade80]/40' : 'border-primary/20'}`}>
@@ -1311,7 +1328,7 @@ const DashboardScreen = ({ navigation }: any) => {
             </GlassSurface>
 
             {/* Benefits Info */}
-            <GlassSurface radius={22} style={{ width: '100%', marginBottom: 20 }}>
+            <GlassSurface solidFallback radius={22} style={{ width: '100%', marginBottom: 20 }}>
               <View className="p-5">
                 <Text className={`font-label text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} mb-2`}>Member Privileges</Text>
                 <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} font-body text-xs leading-relaxed`}>
@@ -1333,7 +1350,7 @@ const DashboardScreen = ({ navigation }: any) => {
             </GlassSurface>
 
             {/* Quick AI Support Card */}
-            <GlassSurface radius={22} style={{ width: '100%', marginBottom: 20 }}>
+            <GlassSurface solidFallback radius={22} style={{ width: '100%', marginBottom: 20 }}>
               <TouchableOpacity
                 onPress={() => {
                   profileSheetRef.current?.close();
@@ -1364,7 +1381,7 @@ const DashboardScreen = ({ navigation }: any) => {
                 {savedAccounts
                   .filter((acc) => acc.phone !== user?.phone)
                   .map((acc) => (
-                    <GlassSurface key={acc.phone} radius={20} style={{ marginBottom: 8 }}>
+                    <GlassSurface solidFallback key={acc.phone} radius={20} style={{ marginBottom: 8 }}>
                       <View className="flex-row items-center justify-between p-4">
                         <View className="flex-row items-center flex-1 mr-3">
                           <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center mr-3 overflow-hidden">
@@ -2062,5 +2079,25 @@ const DashboardScreen = ({ navigation }: any) => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  transactionItemCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    marginBottom: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  sheetSolidCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+});
 
 export default DashboardScreen;

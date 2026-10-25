@@ -4,7 +4,7 @@ import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl, StyleSheet } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { PieChart, Plus, ChevronDown, Tag, Trash2, Headphones } from 'lucide-react-native';
@@ -212,7 +212,15 @@ const BudgetsScreen = () => {
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
-              <GlassSurface radius={22} elevated style={{ marginBottom: 14 }}>
+              <View
+                style={[
+                  styles.budgetCard,
+                  {
+                    backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                    borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                  },
+                ]}
+              >
                 <View className="p-5">
                   <View className="flex-row justify-between items-start mb-4">
                     <View className="flex-row items-center flex-1">
@@ -265,7 +273,7 @@ const BudgetsScreen = () => {
                     />
                   </View>
                 </View>
-              </GlassSurface>
+              </View>
             )}
             ListEmptyComponent={
               <GlassSurface radius={26} style={{ marginTop: 12 }}>
@@ -312,7 +320,15 @@ const BudgetsScreen = () => {
               {/* Category Picker Trigger */}
               <View>
                 <Text className={`text-sm font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Spending Category</Text>
-                <GlassSurface variant="clear" radius={20}>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                    },
+                  ]}
+                >
                   <TouchableOpacity 
                     onPress={() => categoryPickerRef.current?.snapToIndex(0)}
                     className="flex-row items-center justify-between p-5"
@@ -322,13 +338,21 @@ const BudgetsScreen = () => {
                     </Text>
                     <ChevronDown color={theme === 'dark' ? '#9ca3af' : '#6b7280'} size={20} />
                   </TouchableOpacity>
-                </GlassSurface>
+                </View>
               </View>
 
               {/* Amount Input */}
               <View className="mt-4">
                 <Text className={`text-sm font-semibold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2 ml-1`}>Monthly Limit (₵)</Text>
-                <GlassSurface variant="clear" radius={20}>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    {
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+                    },
+                  ]}
+                >
                   <View className="flex-row items-center p-5">
                     <Text className={`text-xl font-bold ${isDark ? 'text-[#4ade80]' : 'text-primary'} mr-2`}>₵</Text>
                     <TextInput
@@ -340,7 +364,7 @@ const BudgetsScreen = () => {
                       onChangeText={setAmount}
                     />
                   </View>
-                </GlassSurface>
+                </View>
               </View>
 
               {/* Alert Threshold */}
@@ -411,5 +435,24 @@ const BudgetsScreen = () => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  budgetCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    marginBottom: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  inputContainer: {
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+});
 
 export default BudgetsScreen;

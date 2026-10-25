@@ -3,7 +3,7 @@ import { GlassSheetBackground } from '../../components/glass/GlassSheetBackgroun
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
-import { View, Text, TouchableOpacity, ScrollView, Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator, Dimensions, StyleSheet } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -42,21 +42,47 @@ const normalizePhoneNumber = (phone: string): string => {
   return `+233${clean}`;
 };
 
-const SettingItem = ({ icon: Icon, title, value, onPress, color, children, hideChevron, rightElement }: any) => {
+const SettingsGroup = ({ children, style }: { children: React.ReactNode; style?: any }) => {
+  const isDark = useThemeStore((state) => state.theme) === 'dark';
+  return (
+    <View
+      style={[
+        {
+          borderRadius: 24,
+          borderWidth: 1,
+          borderColor: isDark ? 'rgba(164, 243, 185, 0.12)' : 'rgba(0, 0, 0, 0.07)',
+          backgroundColor: isDark ? 'rgba(20, 30, 24, 0.88)' : 'rgba(255, 255, 255, 0.95)',
+          overflow: 'hidden',
+          marginBottom: 16,
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: isDark ? 0.2 : 0.06,
+          shadowRadius: 10,
+          elevation: 2,
+        },
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  );
+};
+
+const SettingItem = ({ icon: Icon, title, value, onPress, color, children, hideChevron, rightElement, isLast = false }: any) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const iconColor = color || (isDark ? '#e1e3e0' : '#1C1C2E');
   return (
-    <GlassSurface radius={22} style={{ marginBottom: 10 }}>
+    <View>
       <TouchableOpacity 
         onPress={onPress}
         disabled={!onPress}
-        activeOpacity={0.8}
+        activeOpacity={0.7}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 18,
-          paddingVertical: 16,
+          paddingVertical: 15,
           width: '100%',
         }}
       >
@@ -96,7 +122,16 @@ const SettingItem = ({ icon: Icon, title, value, onPress, color, children, hideC
           )
         )}
       </TouchableOpacity>
-    </GlassSurface>
+      {!isLast && (
+        <View
+          style={{
+            height: StyleSheet.hairlineWidth || 1,
+            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+            marginLeft: 72,
+          }}
+        />
+      )}
+    </View>
   );
 };
 
@@ -1412,117 +1447,126 @@ const SettingsScreen = ({ navigation, route }: any) => {
           <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-8`}>Settings</Text>
 
           {/* Profile Section */}
-          <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Profile</Text>
-          <SettingItem 
-            icon={User} 
-            title="Full Name" 
-            onPress={() => setIsEditingName(true)}
-          >
-            {isEditingName ? (
-              <TextInput 
-                className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base py-1 border-b border-primary/20`}
-                value={newName}
-                onChangeText={setNewName}
-                autoFocus
-                onBlur={saveName}
-                onSubmitEditing={saveName}
-                returnKeyType="done"
-              />
-            ) : (
-              <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>{user?.full_name || 'Set Name'}</Text>
-            )}
-          </SettingItem>
-          <SettingItem icon={Smartphone} title="Phone Number" value={user?.phone} />
-          <SettingItem 
-            icon={ShieldCheck} 
-            title="Identity Verification" 
-            onPress={() => {
-              if (isKycVerified) {
-                Alert.alert(
-                  'Identity Verified',
-                  `Your account is linked to your Ghana Card (${ghanaCardNumber}) and verified for Tier 1 transaction limits.`
-                );
-              } else {
-                kycSheetRef.current?.snapToIndex(0);
-              }
-            }}
-            color={isKycVerified ? "#16a34a" : undefined}
-          >
-            <Text className={`font-bold text-base ${isKycVerified ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-              {isKycVerified ? `Verified (Tier 1)` : 'Unverified (Tap to verify)'}
-            </Text>
-          </SettingItem>
-          <SettingItem 
-            icon={Users} 
-            title="Switch Profile" 
-            onPress={() => switchSheetRef.current?.snapToIndex(0)} 
-          >
-            <Text className={`font-bold text-base ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-              {savedAccounts.length > 1 ? `${savedAccounts.length} Profiles` : 'Manage'}
-            </Text>
-          </SettingItem>
-
-          {/* Tracked Financial Accounts Section */}
-          <View className="mt-6">
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Tracked Accounts & MoMo</Text>
+          <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Profile</Text>
+          <SettingsGroup>
             <SettingItem 
-              icon={Landmark} 
-              title="Cash, MoMo & Bank Accounts" 
-              onPress={() => navigation.navigate('Accounts')} 
+              icon={User} 
+              title="Full Name" 
+              onPress={() => setIsEditingName(true)}
             >
-              <Text className={`font-bold text-base ${isLinked ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-                {isLinked ? 'Manage' : 'Add Account'}
+              {isEditingName ? (
+                <TextInput 
+                  className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base py-1 border-b border-primary/20`}
+                  value={newName}
+                  onChangeText={setNewName}
+                  autoFocus
+                  onBlur={saveName}
+                  onSubmitEditing={saveName}
+                  returnKeyType="done"
+                />
+              ) : (
+                <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>{user?.full_name || 'Set Name'}</Text>
+              )}
+            </SettingItem>
+            <SettingItem icon={Smartphone} title="Phone Number" value={user?.phone} />
+            <SettingItem 
+              icon={ShieldCheck} 
+              title="Identity Verification" 
+              onPress={() => {
+                if (isKycVerified) {
+                  Alert.alert(
+                    'Identity Verified',
+                    `Your account is linked to your Ghana Card (${ghanaCardNumber}) and verified for Tier 1 transaction limits.`
+                  );
+                } else {
+                  kycSheetRef.current?.snapToIndex(0);
+                }
+              }}
+              color={isKycVerified ? "#16a34a" : undefined}
+            >
+              <Text className={`font-bold text-base ${isKycVerified ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                {isKycVerified ? `Verified (Tier 1)` : 'Unverified (Tap to verify)'}
               </Text>
             </SettingItem>
+            <SettingItem 
+              icon={Users} 
+              title="Switch Profile" 
+              onPress={() => switchSheetRef.current?.snapToIndex(0)} 
+              isLast
+            >
+              <Text className={`font-bold text-base ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                {savedAccounts.length > 1 ? `${savedAccounts.length} Profiles` : 'Manage'}
+              </Text>
+            </SettingItem>
+          </SettingsGroup>
+
+          {/* Tracked Financial Accounts Section */}
+          <View className="mt-4">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Tracked Accounts & MoMo</Text>
+            <SettingsGroup>
+              <SettingItem 
+                icon={Landmark} 
+                title="Cash, MoMo & Bank Accounts" 
+                onPress={() => navigation.navigate('Accounts')} 
+                isLast
+              >
+                <Text className={`font-bold text-base ${isLinked ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                  {isLinked ? 'Manage' : 'Add Account'}
+                </Text>
+              </SettingItem>
+            </SettingsGroup>
           </View>
 
           {/* Membership Section */}
-          <View className="mt-6">
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Membership</Text>
-            <SettingItem 
-              icon={Award} 
-              title="Premium Level" 
-              onPress={() => {
-                if (user?.is_premium) {
-                  Alert.alert(
-                    'CediSmart Pro',
-                    'You are a Pro member! Enjoy unlimited vaults, CSV exports, and priority offline syncing.',
-                    [{ text: 'Great!' }]
-                  );
-                } else if (effectiveTrialActive) {
-                  Alert.alert(
-                    'Free Trial Active',
-                    `You are currently enjoying CediSmart Pro for free! You have ${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left. Would you like to subscribe to a paid plan now to avoid interruption?`,
-                    [
-                      { text: 'Later', style: 'cancel' },
-                      { text: 'View Plans', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
-                    ]
-                  );
-                } else if (!user?.trial_started_at) {
-                  Alert.alert(
-                    'Start Free Trial',
-                    'Activate your 7-day free trial of CediSmart Pro now to enjoy automatic syncing and unlimited features.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Start Trial Now', onPress: handleStartTrial }
-                    ]
-                  );
-                } else {
-                  pricingSheetRef.current?.snapToIndex(0);
-                }
-              }}
-              color={user?.is_premium || effectiveTrialActive ? "#4c56af" : undefined}
-            >
-              <Text className={`font-bold text-base ${(user?.is_premium || effectiveTrialActive) ? (isDark ? 'text-indigo-400' : 'text-secondary') : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-                {user?.is_premium 
-                  ? 'CediSmart Pro' 
-                  : effectiveTrialActive 
-                  ? `Free Trial (${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left)`
-                  : !user?.trial_started_at
-                  ? 'Free Tier (Redeem Trial)'
-                  : 'Free Tier (Tap to upgrade)'}
-              </Text>
-            </SettingItem>
+          <View className="mt-4">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Membership</Text>
+            <SettingsGroup>
+              <SettingItem 
+                icon={Award} 
+                title="Premium Level" 
+                onPress={() => {
+                  if (user?.is_premium) {
+                    Alert.alert(
+                      'CediSmart Pro',
+                      'You are a Pro member! Enjoy unlimited vaults, CSV exports, and priority offline syncing.',
+                      [{ text: 'Great!' }]
+                    );
+                  } else if (effectiveTrialActive) {
+                    Alert.alert(
+                      'Free Trial Active',
+                      `You are currently enjoying CediSmart Pro for free! You have ${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left. Would you like to subscribe to a paid plan now to avoid interruption?`,
+                      [
+                        { text: 'Later', style: 'cancel' },
+                        { text: 'View Plans', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
+                      ]
+                    );
+                  } else if (!user?.trial_started_at) {
+                    Alert.alert(
+                      'Start Free Trial',
+                      'Activate your 7-day free trial of CediSmart Pro now to enjoy automatic syncing and unlimited features.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Start Trial Now', onPress: handleStartTrial }
+                      ]
+                    );
+                  } else {
+                    pricingSheetRef.current?.snapToIndex(0);
+                  }
+                }}
+                color={user?.is_premium || effectiveTrialActive ? "#4c56af" : undefined}
+                isLast
+              >
+                <Text className={`font-bold text-base ${(user?.is_premium || effectiveTrialActive) ? (isDark ? 'text-indigo-400' : 'text-secondary') : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                  {user?.is_premium 
+                    ? 'CediSmart Pro' 
+                    : effectiveTrialActive 
+                    ? `Free Trial (${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left)`
+                    : !user?.trial_started_at
+                    ? 'Free Tier (Redeem Trial)'
+                    : 'Free Tier (Tap to upgrade)'}
+                </Text>
+              </SettingItem>
+            </SettingsGroup>
             
             {/* Conditional Cancel Option */}
             {(user?.is_premium || effectiveTrialActive) && (
@@ -1543,226 +1587,244 @@ const SettingsScreen = ({ navigation, route }: any) => {
           </View>
 
           {/* Appearance Section */}
-          <View className="mt-6">
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Appearance</Text>
-            <SettingItem 
-              icon={Moon} 
-              title="Dark Theme" 
-              value="Always use dark appearance"
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setThemeMode(themeMode === 'dark' ? 'none' : 'dark');
-              }}
-              hideChevron
-              rightElement={
-                <View
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
-                    borderWidth: 2,
-                    borderColor: themeMode === 'dark' ? (isDark ? '#4ade80' : '#0d631b') : (isDark ? '#4B5563' : '#9CA3AF'),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'transparent',
-                  }}
-                >
-                  {themeMode === 'dark' && (
-                    <View
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 5,
-                        backgroundColor: isDark ? '#4ade80' : '#0d631b',
-                      }}
-                    />
-                  )}
-                </View>
-              }
-            />
-            <SettingItem 
-              icon={Smartphone} 
-              title="Device Theme" 
-              value="Match system appearance"
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setThemeMode(themeMode === 'system' ? 'none' : 'system');
-              }}
-              hideChevron
-              rightElement={
-                <View
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 11,
-                    borderWidth: 2,
-                    borderColor: themeMode === 'system' ? (isDark ? '#4ade80' : '#0d631b') : (isDark ? '#4B5563' : '#9CA3AF'),
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: 'transparent',
-                  }}
-                >
-                  {themeMode === 'system' && (
-                    <View
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: 5,
-                        backgroundColor: isDark ? '#4ade80' : '#0d631b',
-                      }}
-                    />
-                  )}
-                </View>
-              }
-            />
+          <View className="mt-4">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Appearance</Text>
+            <SettingsGroup>
+              <SettingItem 
+                icon={Moon} 
+                title="Dark Theme" 
+                value="Always use dark appearance"
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setThemeMode(themeMode === 'dark' ? 'none' : 'dark');
+                }}
+                hideChevron
+                rightElement={
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      borderWidth: 2,
+                      borderColor: themeMode === 'dark' ? (isDark ? '#4ade80' : '#0d631b') : (isDark ? '#4B5563' : '#9CA3AF'),
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'transparent',
+                    }}
+                  >
+                    {themeMode === 'dark' && (
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: isDark ? '#4ade80' : '#0d631b',
+                        }}
+                      />
+                    )}
+                  </View>
+                }
+              />
+              <SettingItem 
+                icon={Smartphone} 
+                title="Device Theme" 
+                value="Match system appearance"
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setThemeMode(themeMode === 'system' ? 'none' : 'system');
+                }}
+                hideChevron
+                rightElement={
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      borderWidth: 2,
+                      borderColor: themeMode === 'system' ? (isDark ? '#4ade80' : '#0d631b') : (isDark ? '#4B5563' : '#9CA3AF'),
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'transparent',
+                    }}
+                  >
+                    {themeMode === 'system' && (
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: isDark ? '#4ade80' : '#0d631b',
+                        }}
+                      />
+                    )}
+                  </View>
+                }
+                isLast
+              />
+            </SettingsGroup>
           </View>
 
           {/* Security Section */}
-          <View className="mt-6">
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Security</Text>
-            <SettingItem 
-              icon={Shield} 
-              title="Biometric Login" 
-              value={isBiometricSupported ? 'Use FaceID / Fingerprint' : 'Not supported'}
-              onPress={() => isBiometricSupported && handleBiometricToggle(!isBiometricEnabled)}
-              hideChevron
-              rightElement={
-                isBiometricSupported ? (
-                  <Switch 
-                    value={isBiometricEnabled} 
-                    onValueChange={handleBiometricToggle}
-                    trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
-                  />
-                ) : undefined
-              }
-            />
-            <SettingItem 
-              icon={Shield} 
-              title="Security PIN" 
-              value="Change 6-digit PIN" 
-              onPress={() => pinSheetRef.current?.snapToIndex(0)}
-            />
-            <SettingItem 
-              icon={Shield} 
-              title="Auto-Lock Setting" 
-              value={getAutoLockLabel(appLockSetting)} 
-              onPress={handleAutoLockChange}
-            />
+          <View className="mt-4">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Security</Text>
+            <SettingsGroup>
+              <SettingItem 
+                icon={Shield} 
+                title="Biometric Login" 
+                value={isBiometricSupported ? 'Use FaceID / Fingerprint' : 'Not supported'}
+                onPress={() => isBiometricSupported && handleBiometricToggle(!isBiometricEnabled)}
+                hideChevron
+                rightElement={
+                  isBiometricSupported ? (
+                    <Switch 
+                      value={isBiometricEnabled} 
+                      onValueChange={handleBiometricToggle}
+                      trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
+                    />
+                  ) : undefined
+                }
+              />
+              <SettingItem 
+                icon={Shield} 
+                title="Security PIN" 
+                value="Change 6-digit PIN" 
+                onPress={() => pinSheetRef.current?.snapToIndex(0)}
+              />
+              <SettingItem 
+                icon={Shield} 
+                title="Auto-Lock Setting" 
+                value={getAutoLockLabel(appLockSetting)} 
+                onPress={handleAutoLockChange}
+                isLast
+              />
+            </SettingsGroup>
           </View>
 
           {/* Notifications Section */}
-          <View className="mt-6">
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Notifications</Text>
-            <SettingItem
-              icon={Bell}
-              title="SMS Alert Reminders"
-              value="Weekly SMS summaries"
-              onPress={() => handleSmsAlertsToggle(!smsAlerts)}
-              hideChevron
-              rightElement={
-                <Switch 
-                  value={smsAlerts} 
-                  onValueChange={handleSmsAlertsToggle}
-                  trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
-                />
-              }
-            />
-            <SettingItem
-              icon={Bell}
-              title="Budget Alert Notifications"
-              value="Send notification at limit"
-              onPress={() => handleBudgetAlertsToggle(!budgetAlerts)}
-              hideChevron
-              rightElement={
-                <Switch 
-                  value={budgetAlerts} 
-                  onValueChange={handleBudgetAlertsToggle}
-                  trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
-                />
-              }
-            />
-            {budgetAlerts && (
-              <SettingItem 
-                icon={Bell} 
-                title="Budget Warning Threshold" 
-                value={`${Math.round(budgetThreshold * 100)}% limit`} 
-                onPress={handleBudgetThresholdChange}
+          <View className="mt-4">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Notifications</Text>
+            <SettingsGroup>
+              <SettingItem
+                icon={Bell}
+                title="SMS Alert Reminders"
+                value="Weekly SMS summaries"
+                onPress={() => handleSmsAlertsToggle(!smsAlerts)}
+                hideChevron
+                rightElement={
+                  <Switch 
+                    value={smsAlerts} 
+                    onValueChange={handleSmsAlertsToggle}
+                    trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
+                  />
+                }
+                isLast={!budgetAlerts && !smsAlerts}
               />
-            )}
+              <SettingItem
+                icon={Bell}
+                title="Budget Alert Notifications"
+                value="Send notification at limit"
+                onPress={() => handleBudgetAlertsToggle(!budgetAlerts)}
+                hideChevron
+                rightElement={
+                  <Switch 
+                    value={budgetAlerts} 
+                    onValueChange={handleBudgetAlertsToggle}
+                    trackColor={{ false: theme === 'dark' ? '#374151' : '#D1D5DB', true: '#0d631b' }}
+                  />
+                }
+                isLast={!budgetAlerts}
+              />
+              {budgetAlerts && (
+                <SettingItem 
+                  icon={Bell} 
+                  title="Budget Warning Threshold" 
+                  value={`${Math.round(budgetThreshold * 100)}% limit`} 
+                  onPress={handleBudgetThresholdChange}
+                  isLast
+                />
+              )}
+            </SettingsGroup>
           </View>
 
           {/* Data Section */}
-          <View className="mt-6">
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Data & Storage</Text>
-            <SettingItem 
-              icon={Database} 
-              title="Offline Queue" 
-              value={`${queue.length} pending items`}
-              onPress={() => offlineQueueSheetRef.current?.snapToIndex(0)}
-            />
-            <SettingItem 
-              icon={isExporting ? ActivityIndicator : FileSpreadsheet} 
-              title="Export History" 
-              value={isExporting ? "Exporting data..." : "Export to CSV"} 
-              onPress={isExporting ? undefined : handleExportHistory}
-            />
-            <SettingItem 
-              icon={Smartphone} 
-              title="Premium App Icon" 
-              value={currentAppIcon}
-              onPress={() => {
-                if (user?.has_premium_access) {
-                  appIconSheetRef.current?.snapToIndex(0);
-                } else {
-                  Alert.alert(
-                    'CediSmart Pro Feature',
-                    'Custom App Icons are a premium feature. Upgrade to Pro to customize your home screen!',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      { text: 'Upgrade to Pro', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
-                    ]
-                  );
-                }
-              }}
-              color={user?.has_premium_access ? "#4c56af" : undefined}
-            />
+          <View className="mt-4">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Data & Storage</Text>
+            <SettingsGroup>
+              <SettingItem 
+                icon={Database} 
+                title="Offline Queue" 
+                value={`${queue.length} pending items`}
+                onPress={() => offlineQueueSheetRef.current?.snapToIndex(0)}
+              />
+              <SettingItem 
+                icon={isExporting ? ActivityIndicator : FileSpreadsheet} 
+                title="Export History" 
+                value={isExporting ? "Exporting data..." : "Export to CSV"} 
+                onPress={isExporting ? undefined : handleExportHistory}
+              />
+              <SettingItem 
+                icon={Smartphone} 
+                title="Premium App Icon" 
+                value={currentAppIcon}
+                onPress={() => {
+                  if (user?.has_premium_access) {
+                    appIconSheetRef.current?.snapToIndex(0);
+                  } else {
+                    Alert.alert(
+                      'CediSmart Pro Feature',
+                      'Custom App Icons are a premium feature. Upgrade to Pro to customize your home screen!',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Upgrade to Pro', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
+                      ]
+                    );
+                  }
+                }}
+                color={user?.has_premium_access ? "#4c56af" : undefined}
+                isLast
+              />
+            </SettingsGroup>
           </View>
 
           {/* Support Section */}
-          <View className="mt-6">
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-4 ml-1`}>Support</Text>
-            <SettingItem 
-              icon={Bug} 
-              title="Report a Bug" 
-              value="Submit issues to developers" 
-              onPress={() => setIsBugModalVisible(true)}
-            />
-            <SettingItem 
-              icon={Headphones} 
-              color={isDark ? '#4ade80' : '#0d631b'}
-              title="AI Support Assistant" 
-              value="Chat with CediSmart AI helper" 
-              onPress={() => setIsSupportModalVisible(true)}
-            />
-            <SettingItem 
-              icon={MessageSquare} 
-              title="Share Feedback" 
-              value="Suggest features or send reviews" 
-              onPress={() => setIsFeedbackModalVisible(true)}
-            />
+          <View className="mt-4">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Support</Text>
+            <SettingsGroup>
+              <SettingItem 
+                icon={Bug} 
+                title="Report a Bug" 
+                value="Submit issues to developers" 
+                onPress={() => setIsBugModalVisible(true)}
+              />
+              <SettingItem 
+                icon={Headphones} 
+                color={isDark ? '#4ade80' : '#0d631b'}
+                title="AI Support Assistant" 
+                value="Chat with CediSmart AI helper" 
+                onPress={() => setIsSupportModalVisible(true)}
+              />
+              <SettingItem 
+                icon={MessageSquare} 
+                title="Share Feedback" 
+                value="Suggest features or send reviews" 
+                onPress={() => setIsFeedbackModalVisible(true)}
+                isLast
+              />
+            </SettingsGroup>
           </View>
 
           {/* Danger Zone */}
-          <View className="mt-10 mb-6">
-            <GlassSurface radius={22} style={{ marginBottom: 12 }}>
+          <View className="mt-8 mb-6">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Account Actions</Text>
+            <SettingsGroup>
               <TouchableOpacity 
                 onPress={handleLogout}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   paddingHorizontal: 18,
-                  paddingVertical: 16,
+                  paddingVertical: 15,
                   width: '100%',
                 }}
               >
@@ -1773,18 +1835,23 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   <LogOut size={20} color={isDark ? '#e1e3e0' : '#1C1C2E'} />
                 </View>
                 <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base flex-1`}>Logout</Text>
+                <ChevronRight size={20} color={isDark ? '#6B7280' : '#9CA3AF'} />
               </TouchableOpacity>
-            </GlassSurface>
-
-            <GlassSurface radius={22}>
+              <View
+                style={{
+                  height: StyleSheet.hairlineWidth || 1,
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                  marginLeft: 72,
+                }}
+              />
               <TouchableOpacity 
                 onPress={handleDeleteAccount}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   paddingHorizontal: 18,
-                  paddingVertical: 16,
+                  paddingVertical: 15,
                   width: '100%',
                 }}
               >
@@ -1795,8 +1862,9 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   <Trash2 size={20} color="#DC2626" />
                 </View>
                 <Text className="text-error font-bold text-base flex-1">Delete Account</Text>
+                <ChevronRight size={20} color="#DC2626" />
               </TouchableOpacity>
-            </GlassSurface>
+            </SettingsGroup>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

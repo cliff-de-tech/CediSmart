@@ -1,6 +1,5 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { GlassSheetBackground } from '../glass/GlassSheetBackground';
-import { GlassSurface } from '../glass/GlassSurface';
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { useQuery } from '@tanstack/react-query';
@@ -177,20 +176,21 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ bottomSheetRef, type, o
                   onPress={() => handleSelect(item.id, item.name)}
                   className="items-center w-[23%]"
                 >
-                  <GlassSurface
-                    variant="clear"
-                    radius={20}
+                  <View
                     style={{
                       width: 56,
                       height: 56,
+                      borderRadius: 20,
                       alignItems: 'center',
                       justifyContent: 'center',
                       marginBottom: 8,
-                      backgroundColor: `${accent}18`,
+                      backgroundColor: `${accent}20`,
+                      borderWidth: 1,
+                      borderColor: `${accent}35`,
                     }}
                   >
                     <IconComp size={24} color={accent} />
-                  </GlassSurface>
+                  </View>
                   <Text 
                     className={`text-xs font-medium ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-center`} 
                     numberOfLines={2}

@@ -3,7 +3,7 @@ import { GlassSheetBackground } from '../../components/glass/GlassSheetBackgroun
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert, TextInput, ScrollView, Modal, RefreshControl, Platform, PermissionsAndroid, Clipboard, Linking, NativeModules, Image } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert, TextInput, ScrollView, Modal, RefreshControl, Platform, PermissionsAndroid, Clipboard, Linking, NativeModules, Image, StyleSheet } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
@@ -496,15 +496,24 @@ const AccountsScreen = ({ navigation }: any) => {
             {/* SOURCE CARDS */}
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest ml-1 mb-2`}>Add or Update Accounts</Text>
 
-            {/* MoMo Card */}
-            <GlassSurface radius={22} style={{ marginBottom: 14 }}>
+            {/* Unified Action Card */}
+            <View
+              style={[
+                styles.sourceActionGroup,
+                {
+                  backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                  borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                },
+              ]}
+            >
+              {/* MoMo Row */}
               <TouchableOpacity 
                 onPress={() => openLinkSheet('momo')}
-                activeOpacity={0.8}
-                style={{ flexDirection: 'row', alignItems: 'center', padding: 18, width: '100%' }}
+                activeOpacity={0.7}
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 16, width: '100%' }}
               >
-                <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 14, flexShrink: 0 }}>
-                  <Smartphone size={24} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                <View className={`w-11 h-11 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 14, flexShrink: 0 }}>
+                  <Smartphone size={22} color={isDark ? '#4ade80' : '#0A6E4A'} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>Add MoMo Wallet</Text>
@@ -516,17 +525,23 @@ const AccountsScreen = ({ navigation }: any) => {
                   <ChevronRight size={20} color={isDark ? '#6B7280' : '#9CA3AF'} />
                 )}
               </TouchableOpacity>
-            </GlassSurface>
 
-            {/* Bank Card */}
-            <GlassSurface radius={22} style={{ marginBottom: 14 }}>
+              <View
+                style={{
+                  height: StyleSheet.hairlineWidth || 1,
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                  marginLeft: 70,
+                }}
+              />
+
+              {/* Bank Row */}
               <TouchableOpacity 
                 onPress={() => openLinkSheet('bank')}
-                activeOpacity={0.8}
-                style={{ flexDirection: 'row', alignItems: 'center', padding: 18, width: '100%' }}
+                activeOpacity={0.7}
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 16, width: '100%' }}
               >
-                <View className={`w-12 h-12 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 14, flexShrink: 0 }}>
-                  <Landmark size={24} color={isDark ? '#4ade80' : '#0A6E4A'} />
+                <View className={`w-11 h-11 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 14, flexShrink: 0 }}>
+                  <Landmark size={22} color={isDark ? '#4ade80' : '#0A6E4A'} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text className={`font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} text-base`}>Add Bank Account</Text>
@@ -538,19 +553,25 @@ const AccountsScreen = ({ navigation }: any) => {
                   <ChevronRight size={20} color={isDark ? '#6B7280' : '#9CA3AF'} />
                 )}
               </TouchableOpacity>
-            </GlassSurface>
 
-            {/* Physical Cash Card */}
-            <GlassSurface radius={22} style={{ marginBottom: 22 }}>
+              <View
+                style={{
+                  height: StyleSheet.hairlineWidth || 1,
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                  marginLeft: 70,
+                }}
+              />
+
+              {/* Physical Cash Row */}
               <TouchableOpacity 
                 onPress={() => {
                   setCashInput(cashAccount ? parseFloat(cashAccount.balance).toString() : '0.00');
                   cashSheetRef.current?.snapToIndex(0);
                 }}
-                activeOpacity={0.8}
-                style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, width: '100%' }}
+                activeOpacity={0.7}
+                style={{ flexDirection: 'row', alignItems: 'center', padding: 16, width: '100%' }}
               >
-                <View className={`w-11 h-11 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 12, flexShrink: 0 }}>
+                <View className={`w-11 h-11 rounded-full ${isDark ? 'bg-primary/20' : 'bg-primary/10'} items-center justify-center`} style={{ marginRight: 14, flexShrink: 0 }}>
                   <Wallet size={22} color={isDark ? '#4ade80' : '#0A6E4A'} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
@@ -587,7 +608,7 @@ const AccountsScreen = ({ navigation }: any) => {
                 </View>
                 <ChevronRight size={18} color={isDark ? '#6B7280' : '#9CA3AF'} />
               </TouchableOpacity>
-            </GlassSurface>
+            </View>
 
             {/* ACTIVE SOURCES LIST */}
             {filteredLinkedAccounts.length > 0 && (
@@ -779,7 +800,7 @@ const AccountsScreen = ({ navigation }: any) => {
                 })}
                 
                 {accounts?.some((acc: any) => acc.account_type === 'mobile_money') && (
-                  <GlassSurface radius={26} elevated style={{ marginTop: 8, marginBottom: 24 }}>
+                  <GlassSurface solidFallback radius={26} elevated style={{ marginTop: 8, marginBottom: 24 }}>
                     <View style={{ padding: 20, width: '100%' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, width: '100%' }}>
                         <View
@@ -1452,5 +1473,19 @@ const AccountsScreen = ({ navigation }: any) => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  sourceActionGroup: {
+    borderRadius: 24,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: 24,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+});
 
 export default AccountsScreen;

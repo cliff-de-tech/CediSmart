@@ -26,6 +26,8 @@ export type GlassSurfaceProps = ViewProps & {
   intensity?: number;
   tint?: GlassTint;
   variant?: GlassVariant;
+  solidFallback?: boolean;
+  noBlur?: boolean;
 };
 
 export function GlassSurface({
@@ -37,6 +39,8 @@ export function GlassSurface({
   intensity,
   tint = 'default',
   variant = 'regular',
+  solidFallback = false,
+  noBlur = false,
   ...props
 }: GlassSurfaceProps) {
   const theme = useThemeStore(state => state.theme);
@@ -44,6 +48,8 @@ export function GlassSurface({
   const { reduceMotion, reduceTransparency } = useAccessibilityPreferences();
   const shape = { borderRadius: radius };
   const shadow = elevated ? (isDark ? styles.shadowDarkElevated : styles.shadowLightElevated) : (isDark ? styles.shadowDarkSubtle : styles.shadowLightSubtle);
+
+  const shouldBypassBlur = reduceTransparency || noBlur || (Platform.OS === 'android' && solidFallback);
 
   const resolvedIntensity = intensity ?? (
     variant === 'clear'
@@ -56,36 +62,36 @@ export function GlassSurface({
   const getCausticColors = (): [string, string, string] => {
     if (tint === 'emerald') {
       return isDark
-        ? ['rgba(46, 160, 80, 0.34)', 'rgba(14, 48, 24, 0.52)', 'rgba(164, 243, 185, 0.18)']
-        : ['rgba(16, 122, 42, 0.88)', 'rgba(13, 99, 27, 0.78)', 'rgba(46, 180, 80, 0.84)'];
+        ? ['rgba(22, 101, 52, 0.68)', 'rgba(11, 42, 20, 0.88)', 'rgba(34, 136, 68, 0.58)']
+        : ['rgba(16, 122, 42, 0.94)', 'rgba(13, 99, 27, 0.88)', 'rgba(46, 180, 80, 0.90)'];
     }
     if (tint === 'gold') {
       return isDark
-        ? ['rgba(245, 166, 35, 0.28)', 'rgba(38, 28, 12, 0.45)', 'rgba(251, 191, 36, 0.14)']
-        : ['rgba(255, 248, 230, 0.75)', 'rgba(254, 243, 199, 0.55)', 'rgba(253, 230, 138, 0.65)'];
+        ? ['rgba(245, 166, 35, 0.42)', 'rgba(48, 36, 14, 0.82)', 'rgba(251, 191, 36, 0.28)']
+        : ['rgba(255, 248, 230, 0.90)', 'rgba(254, 243, 199, 0.80)', 'rgba(253, 230, 138, 0.84)'];
     }
     if (tint === 'clear' || variant === 'clear') {
       return isDark
-        ? ['rgba(210, 255, 224, 0.14)', 'rgba(18, 28, 22, 0.28)', 'rgba(164, 243, 185, 0.08)']
-        : ['rgba(255, 255, 255, 0.62)', 'rgba(240, 249, 242, 0.38)', 'rgba(255, 255, 255, 0.48)'];
+        ? ['rgba(210, 255, 224, 0.20)', 'rgba(18, 28, 22, 0.65)', 'rgba(164, 243, 185, 0.12)']
+        : ['rgba(255, 255, 255, 0.86)', 'rgba(240, 249, 242, 0.68)', 'rgba(255, 255, 255, 0.78)'];
     }
     return isDark
-      ? ['rgba(195, 250, 212, 0.16)', 'rgba(18, 28, 22, 0.46)', 'rgba(130, 220, 158, 0.09)']
-      : ['rgba(255, 255, 255, 0.78)', 'rgba(242, 250, 244, 0.56)', 'rgba(232, 246, 236, 0.68)'];
+      ? ['rgba(28, 44, 34, 0.70)', 'rgba(18, 28, 22, 0.85)', 'rgba(22, 38, 28, 0.75)']
+      : ['rgba(255, 255, 255, 0.92)', 'rgba(245, 252, 247, 0.84)', 'rgba(240, 250, 243, 0.88)'];
   };
 
   const borderColor = tint === 'emerald'
-    ? (isDark ? 'rgba(164, 243, 185, 0.34)' : 'rgba(255, 255, 255, 0.45)')
+    ? (isDark ? 'rgba(164, 243, 185, 0.38)' : 'rgba(255, 255, 255, 0.55)')
     : tint === 'gold'
-    ? (isDark ? 'rgba(251, 191, 36, 0.35)' : 'rgba(245, 158, 11, 0.35)')
-    : (isDark ? 'rgba(205, 252, 218, 0.22)' : 'rgba(255, 255, 255, 0.85)');
+    ? (isDark ? 'rgba(251, 191, 36, 0.42)' : 'rgba(245, 158, 11, 0.45)')
+    : (isDark ? 'rgba(205, 252, 218, 0.26)' : 'rgba(255, 255, 255, 0.90)');
 
   const specularRimColors: [string, string, string] = isDark
-    ? ['rgba(255, 255, 255, 0.02)', 'rgba(220, 255, 232, 0.42)', 'rgba(255, 255, 255, 0.02)']
-    : ['rgba(255, 255, 255, 0.15)', 'rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.15)'];
+    ? ['rgba(255, 255, 255, 0.02)', 'rgba(220, 255, 232, 0.45)', 'rgba(255, 255, 255, 0.02)']
+    : ['rgba(255, 255, 255, 0.20)', 'rgba(255, 255, 255, 0.98)', 'rgba(255, 255, 255, 0.20)'];
 
   // Native iOS 26+ UIGlassEffect path
-  if (nativeLiquidGlassAvailable && !reduceTransparency) {
+  if (nativeLiquidGlassAvailable && !shouldBypassBlur) {
     return (
       <GlassView
         {...props}
@@ -117,21 +123,40 @@ export function GlassSurface({
       style={[
         shape,
         shadow,
-        reduceTransparency && {
-          backgroundColor: isDark ? '#16201a' : '#f2f8f4',
+        shouldBypassBlur && {
+          backgroundColor: isDark
+            ? (tint === 'emerald' ? '#0d3218' : '#141e17')
+            : (tint === 'emerald' ? '#eaf8ed' : '#ffffff'),
         },
         style,
       ]}
     >
       {/* Clipped optical refraction & specular layers */}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, shape, styles.clip]}>
-        {!reduceTransparency && (
+        {!shouldBypassBlur ? (
           <>
             <BlurView
               intensity={resolvedIntensity}
               tint={blurTint}
               style={StyleSheet.absoluteFill}
             />
+            <LinearGradient
+              colors={getCausticColors()}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0.05, y: 0 }}
+              end={{ x: 0.95, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            {/* Top meniscus liquid light reflection */}
+            <LinearGradient
+              colors={specularRimColors}
+              start={{ x: 0.1, y: 0 }}
+              end={{ x: 0.9, y: 0 }}
+              style={styles.topSpecular}
+            />
+          </>
+        ) : (
+          <>
             <LinearGradient
               colors={getCausticColors()}
               locations={[0, 0.55, 1]}

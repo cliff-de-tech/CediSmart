@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Image, StyleSheet } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import BottomSheet from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -361,7 +361,15 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
             
             {/* AI SMS Autofill Toggle */}
             <View className="mb-6">
-              <GlassSurface radius={22}>
+              <View
+                style={[
+                  styles.formFieldCard,
+                  {
+                    backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                    borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                  },
+                ]}
+              >
                 <TouchableOpacity
                   onPress={() => {
                     Haptics.selectionAsync().catch(() => {});
@@ -389,10 +397,20 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
                     style={{ transform: [{ rotate: showAiPaste ? '90deg' : '0deg' }] } as any}
                   />
                 </TouchableOpacity>
-              </GlassSurface>
+              </View>
 
               {showAiPaste && (
-                <GlassSurface radius={22} style={{ marginTop: 12, padding: 16 }}>
+                <View
+                  style={[
+                    styles.formFieldCard,
+                    {
+                      marginTop: 12,
+                      padding: 16,
+                      backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                      borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                    },
+                  ]}
+                >
                   <TextInput
                     placeholder="Paste your MoMo or bank SMS alert here..."
                     placeholderTextColor={isDark ? '#6b7280' : '#707a6c80'}
@@ -430,7 +448,7 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
                       )}
                     </TouchableOpacity>
                   </View>
-                </GlassSurface>
+                </View>
               )}
             </View>
 
@@ -489,7 +507,17 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
             <View className="space-y-4">
               <View style={{ flexDirection: 'row', gap: 14, marginBottom: 14 }}>
                 {/* Category Picker */}
-                <GlassSurface radius={24} style={{ flex: 1, minWidth: 0 }}>
+                <View
+                  style={[
+                    styles.formFieldCard,
+                    {
+                      flex: 1,
+                      minWidth: 0,
+                      backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                      borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                    },
+                  ]}
+                >
                   <TouchableOpacity 
                     onPress={() => categorySheetRef.current?.snapToIndex(0)}
                     activeOpacity={0.85}
@@ -506,10 +534,20 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
                       {categoryName}
                     </Text>
                   </TouchableOpacity>
-                </GlassSurface>
+                </View>
 
                 {/* Paid With Picker */}
-                <GlassSurface radius={24} style={{ flex: 1, minWidth: 0 }}>
+                <View
+                  style={[
+                    styles.formFieldCard,
+                    {
+                      flex: 1,
+                      minWidth: 0,
+                      backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                      borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                    },
+                  ]}
+                >
                   <TouchableOpacity 
                     onPress={() => accountSheetRef.current?.snapToIndex(0)}
                     activeOpacity={0.85}
@@ -525,11 +563,20 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
                       {accountName}
                     </Text>
                   </TouchableOpacity>
-                </GlassSurface>
+                </View>
               </View>
 
               {/* Interactive Date Selector */}
-              <GlassSurface radius={24} style={{ marginBottom: 14 }}>
+              <View
+                style={[
+                  styles.formFieldCard,
+                  {
+                    marginBottom: 14,
+                    backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                    borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                  },
+                ]}
+              >
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={() => {
@@ -609,10 +656,20 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
                     )}
                   </View>
                 )}
-              </GlassSurface>
+              </View>
 
               {/* Note / Description */}
-              <GlassSurface radius={24} style={{ padding: 18, marginBottom: 14 }}>
+              <View
+                style={[
+                  styles.formFieldCard,
+                  {
+                    padding: 18,
+                    marginBottom: 14,
+                    backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                    borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                  },
+                ]}
+              >
                 <Text className={`font-label uppercase tracking-widest text-[10px] ${isDark ? 'text-gray-400' : 'text-outline'} mb-2`}>Note (Optional)</Text>
                 <Controller
                   control={control}
@@ -628,10 +685,18 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
                     />
                   )}
                 />
-              </GlassSurface>
+              </View>
 
               {/* Progressive Disclosure: More details (Tags & Receipt) */}
-              <GlassSurface radius={24}>
+              <View
+                style={[
+                  styles.formFieldCard,
+                  {
+                    backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+                    borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+                  },
+                ]}
+              >
                 <TouchableOpacity
                   onPress={() => setShowMoreDetails(!showMoreDetails)}
                   activeOpacity={0.85}
@@ -723,7 +788,7 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
                     )}
                   </View>
                 )}
-              </GlassSurface>
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -763,5 +828,18 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  formFieldCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+});
 
 export default AddTransactionScreen;
