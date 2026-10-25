@@ -1398,6 +1398,12 @@ class SupportService:
             if mistral_audio:
                 return mistral_audio, mistral_mime
 
+        # 3. Tertiary Engine: OpenAI tts-1 Fallback
+        if settings.OPENAI_API_KEY:
+            oa_audio, oa_mime = await SupportService._synthesize_with_openai(clean_text)
+            if oa_audio:
+                return oa_audio, oa_mime
+
         return None, None
 
     @staticmethod
@@ -1438,6 +1444,46 @@ class SupportService:
                 )
         except Exception as exc:
             logger.warning("Mistral Voxtral TTS connection error: %s", str(exc))
+        return None, None
+
+    @staticmethod
+    async def _synthesize_with_openai(text: str, voice: str = "nova") -> tuple[str | None, str | None]:
+        """Synthesize natural neural speech using OpenAI tts-1 API."""
+        if not settings.OPENAI_API_KEY or not text or not text.strip():
+            return None, None
+
+        clean_text = re.sub(r"\[ACTION:[^\]]+\]", "", text)
+        clean_text = re.sub(r"\[VOICE_ACTION:[^\]]+\]", "", clean_text)
+        clean_text = re.sub(r"[*#_`]", "", clean_text).strip()
+        if not clean_text:
+            return None, None
+
+        url = "https://api.openai.com/v1/audio/speech"
+        payload = {
+            "model": "tts-1",
+            "input": clean_text,
+            "voice": voice,
+            "response_format": "mp3",
+        }
+        headers = {
+            "Authorization": f"Bearer {settings.OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code == 200:
+                    import base64
+                    audio_b64 = base64.b64encode(resp.content).decode("utf-8")
+                    return audio_b64, "audio/mp3"
+                logger.warning(
+                    "OpenAI TTS error (status %d): %s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+        except Exception as exc:
+            logger.warning("OpenAI TTS connection error: %s", str(exc))
         return None, None
 
 

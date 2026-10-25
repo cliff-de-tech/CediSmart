@@ -719,6 +719,44 @@ async def parse_sms_with_gemini(
         except Exception as me:
             logger.warning("Mistral SMS parse fallback failed: %s", str(me))
 
+    # Fallback to OpenAI (gpt-4o-mini) if Gemini and Mistral failed
+    if not parsed_data and settings.OPENAI_API_KEY:
+        try:
+            oa_url = "https://api.openai.com/v1/chat/completions"
+            oa_payload = {
+                "model": "gpt-4o-mini",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a Ghanaian mobile money and banking SMS parser. "
+                            "Analyze the SMS transaction notification and extract details into valid JSON with keys: "
+                            "amount (number), transaction_type ('income' or 'expense'), "
+                            "description (string), category_suggestion (string), notes (string)."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"SMS: \"{sms_text}\"",
+                    },
+                ],
+                "response_format": {"type": "json_object"},
+            }
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                oa_resp = await client.post(
+                    oa_url,
+                    json=oa_payload,
+                    headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
+                )
+                if oa_resp.status_code == 200:
+                    oa_data = oa_resp.json()
+                    content = oa_data["choices"][0]["message"]["content"]
+                    parsed_data = json.loads(content)
+                else:
+                    logger.warning("OpenAI SMS parse error (status %d): %s", oa_resp.status_code, oa_resp.text[:200])
+        except Exception as oe:
+            logger.warning("OpenAI SMS parse fallback failed: %s", str(oe))
+
     if not parsed_data:
         logger.info("Using local regex fallback parser for SMS")
         parsed_data = _parse_sms_fallback(sms_text)

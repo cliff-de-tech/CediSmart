@@ -306,3 +306,21 @@ async def test_voice_synthesis_falls_back_to_mistral() -> None:
         assert audio_b64 == "bXAzX2Jhc2U2NA=="
         assert mime == "audio/mp3"
 
+
+@pytest.mark.asyncio
+async def test_voice_synthesis_falls_back_to_openai() -> None:
+    from app.modules.support.service import SupportService
+    with patch("app.modules.support.service.settings.GEMINI_API_KEY", "dummy"), \
+         patch("app.modules.support.service.settings.MISTRAL_API_KEY", ""), \
+         patch("app.modules.support.service.settings.OPENAI_API_KEY", "dummy_openai"), \
+         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        resp_gemini = AsyncMock(status_code=503)
+        resp_openai = AsyncMock(status_code=200, content=b"fake_mp3_data")
+        mock_post.side_effect = [resp_gemini, resp_gemini, resp_openai]
+
+        audio_b64, mime = await SupportService.synthesize_neural_voice("Test fallback")
+        import base64
+        assert audio_b64 == base64.b64encode(b"fake_mp3_data").decode("utf-8")
+        assert mime == "audio/mp3"
+
+
