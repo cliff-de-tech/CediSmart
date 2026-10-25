@@ -57,6 +57,24 @@ import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import { Message } from '../shared/SupportModal';
 import uuid from 'react-native-uuid';
+import {
+  PRECACHED_BALANCE_BRIDGES,
+  PRECACHED_EXPENSE_BRIDGES,
+  PRECACHED_BUDGET_BRIDGES,
+} from '../../assets/audio/precachedBridges';
+
+let lastBridgeIndex = -1;
+const getPrecachedBridge = (type: 'balance' | 'expense' | 'budget') => {
+  const pool = type === 'balance' ? PRECACHED_BALANCE_BRIDGES
+             : type === 'expense' ? PRECACHED_EXPENSE_BRIDGES
+             : PRECACHED_BUDGET_BRIDGES;
+  let nextIdx = Math.floor(Math.random() * pool.length);
+  if (pool.length > 1 && nextIdx === lastBridgeIndex) {
+    nextIdx = (nextIdx + 1) % pool.length;
+  }
+  lastBridgeIndex = nextIdx;
+  return pool[nextIdx];
+};
 
 // Helper to filter out silence artifacts, background noise, or model timestamp hallucinations (e.g. "00:00")
 const isInvalidTranscript = (text: string) => {
@@ -618,7 +636,10 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       // Execute detected voice action with parallel verbal bridge playback
       if (action && action.type === 'create_transaction' && action.payload) {
         setDynamicStatus('Recording expense…');
-        const bridgePromise = neuralAudioB64 ? playBridgePhrase(reply, neuralAudioB64, turn) : Promise.resolve();
+        const bridge = neuralAudioB64
+          ? { text: reply, base64: neuralAudioB64 }
+          : getPrecachedBridge('expense');
+        const bridgePromise = playBridgePhrase(bridge.text, bridge.base64, turn);
         const actionPromise = handleExecuteVoiceTransaction(action.payload, turn);
         const [_, outcomeText] = await Promise.all([bridgePromise, actionPromise]);
         if (!isCurrentTurn(turn)) return;
@@ -626,7 +647,10 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         neuralAudioB64 = null;
       } else if (action && action.type === 'check_balance') {
         setDynamicStatus('Checking your balances…');
-        const bridgePromise = neuralAudioB64 ? playBridgePhrase(reply, neuralAudioB64, turn) : Promise.resolve();
+        const bridge = neuralAudioB64
+          ? { text: reply, base64: neuralAudioB64 }
+          : getPrecachedBridge('balance');
+        const bridgePromise = playBridgePhrase(bridge.text, bridge.base64, turn);
         const fetchPromise = (async () => {
           setActionToast(null);
           try {
@@ -671,7 +695,10 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         neuralAudioB64 = null;
       } else if (action && action.type === 'check_budget') {
         setDynamicStatus('Checking your budgets…');
-        const bridgePromise = neuralAudioB64 ? playBridgePhrase(reply, neuralAudioB64, turn) : Promise.resolve();
+        const bridge = neuralAudioB64
+          ? { text: reply, base64: neuralAudioB64 }
+          : getPrecachedBridge('budget');
+        const bridgePromise = playBridgePhrase(bridge.text, bridge.base64, turn);
         const budgetPromise = (async () => {
           setActionToast(null);
           try {

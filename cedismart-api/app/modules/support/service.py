@@ -571,7 +571,15 @@ class SupportService:
                 except Exception as exc:
                     logger.warning("Gemini chat connection failed (%s): %s", model_name, str(exc))
 
-        # 2. Secondary Engine: ChatGPT (gpt-4o-mini) via OpenAI API or Free GitHub Models
+        # 2. Secondary Engine: Mistral Pro (`mistral-small-latest`) via MISTRAL_API_KEY
+        mistral_reply = await SupportService._call_mistral_fallback(
+            messages=messages,
+            system_prompt=system_prompt,
+        )
+        if mistral_reply:
+            return mistral_reply
+
+        # 3. Tertiary Engine: ChatGPT (gpt-4o-mini) via OpenAI API or Free GitHub Models
         chatgpt_reply = await SupportService._call_chatgpt_fallback(
             messages=messages,
             system_prompt=system_prompt,
@@ -651,6 +659,51 @@ class SupportService:
                 )
         except Exception as exc:
             logger.warning("ChatGPT fallback connection error: %s", str(exc))
+        return None
+
+    @staticmethod
+    async def _call_mistral_fallback(
+        messages: list[ChatMessage],
+        system_prompt: str,
+    ) -> str | None:
+        """Fallback to Mistral Pro (`mistral-small-latest`) via MISTRAL_API_KEY."""
+        if not settings.MISTRAL_API_KEY:
+            return None
+
+        url = "https://api.mistral.ai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        mistral_messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        for msg in messages:
+            mistral_messages.append({
+                "role": "assistant" if msg.role == "model" else "user",
+                "content": msg.content,
+            })
+
+        payload = {
+            "model": "mistral-small-latest",
+            "messages": mistral_messages,
+            "temperature": 0.3,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(url, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    choices = data.get("choices") or []
+                    if choices and "message" in choices[0]:
+                        return choices[0]["message"].get("content")
+                logger.warning(
+                    "Mistral chat fallback returned status %d: %s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+        except Exception as exc:
+            logger.warning("Mistral chat fallback connection error: %s", str(exc))
         return None
 
     @staticmethod
@@ -1338,6 +1391,53 @@ class SupportService:
                     logger.warning("Gemini TTS unavailable (%s status %d)", model, resp.status_code)
             except Exception as e:
                 logger.warning("Gemini TTS synthesis failed on %s: %s", model, type(e).__name__)
+
+        # 2. Secondary Engine: Mistral Voxtral 3 Realtime TTS Fallback
+        if settings.MISTRAL_API_KEY:
+            mistral_audio, mistral_mime = await SupportService._synthesize_with_mistral(clean_text)
+            if mistral_audio:
+                return mistral_audio, mistral_mime
+
+        return None, None
+
+    @staticmethod
+    async def _synthesize_with_mistral(text: str, voice: str = "en_paul_neutral") -> tuple[str | None, str | None]:
+        """Synthesize natural neural speech using Mistral Voxtral 3 Realtime TTS API."""
+        if not settings.MISTRAL_API_KEY or not text or not text.strip():
+            return None, None
+
+        clean_text = re.sub(r"\[ACTION:[^\]]+\]", "", text)
+        clean_text = re.sub(r"\[VOICE_ACTION:[^\]]+\]", "", clean_text)
+        clean_text = re.sub(r"[*#_`]", "", clean_text).strip()
+        if not clean_text:
+            return None, None
+
+        url = "https://api.mistral.ai/v1/audio/speech"
+        payload = {
+            "model": "voxtral-mini-tts-latest",
+            "input": clean_text,
+            "voice": voice,
+        }
+        headers = {
+            "Authorization": f"Bearer {settings.MISTRAL_API_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    audio_b64 = data.get("audio_data")
+                    if audio_b64:
+                        return audio_b64, "audio/mp3"
+                logger.warning(
+                    "Mistral Voxtral TTS error (status %d): %s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+        except Exception as exc:
+            logger.warning("Mistral Voxtral TTS connection error: %s", str(exc))
         return None, None
 
 

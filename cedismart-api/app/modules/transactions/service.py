@@ -681,6 +681,44 @@ async def parse_sms_with_gemini(
         except Exception as e:
             logger.error("Failed to parse SMS using Gemini API: %s", str(e))
 
+    # Fallback to Mistral Pro if Gemini failed or was unavailable
+    if not parsed_data and settings.MISTRAL_API_KEY:
+        try:
+            mistral_url = "https://api.mistral.ai/v1/chat/completions"
+            mistral_payload = {
+                "model": "mistral-small-latest",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a Ghanaian mobile money and banking SMS parser. "
+                            "Analyze the SMS transaction notification and extract details into valid JSON with keys: "
+                            "amount (number), transaction_type ('income' or 'expense'), "
+                            "description (string), category_suggestion (string), notes (string)."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"SMS: \"{sms_text}\"",
+                    },
+                ],
+                "response_format": {"type": "json_object"},
+            }
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                m_resp = await client.post(
+                    mistral_url,
+                    json=mistral_payload,
+                    headers={"Authorization": f"Bearer {settings.MISTRAL_API_KEY}"},
+                )
+                if m_resp.status_code == 200:
+                    m_data = m_resp.json()
+                    content = m_data["choices"][0]["message"]["content"]
+                    parsed_data = json.loads(content)
+                else:
+                    logger.warning("Mistral SMS parse error (status %d): %s", m_resp.status_code, m_resp.text[:200])
+        except Exception as me:
+            logger.warning("Mistral SMS parse fallback failed: %s", str(me))
+
     if not parsed_data:
         logger.info("Using local regex fallback parser for SMS")
         parsed_data = _parse_sms_fallback(sms_text)

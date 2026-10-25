@@ -289,3 +289,20 @@ async def test_missing_voice_provider_does_not_claim_to_hear_user() -> None:
     assert result["transcript"] == ""
     assert result["action"] is None
     synth.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_voice_synthesis_falls_back_to_mistral() -> None:
+    from app.modules.support.service import SupportService
+    with patch("app.modules.support.service.settings.GEMINI_API_KEY", "dummy"), \
+         patch("app.modules.support.service.settings.MISTRAL_API_KEY", "dummy_mistral"), \
+         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+        resp_gemini = AsyncMock(status_code=503)
+        resp_mistral = AsyncMock(status_code=200)
+        resp_mistral.json = lambda: {"audio_data": "bXAzX2Jhc2U2NA=="}
+        mock_post.side_effect = [resp_gemini, resp_gemini, resp_mistral]
+
+        audio_b64, mime = await SupportService.synthesize_neural_voice("Test fallback")
+        assert audio_b64 == "bXAzX2Jhc2U2NA=="
+        assert mime == "audio/mp3"
+

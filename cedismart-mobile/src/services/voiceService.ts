@@ -75,7 +75,9 @@ class VoiceService {
         interruptionMode: 'mixWithOthers',
       });
       if (generation !== this.generation) return;
-      const tempUri = `${FileSystem.cacheDirectory}neural_${Date.now()}_${generation}.wav`;
+      const isMp3 = audioBase64.startsWith('SUQz') || audioBase64.startsWith('//');
+      const ext = isMp3 ? 'mp3' : 'wav';
+      const tempUri = `${FileSystem.cacheDirectory}neural_${Date.now()}_${generation}.${ext}`;
       this.activeFile = tempUri;
       await FileSystem.writeAsStringAsync(tempUri, audioBase64, { encoding: FileSystem.EncodingType.Base64 });
       if (generation !== this.generation) {
