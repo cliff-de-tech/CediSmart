@@ -4,11 +4,13 @@ import {
   Text,
   Modal,
   TextInput,
+  TextInputInstance,
   TouchableOpacity,
   TouchableWithoutFeedback,
   StyleSheet,
   Dimensions,
   ScrollView,
+  ScrollViewInstance,
   Platform,
   KeyboardAvoidingView,
   Alert,
@@ -114,8 +116,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const user = useAuthStore((state) => state.user);
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const scrollViewRef = useRef<ScrollView>(null);
-  const voiceInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollViewInstance>(null);
+  const voiceInputRef = useRef<TextInputInstance>(null);
 
   const { stream } = useAudioStream({
     sampleRate: 16000,

@@ -4,8 +4,10 @@ import {
   Text,
   Modal,
   TextInput,
+  TextInputInstance,
   TouchableOpacity,
   ScrollView,
+  ScrollViewInstance,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -417,8 +419,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     mimeType: string;
   } | null>(null);
 
-  const textInputRef = useRef<TextInput>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const textInputRef = useRef<TextInputInstance>(null);
+  const scrollViewRef = useRef<ScrollViewInstance>(null);
 
   const sessionsStorageKey = `cedismart_chat_sessions_${phone.replace(/[^\d+]/g, '') || 'anonymous'}_${supportType}`;
   const legacyStorageKey = `cedismart_chat_history_${phone.replace(/[^\d+]/g, '') || 'anonymous'}_${supportType}`;

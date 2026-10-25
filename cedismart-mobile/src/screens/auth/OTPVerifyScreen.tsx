@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, TextInputInstance } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { Shield, ArrowRight, Lock, Clock, HelpCircle } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +26,7 @@ const OTPVerifyScreen = ({ route, navigation }: any) => {
   const [fullName, setFullName] = useState('');
   const [clerkUserId, setClerkUserId] = useState<string | null>(null);
   
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  const inputRefs = useRef<Array<TextInputInstance | null>>([]);
 
   useEffect(() => {
     const interval = setInterval(() => {

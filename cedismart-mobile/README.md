@@ -203,7 +203,7 @@ npm start -- --clear
 # or: npx expo start --clear
 ```
 
-Use Expo Go for SDK 57 when opening this project on a physical device. After upgrading, stop any existing Metro server and restart it with the command above to clear cached SDK 54 bundles.
+Use Expo Go for SDK 58 when opening this project on a physical device. After upgrading, stop any existing Metro server and restart it with the command above to clear cached bundles.
 
 Custom native features such as dynamic app icons and the Android SMS receiver require a development or preview build. Rebuild existing native apps after this SDK upgrade.
 

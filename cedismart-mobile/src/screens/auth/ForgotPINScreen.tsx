@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Animated, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Animated, Alert, TextInputInstance } from 'react-native';
 import { useMutation } from '@tanstack/react-query';
 import { useSignIn, useAuth } from '@clerk/clerk-expo';
 import { Shield, ArrowRight, Lock, Clock, ArrowLeft, KeyRound, HelpCircle } from 'lucide-react-native';
@@ -39,7 +39,7 @@ const ForgotPINScreen = ({ navigation }: any) => {
   
   const [error, setError] = useState('');
   const shakeAnimation = useState(new Animated.Value(0))[0];
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  const inputRefs = useRef<Array<TextInputInstance | null>>([]);
 
   const shake = () => {
     Animated.sequence([

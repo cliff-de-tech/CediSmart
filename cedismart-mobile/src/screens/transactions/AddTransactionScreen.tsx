@@ -732,7 +732,7 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
       {/* Floating Save Button */}
       <View className="absolute bottom-8 left-0 right-0 px-8">
         <TouchableOpacity
-          onPress={handleSubmit(onSubmit)}
+          onPress={() => handleSubmit(onSubmit)()}
           disabled={isSubmitting}
           className={`w-full flex-row items-center justify-center space-x-3 py-4 rounded-[24px] shadow-2xl shadow-primary/30 ${isSubmitting ? 'bg-gray-400' : 'bg-primary'}`}
         >

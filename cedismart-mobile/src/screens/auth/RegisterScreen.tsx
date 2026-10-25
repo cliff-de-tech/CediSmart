@@ -153,7 +153,7 @@ const RegisterScreen = ({ navigation }: any) => {
 
               {/* Primary CTA Button */}
               <TouchableOpacity
-                onPress={handleSubmit(onSubmit)}
+                onPress={() => handleSubmit(onSubmit)()}
                 disabled={mutation.isPending}
                 className="overflow-hidden rounded-2xl shadow-lg shadow-primary/20 mt-4"
               >
