@@ -181,4 +181,3 @@ class SMSWebhookRequest(BaseModel):
     sender: str = Field(..., min_length=1, max_length=50)
     message_body: str = Field(..., min_length=5, max_length=1000)
     phone: str = Field(..., min_length=5, max_length=30)
-

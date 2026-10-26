@@ -4,7 +4,8 @@ Verifies Clerk user IDs against the Clerk Backend API using HTTPX.
 """
 
 import logging
-from typing import Any
+from typing import Any, cast
+
 import httpx
 
 from app.core.config import settings
@@ -101,4 +102,4 @@ async def verify_clerk_user(clerk_user_id: str, expected_phone: str) -> dict[str
             message="The authenticated phone number does not match your registration phone number.",
         )
 
-    return user_data
+    return cast(dict[str, Any], user_data)

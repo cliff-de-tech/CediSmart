@@ -89,7 +89,8 @@ async def test_delete_me(client: AsyncClient, make_user) -> None:
 
 
 async def test_verify_kyc_success(client: AsyncClient, make_user) -> None:
-    from unittest.mock import patch, MagicMock, AsyncMock
+    from unittest.mock import AsyncMock, MagicMock, patch
+
     user = await make_user()
     headers = make_auth_headers(user.id)
 
@@ -98,18 +99,17 @@ async def test_verify_kyc_success(client: AsyncClient, make_user) -> None:
     mock_response.json.return_value = {
         "ResultCode": "1012",
         "ResultText": "ID Validated",
-        "Actions": {
-            "Verify_DOB": "Passed",
-            "Verify_Name": "Passed"
-        }
+        "Actions": {"Verify_DOB": "Passed", "Verify_Name": "Passed"},
     }
 
     mock_client = MagicMock()
     mock_client.post = AsyncMock(return_value=mock_response)
 
-    with patch("app.core.config.settings.SMILE_ID_PARTNER_ID", "123"), \
-         patch("app.core.config.settings.SMILE_ID_API_KEY", "api_key"), \
-         patch("app.modules.users.service.httpx.AsyncClient") as mock_client_class:
+    with (
+        patch("app.core.config.settings.SMILE_ID_PARTNER_ID", "123"),
+        patch("app.core.config.settings.SMILE_ID_API_KEY", "api_key"),
+        patch("app.modules.users.service.httpx.AsyncClient") as mock_client_class,
+    ):
 
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
@@ -118,9 +118,9 @@ async def test_verify_kyc_success(client: AsyncClient, make_user) -> None:
             json={
                 "ghana_card_number": "GHA-123456789-0",
                 "full_name": "Kofi Adu",
-                "dob": "1990-01-01"
+                "dob": "1990-01-01",
             },
-            headers=headers
+            headers=headers,
         )
 
         assert resp.status_code == 200
@@ -137,7 +137,8 @@ async def test_verify_kyc_success(client: AsyncClient, make_user) -> None:
 
 
 async def test_verify_kyc_failure_mismatch(client: AsyncClient, make_user) -> None:
-    from unittest.mock import patch, MagicMock, AsyncMock
+    from unittest.mock import AsyncMock, MagicMock, patch
+
     user = await make_user()
     headers = make_auth_headers(user.id)
 
@@ -146,18 +147,17 @@ async def test_verify_kyc_failure_mismatch(client: AsyncClient, make_user) -> No
     mock_response.json.return_value = {
         "ResultCode": "1012",
         "ResultText": "ID Validated",
-        "Actions": {
-            "Verify_DOB": "Passed",
-            "Verify_Name": "Failed"
-        }
+        "Actions": {"Verify_DOB": "Passed", "Verify_Name": "Failed"},
     }
 
     mock_client = MagicMock()
     mock_client.post = AsyncMock(return_value=mock_response)
 
-    with patch("app.core.config.settings.SMILE_ID_PARTNER_ID", "123"), \
-         patch("app.core.config.settings.SMILE_ID_API_KEY", "api_key"), \
-         patch("app.modules.users.service.httpx.AsyncClient") as mock_client_class:
+    with (
+        patch("app.core.config.settings.SMILE_ID_PARTNER_ID", "123"),
+        patch("app.core.config.settings.SMILE_ID_API_KEY", "api_key"),
+        patch("app.modules.users.service.httpx.AsyncClient") as mock_client_class,
+    ):
 
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
@@ -166,9 +166,9 @@ async def test_verify_kyc_failure_mismatch(client: AsyncClient, make_user) -> No
             json={
                 "ghana_card_number": "GHA-123456789-0",
                 "full_name": "Wrong Name",
-                "dob": "1990-01-01"
+                "dob": "1990-01-01",
             },
-            headers=headers
+            headers=headers,
         )
 
         assert resp.status_code == 400
@@ -178,20 +178,23 @@ async def test_verify_kyc_failure_mismatch(client: AsyncClient, make_user) -> No
 
 async def test_verify_kyc_unconfigured(client: AsyncClient, make_user) -> None:
     from unittest.mock import patch
+
     user = await make_user()
     headers = make_auth_headers(user.id)
 
-    with patch("app.core.config.settings.SMILE_ID_PARTNER_ID", ""), \
-         patch("app.core.config.settings.SMILE_ID_API_KEY", ""):
+    with (
+        patch("app.core.config.settings.SMILE_ID_PARTNER_ID", ""),
+        patch("app.core.config.settings.SMILE_ID_API_KEY", ""),
+    ):
 
         resp = await client.post(
             "/api/v1/users/verify-kyc",
             json={
                 "ghana_card_number": "GHA-123456789-0",
                 "full_name": "Kofi Adu",
-                "dob": "1990-01-01"
+                "dob": "1990-01-01",
             },
-            headers=headers
+            headers=headers,
         )
 
         assert resp.status_code == 400
@@ -202,7 +205,7 @@ async def test_verify_kyc_unconfigured(client: AsyncClient, make_user) -> None:
 async def test_verify_kyc_duplicate_card(client: AsyncClient, make_user, db_session) -> None:
     # 1. Create a user who already has this card verified
     user_a = await make_user(phone="+233201111111")
-    
+
     # Manually update their ghana_card and save to DB
     user_a.ghana_card = "GHA-123456789-0"
     user_a.kyc_verified = True
@@ -214,12 +217,8 @@ async def test_verify_kyc_duplicate_card(client: AsyncClient, make_user, db_sess
 
     resp = await client.post(
         "/api/v1/users/verify-kyc",
-        json={
-            "ghana_card_number": "GHA-123456789-0",
-            "full_name": "Kofi Adu",
-            "dob": "1990-01-01"
-        },
-        headers=headers
+        json={"ghana_card_number": "GHA-123456789-0", "full_name": "Kofi Adu", "dob": "1990-01-01"},
+        headers=headers,
     )
 
     assert resp.status_code == 400
@@ -284,6 +283,7 @@ async def test_delete_me_with_related_data(client: AsyncClient, make_user) -> No
 
 async def test_report_bug_logged_locally(client: AsyncClient, make_user) -> None:
     from unittest.mock import patch
+
     user = await make_user()
     headers = make_auth_headers(user.id)
 
@@ -293,9 +293,9 @@ async def test_report_bug_logged_locally(client: AsyncClient, make_user) -> None
             json={
                 "title": "Bug in login screen",
                 "description": "It crashes when typing double spaces in phone number field",
-                "device_info": {"os": "Android 13", "screen": "1080x2400"}
+                "device_info": {"os": "Android 13", "screen": "1080x2400"},
             },
-            headers=headers
+            headers=headers,
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -305,7 +305,8 @@ async def test_report_bug_logged_locally(client: AsyncClient, make_user) -> None
 
 
 async def test_report_bug_submitted(client: AsyncClient, make_user) -> None:
-    from unittest.mock import patch, MagicMock, AsyncMock
+    from unittest.mock import AsyncMock, MagicMock, patch
+
     user = await make_user()
     headers = make_auth_headers(user.id)
 
@@ -313,14 +314,16 @@ async def test_report_bug_submitted(client: AsyncClient, make_user) -> None:
     mock_response.status_code = 201
     mock_response.json.return_value = {
         "number": 42,
-        "html_url": "https://github.com/cliff-de-tech/CediSmart/issues/42"
+        "html_url": "https://github.com/cliff-de-tech/CediSmart/issues/42",
     }
 
     mock_client = MagicMock()
     mock_client.post = AsyncMock(return_value=mock_response)
 
-    with patch("app.core.config.settings.GITHUB_ACCESS_TOKEN", "mock_token"), \
-         patch("app.modules.users.service.httpx.AsyncClient") as mock_client_class:
+    with (
+        patch("app.core.config.settings.GITHUB_ACCESS_TOKEN", "mock_token"),
+        patch("app.modules.users.service.httpx.AsyncClient") as mock_client_class,
+    ):
 
         mock_client_class.return_value.__aenter__.return_value = mock_client
 
@@ -329,9 +332,9 @@ async def test_report_bug_submitted(client: AsyncClient, make_user) -> None:
             json={
                 "title": "Database connection error",
                 "description": "The application fails to connect to database periodically",
-                "device_info": {"os": "iOS 17", "screen": "1170x2532"}
+                "device_info": {"os": "iOS 17", "screen": "1170x2532"},
             },
-            headers=headers
+            headers=headers,
         )
 
         assert resp.status_code == 200
@@ -341,7 +344,7 @@ async def test_report_bug_submitted(client: AsyncClient, make_user) -> None:
         assert body["issue_url"] == "https://github.com/cliff-de-tech/CediSmart/issues/42"
 
         assert mock_client.post.call_count == 2
-        
+
         # Verify first call was for GitHub
         github_call = mock_client.post.call_args_list[0]
         args, kwargs = github_call
@@ -368,7 +371,7 @@ async def test_register_device_token(client: AsyncClient, make_user) -> None:
             "device_name": "iPhone XR",
             "platform": "ios",
         },
-        headers=headers
+        headers=headers,
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "success"
@@ -381,7 +384,7 @@ async def test_register_device_token(client: AsyncClient, make_user) -> None:
             "device_name": "iPhone XR Updated",
             "platform": "ios",
         },
-        headers=headers
+        headers=headers,
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "success"
@@ -399,23 +402,15 @@ async def test_remove_device_token(client: AsyncClient, make_user) -> None:
             "device_name": "Pixel 7",
             "platform": "android",
         },
-        headers=headers
+        headers=headers,
     )
 
     # Remove
     resp = await client.request(
         "DELETE",
         "/api/v1/users/me/device-tokens",
-        json={
-            "token": "ExponentPushToken[67890]"
-        },
-        headers=headers
+        json={"token": "ExponentPushToken[67890]"},
+        headers=headers,
     )
     assert resp.status_code == 200
     assert resp.json()["status"] == "success"
-
-
-
-
-
-

@@ -279,9 +279,9 @@ async def update_account(
         current_balances = await _compute_balances(user_id, db, [account.id])
         current_balance = current_balances.get(account.id, Decimal(str(account.opening_balance)))
         delta = payload.reconcile_to_balance - current_balance
-        account.opening_balance = Decimal(str(account.opening_balance)) + delta
+        account.opening_balance = float(Decimal(str(account.opening_balance)) + delta)
     elif payload.opening_balance is not None:
-        account.opening_balance = payload.opening_balance
+        account.opening_balance = float(payload.opening_balance)
 
     await db.flush()
 

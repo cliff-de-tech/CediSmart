@@ -278,6 +278,7 @@ async def create_transaction(
 
     if tx.transaction_type == "expense" and not tx.is_deleted:
         from app.modules.budgets.service import check_and_trigger_budget_alerts
+
         await check_and_trigger_budget_alerts(
             user_id=user_id,
             category_id=tx.category_id,
@@ -288,7 +289,6 @@ async def create_transaction(
         )
 
     return tx
-
 
 
 async def update_transaction(
@@ -337,6 +337,7 @@ async def update_transaction(
 
     if tx.transaction_type == "expense" and not tx.is_deleted:
         from app.modules.budgets.service import check_and_trigger_budget_alerts
+
         await check_and_trigger_budget_alerts(
             user_id=user_id,
             category_id=tx.category_id,
@@ -347,7 +348,6 @@ async def update_transaction(
         )
 
     return tx
-
 
 
 async def delete_transaction(
@@ -368,6 +368,7 @@ async def delete_transaction(
 
     if tx.transaction_type == "expense":
         from app.modules.budgets.service import check_and_trigger_budget_alerts
+
         await check_and_trigger_budget_alerts(
             user_id=user_id,
             category_id=tx.category_id,
@@ -376,7 +377,6 @@ async def delete_transaction(
             db=db,
             redis=redis,
         )
-
 
 
 async def bulk_create_transactions(
@@ -485,6 +485,7 @@ async def bulk_create_transactions(
 
         if affected_budgets:
             from app.modules.budgets.service import check_and_trigger_budget_alerts
+
             for category_id, year, month in affected_budgets:
                 await check_and_trigger_budget_alerts(
                     user_id=user_id,
@@ -496,7 +497,6 @@ async def bulk_create_transactions(
                 )
 
     return {"created": created, "skipped": skipped, "errors": errors}
-
 
 
 async def get_summary(
@@ -627,8 +627,9 @@ async def parse_sms_with_gemini(
     sms_content: str, db: AsyncSession, user_id: uuid.UUID
 ) -> dict[str, Any]:
     """Parse SMS transaction notifications using Gemini 2.5 Flash API or a fallback rules-based engine."""
-    from app.core.config import settings
     import httpx
+
+    from app.core.config import settings
 
     sms_text = sms_content.strip()
     parsed_data = None
@@ -642,17 +643,11 @@ async def parse_sms_with_gemini(
             "Identify the amount of the transaction. "
             "Identify the counterparty / recipient / sender or activity as description. "
             "Suggest a category (e.g. food, transfer, utilities, cash-out, leisure, or other). "
-            f"SMS: \"{sms_text}\""
+            f'SMS: "{sms_text}"'
         )
 
         payload = {
-            "contents": [
-                {
-                    "parts": [
-                        {"text": prompt}
-                    ]
-                }
-            ],
+            "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "responseSchema": {
@@ -662,11 +657,11 @@ async def parse_sms_with_gemini(
                         "transaction_type": {"type": "STRING", "enum": ["income", "expense"]},
                         "description": {"type": "STRING"},
                         "category_suggestion": {"type": "STRING"},
-                        "notes": {"type": "STRING"}
+                        "notes": {"type": "STRING"},
                     },
-                    "required": ["amount", "transaction_type", "description"]
-                }
-            }
+                    "required": ["amount", "transaction_type", "description"],
+                },
+            },
         }
 
         try:
@@ -677,7 +672,9 @@ async def parse_sms_with_gemini(
                     text_out = resp_json["candidates"][0]["content"]["parts"][0]["text"]
                     parsed_data = json.loads(text_out)
                 else:
-                    logger.error("Gemini API error (status %d): %s", response.status_code, response.text)
+                    logger.error(
+                        "Gemini API error (status %d): %s", response.status_code, response.text
+                    )
         except Exception as e:
             logger.error("Failed to parse SMS using Gemini API: %s", str(e))
 
@@ -699,7 +696,7 @@ async def parse_sms_with_gemini(
                     },
                     {
                         "role": "user",
-                        "content": f"SMS: \"{sms_text}\"",
+                        "content": f'SMS: "{sms_text}"',
                     },
                 ],
                 "response_format": {"type": "json_object"},
@@ -715,7 +712,11 @@ async def parse_sms_with_gemini(
                     content = m_data["choices"][0]["message"]["content"]
                     parsed_data = json.loads(content)
                 else:
-                    logger.warning("Mistral SMS parse error (status %d): %s", m_resp.status_code, m_resp.text[:200])
+                    logger.warning(
+                        "Mistral SMS parse error (status %d): %s",
+                        m_resp.status_code,
+                        m_resp.text[:200],
+                    )
         except Exception as me:
             logger.warning("Mistral SMS parse fallback failed: %s", str(me))
 
@@ -737,7 +738,7 @@ async def parse_sms_with_gemini(
                     },
                     {
                         "role": "user",
-                        "content": f"SMS: \"{sms_text}\"",
+                        "content": f'SMS: "{sms_text}"',
                     },
                 ],
                 "response_format": {"type": "json_object"},
@@ -753,7 +754,11 @@ async def parse_sms_with_gemini(
                     content = oa_data["choices"][0]["message"]["content"]
                     parsed_data = json.loads(content)
                 else:
-                    logger.warning("OpenAI SMS parse error (status %d): %s", oa_resp.status_code, oa_resp.text[:200])
+                    logger.warning(
+                        "OpenAI SMS parse error (status %d): %s",
+                        oa_resp.status_code,
+                        oa_resp.text[:200],
+                    )
         except Exception as oe:
             logger.warning("OpenAI SMS parse fallback failed: %s", str(oe))
 
@@ -764,15 +769,15 @@ async def parse_sms_with_gemini(
     category_id = None
     if parsed_data.get("category_suggestion"):
         suggested = parsed_data["category_suggestion"].strip().lower()
-        stmt = select(Category).where(
-            func.lower(Category.name) == suggested
-        )
+        stmt = select(Category).where(func.lower(Category.name) == suggested)
         result = await db.execute(stmt)
         cat_obj = result.scalar_one_or_none()
         if cat_obj:
             category_id = cat_obj.id
         else:
-            stmt_all = select(Category).where(Category.category_type == parsed_data["transaction_type"])
+            stmt_all = select(Category).where(
+                Category.category_type == parsed_data["transaction_type"]
+            )
             res_all = await db.execute(stmt_all)
             cats = res_all.scalars().all()
             for c in cats:
@@ -781,11 +786,10 @@ async def parse_sms_with_gemini(
                     break
 
             if not category_id and cats:
-                other_cat = next((c for c in cats if "other" in c.name.lower() or "misc" in c.name.lower()), None)
-                if other_cat:
-                    category_id = other_cat.id
-                else:
-                    category_id = cats[0].id
+                other_cat = next(
+                    (c for c in cats if "other" in c.name.lower() or "misc" in c.name.lower()), None
+                )
+                category_id = other_cat.id if other_cat else cats[0].id
 
     return {
         "amount": parsed_data.get("amount", 0.0),
@@ -793,13 +797,15 @@ async def parse_sms_with_gemini(
         "description": parsed_data.get("description", "SMS Import"),
         "category_id": category_id,
         "category_name": parsed_data.get("category_suggestion", "Other").title(),
-        "notes": parsed_data.get("notes", f"Parsed SMS: {sms_text}")
+        "notes": parsed_data.get("notes", f"Parsed SMS: {sms_text}"),
     }
 
 
 def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
     """Fallback rule-based regex parsing for common Ghana Mobile Money transaction SMS structures."""
+    import contextlib
     import re
+
     sms_text_lower = sms_text.lower()
 
     amount = 0.0
@@ -809,15 +815,13 @@ def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
     notes = f"Regex Parsed SMS: {sms_text}"
 
     # 1. Extract amount
-    amount_match = re.search(r'(?:ghs|ghc|₵)\s*(\d+(?:\.\d{2})?)', sms_text, re.IGNORECASE)
+    amount_match = re.search(r"(?:ghs|ghc|₵)\s*(\d+(?:\.\d{2})?)", sms_text, re.IGNORECASE)
     if not amount_match:
-        amount_match = re.search(r'(\d+\.\d{2})', sms_text)
+        amount_match = re.search(r"(\d+\.\d{2})", sms_text)
 
     if amount_match:
-        try:
+        with contextlib.suppress(ValueError):
             amount = float(amount_match.group(1))
-        except ValueError:
-            pass
 
     # 2. Determine Transaction Type (income vs expense)
     income_keywords = [
@@ -837,12 +841,12 @@ def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
         category_suggestion = "other income"
 
         sender_patterns = [
-            r'received\s+from\s+([^.]+)',
-            r'received\s+of\s+(?:ghs|ghc|₵)?\s*\d+(?:\.\d{2})?\s+from\s+([^.]+)',
-            r'received\s+of\s+([^.]+)\s+from',
-            r'deposited\s+into.*by\s+([^.]+)',
-            r'deposited\s+by\s+([^.]+)',
-            r'transfer\s+from\s+([^.]+)',
+            r"received\s+from\s+([^.]+)",
+            r"received\s+of\s+(?:ghs|ghc|₵)?\s*\d+(?:\.\d{2})?\s+from\s+([^.]+)",
+            r"received\s+of\s+([^.]+)\s+from",
+            r"deposited\s+into.*by\s+([^.]+)",
+            r"deposited\s+by\s+([^.]+)",
+            r"transfer\s+from\s+([^.]+)",
         ]
         for pattern in sender_patterns:
             match = re.search(pattern, sms_text, re.IGNORECASE)
@@ -854,14 +858,14 @@ def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
         category_suggestion = "utilities"
 
         recipient_patterns = [
-            r'payment\s+made\s+for\s+(?:ghs|ghc|₵)?\s*[\d\.,]+\s+to\s+([^.]+)',
-            r'cash\s*out\s*(?:made\s+for)?\s*(?:ghs|ghc|₵)?\s*[\d\.,]+\s+(?:at|to|from)\s+([^.]+)',
-            r'sent\s+(?:ghs|ghc|₵)?\s*\d+(?:\.\d{2})?\s+to\s+([^.]+)',
-            r'sent\s+to\s+([^.]+)',
-            r'paid\s+to\s+([^.]+)',
-            r'payment\s+to\s+([^.]+)',
-            r'payment\s+of\s+.*?\s+made\s+to\s+([^.]+)',
-            r'transferred\s+to\s+([^.]+)',
+            r"payment\s+made\s+for\s+(?:ghs|ghc|₵)?\s*[\d\.,]+\s+to\s+([^.]+)",
+            r"cash\s*out\s*(?:made\s+for)?\s*(?:ghs|ghc|₵)?\s*[\d\.,]+\s+(?:at|to|from)\s+([^.]+)",
+            r"sent\s+(?:ghs|ghc|₵)?\s*\d+(?:\.\d{2})?\s+to\s+([^.]+)",
+            r"sent\s+to\s+([^.]+)",
+            r"paid\s+to\s+([^.]+)",
+            r"payment\s+to\s+([^.]+)",
+            r"payment\s+of\s+.*?\s+made\s+to\s+([^.]+)",
+            r"transferred\s+to\s+([^.]+)",
         ]
         for pattern in recipient_patterns:
             match = re.search(pattern, sms_text, re.IGNORECASE)
@@ -869,10 +873,11 @@ def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
                 description = match.group(1).strip()
                 break
 
-        if description == "SMS Import":
-            if "withdrawn" in sms_text_lower or "cash out" in sms_text_lower:
-                description = "Agent Withdrawal"
-                category_suggestion = "cash out"
+        if description == "SMS Import" and (
+            "withdrawn" in sms_text_lower or "cash out" in sms_text_lower
+        ):
+            description = "Agent Withdrawal"
+            category_suggestion = "cash out"
 
         desc_lower = description.lower()
         if any(w in desc_lower for w in ["ecg", "electricity", "water", "gwcl"]):
@@ -881,10 +886,14 @@ def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
             category_suggestion = "transport"
         elif any(w in desc_lower for w in ["food", "restaurant", "kfc", "chop", "canteen"]):
             category_suggestion = "food"
-        elif any(w in desc_lower for w in ["telecel", "mtn", "airtel", "bundle", "credit", "internet"]):
+        elif any(
+            w in desc_lower for w in ["telecel", "mtn", "airtel", "bundle", "credit", "internet"]
+        ):
             category_suggestion = "telecom"
 
-    ref_match = re.search(r'(?:transaction\s+id|financial\s+transaction\s+id|id):\s*(\w+)', sms_text, re.IGNORECASE)
+    ref_match = re.search(
+        r"(?:transaction\s+id|financial\s+transaction\s+id|id):\s*(\w+)", sms_text, re.IGNORECASE
+    )
     reference_id = ref_match.group(1).strip() if ref_match else ""
 
     return {
@@ -910,39 +919,43 @@ async def parse_and_log_sms(
     clean_phone = phone.strip().replace(" ", "").replace("-", "")
     if clean_phone.startswith("+233"):
         clean_phone = "0" + clean_phone[4:]  # convert +233240123456 to 0240123456
-        
+
     # 2. Find the corresponding FinancialAccount
     stmt = select(FinancialAccount).where(
         FinancialAccount.user_id == user_id,
         FinancialAccount.is_active == True,
-        FinancialAccount.account_number == clean_phone
+        FinancialAccount.account_number == clean_phone,
     )
     result = await db.execute(stmt)
     account = result.scalar_one_or_none()
-    
+
     if not account:
         # Fallback: match by provider/carrier name if phone is not matched
         provider_hint = None
-        if "mobilemoney" in sender.lower() or "mtnmomo" in sender.lower() or "mtn" in sender.lower():
+        if (
+            "mobilemoney" in sender.lower()
+            or "mtnmomo" in sender.lower()
+            or "mtn" in sender.lower()
+        ):
             provider_hint = "MTN MoMo"
         elif "telecel" in sender.lower() or "voda" in sender.lower():
             provider_hint = "Telecel Cash"
-            
+
         if provider_hint:
             stmt = select(FinancialAccount).where(
                 FinancialAccount.user_id == user_id,
                 FinancialAccount.is_active == True,
                 FinancialAccount.account_type == "mobile_money",
-                FinancialAccount.provider == provider_hint
+                FinancialAccount.provider == provider_hint,
             )
             result = await db.execute(stmt)
             account = result.scalar_one_or_none()
-            
+
     if not account:
         raise AppException(
             status_code=404,
             error_code="ACCOUNT_NOT_FOUND",
-            message=f"No linked Mobile Money account found for provider matching '{sender}' and phone number '{phone}'."
+            message=f"No linked Mobile Money account found for provider matching '{sender}' and phone number '{phone}'.",
         )
 
     # 3. Parse SMS (using regex first, falling back to Gemini)
@@ -955,37 +968,33 @@ async def parse_and_log_sms(
             "transaction_type": res_gemini["transaction_type"],
             "description": res_gemini["description"],
             "reference_id": f"sms_{int(datetime.now(UTC).timestamp())}",
-            "new_balance": 0.0
+            "new_balance": 0.0,
         }
         category_id = res_gemini["category_id"]
     else:
         # Resolve category
-        category_name = "Mobile Money Received" if parsed["transaction_type"] == "income" else "Other Expense"
-        
-        # Check system or user category
-        stmt = select(Category).where(
-            or_(
-                Category.user_id == user_id,
-                Category.is_system == True
-            ),
-            Category.category_type == parsed["transaction_type"],
-            func.lower(Category.name) == category_name.lower()
+        category_name = (
+            "Mobile Money Received" if parsed["transaction_type"] == "income" else "Other Expense"
         )
-        cat_res = await db.execute(stmt)
+
+        # Check system or user category
+        cat_stmt = select(Category).where(
+            or_(Category.user_id == user_id, Category.is_system == True),
+            Category.category_type == parsed["transaction_type"],
+            func.lower(Category.name) == category_name.lower(),
+        )
+        cat_res = await db.execute(cat_stmt)
         cat_obj = cat_res.scalar_one_or_none()
-        
+
         if not cat_obj:
             # Fallback to any category for this type
-            stmt = select(Category).where(
-                or_(
-                    Category.user_id == user_id,
-                    Category.is_system == True
-                ),
-                Category.category_type == parsed["transaction_type"]
+            cat_stmt = select(Category).where(
+                or_(Category.user_id == user_id, Category.is_system == True),
+                Category.category_type == parsed["transaction_type"],
             )
-            cat_res = await db.execute(stmt)
+            cat_res = await db.execute(cat_stmt)
             cat_obj = cat_res.scalar_one_or_none()
-            
+
         if not cat_obj:
             # Create on the fly
             cat_obj = Category(
@@ -994,29 +1003,26 @@ async def parse_and_log_sms(
                 icon="wallet-outline" if parsed["transaction_type"] == "income" else "card-outline",
                 color="#9C27B0" if parsed["transaction_type"] == "income" else "#9E9E9E",
                 category_type=parsed["transaction_type"],
-                is_system=False
+                is_system=False,
             )
             db.add(cat_obj)
             await db.flush()
-            
+
         category_id = cat_obj.id
 
     # 4. Check for duplicate transaction Ref ID to ensure idempotency
     ref_id = parsed["reference_id"]
-    stmt = select(Transaction).where(
+    tx_dup_stmt = select(Transaction).where(
         Transaction.user_id == user_id,
         Transaction.account_id == account.id,
-        or_(
-            Transaction.notes.like(f"%{ref_id}%"),
-            Transaction.description.like(f"%{ref_id}%")
-        )
+        or_(Transaction.notes.like(f"%{ref_id}%"), Transaction.description.like(f"%{ref_id}%")),
     )
-    dup_res = await db.execute(stmt)
+    dup_res = await db.execute(tx_dup_stmt)
     if dup_res.scalar_one_or_none():
         raise AppException(
             status_code=409,
             error_code="TRANSACTION_ALREADY_LOGGED",
-            message=f"Transaction with Reference ID {ref_id} has already been logged."
+            message=f"Transaction with Reference ID {ref_id} has already been logged.",
         )
 
     # 5. Create transaction
@@ -1029,23 +1035,20 @@ async def parse_and_log_sms(
         transaction_type=parsed["transaction_type"],
         description=parsed["description"],
         transaction_date=date.today(),
-        notes=notes
+        notes=notes,
     )
     db.add(tx)
-    
+
     # Save Fee Transaction (if fee > 0 and transaction is an expense)
     if parsed["fee"] > 0 and parsed["transaction_type"] == "expense":
         stmt_fee = select(Category).where(
-            or_(
-                Category.user_id == user_id,
-                Category.is_system == True
-            ),
+            or_(Category.user_id == user_id, Category.is_system == True),
             Category.category_type == "expense",
-            func.lower(Category.name) == "mobile money fees"
+            func.lower(Category.name) == "mobile money fees",
         )
         fee_cat_res = await db.execute(stmt_fee)
         fee_cat = fee_cat_res.scalar_one_or_none()
-        
+
         if not fee_cat:
             # Create on the fly
             fee_cat = Category(
@@ -1054,13 +1057,13 @@ async def parse_and_log_sms(
                 icon="card-outline",
                 color="#FF9800",
                 category_type="expense",
-                is_system=False
+                is_system=False,
             )
             db.add(fee_cat)
             await db.flush()
-            
+
         fee_category_id = fee_cat.id
-        
+
         fee_tx = Transaction(
             user_id=user_id,
             account_id=account.id,
@@ -1069,7 +1072,7 @@ async def parse_and_log_sms(
             transaction_type="expense",
             description="Mobile Money Fee",
             transaction_date=date.today(),
-            notes=f"Fee for transaction Ref: {ref_id}"
+            notes=f"Fee for transaction Ref: {ref_id}",
         )
         db.add(fee_tx)
 
@@ -1079,11 +1082,11 @@ async def parse_and_log_sms(
     if parsed["new_balance"] > 0:
         current_balances = await _compute_balances(user_id, db, [account.id])
         curr_bal = current_balances.get(account.id, Decimal("0.00"))
-        
+
         target_bal = Decimal(str(parsed["new_balance"]))
         if curr_bal != target_bal:
             diff = target_bal - curr_bal
-            account.opening_balance = account.opening_balance + diff
+            account.opening_balance = float(Decimal(str(account.opening_balance)) + diff)
             await db.flush()
 
     # Invalidate cache
@@ -1102,4 +1105,3 @@ async def parse_and_log_sms(
     )
     tx_reload = (await db.execute(stmt_reload)).scalar_one()
     return tx_reload
-

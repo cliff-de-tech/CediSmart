@@ -7,6 +7,7 @@ models to be imported and inspected without a running DB (e.g. for tests, lintin
 
 from collections.abc import AsyncGenerator
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import TIMESTAMP, func
 from sqlalchemy.ext.asyncio import (
@@ -73,7 +74,7 @@ def get_engine() -> AsyncEngine:
         clean_query = urlencode(qs, doseq=True)
         clean_url = urlunparse(parsed._replace(query=clean_query))
 
-        connect_args: dict = {}
+        connect_args: dict[str, Any] = {}
         if ssl_mode in ("require", "verify-ca", "verify-full"):
             connect_args["ssl"] = "require"
 

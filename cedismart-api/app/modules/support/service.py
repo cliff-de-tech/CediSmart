@@ -4,10 +4,10 @@ import logging
 import re
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, cast
 
 import httpx
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -50,65 +50,69 @@ VOICE_MODE_INSTRUCTIONS = (
     "4. Mention currency naturally (e.g. '50 cedis' rather than 'GHS 50.00').\n"
 )
 
-AUTH_SYSTEM_PROMPT = (
-    "You are the CediSmart Onboarding & Authentication Troubleshooter. CediSmart is a digital ledger "
-    "and budgeting mobile application built for the Ghanaian market.\n\n"
-    "Your tone should be professional, polite, helpful, and direct.\n\n"
-    "Your sole focus is helping users resolve registration, SMS verification OTP, sign-in, and 6-digit Secure PIN reset issues.\n"
-    "- SMS Verification OTP: SMS verification is handled via Clerk. If they aren't receiving OTPs, "
-    "suggest they check cellular signal, ensure they didn't prefix the number with another 0 "
-    "(Ghana numbers are 9 digits, e.g., 24XXXXXXX, excluding the leading 0), or check if they have "
-    "MTN Do Not Disturb (DND) active which blocks transaction SMS. "
-    "Also note that reviewers can use pre-configured Test Phone Numbers.\n"
-    "- PIN & Login: Security PINs are 6 digits and stored securely. PIN resets require a Clerk "
-    "phone re-verification step.\n"
-    "- Screenshot Vision: If the user attaches a screenshot of an error screen or OTP issue, inspect the visual details carefully and give exact step-by-step guidance.\n"
-    "- Important restriction: Since you are the Onboarding Troubleshooter, if users ask about general ledger usage, "
-    "adding transactions, or setting budgets, politely advise them that you are specialized in login/registration issues, "
-    "but once they are logged in, the General Support assistant in Settings will happily help them with budgeting.\n\n"
-    "IMPORTANT ESCALATION PROTOCOL:\n"
-    "If the user describes a bug, a server crash, asks for human support, or if the issue is complex "
-    "and you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your response. "
-    "This lets the system know it needs to offer the user a direct problem report."
-    + ACTION_TAGS_GUIDE
-    + CRITICAL_TRUTH_AND_INTEGRITY_RULES
-    + VOICE_MODE_INSTRUCTIONS
+AUTH_SYSTEM_PROMPT = "".join(
+    [
+        "You are the CediSmart Onboarding & Authentication Troubleshooter. CediSmart is a digital ledger "
+        "and budgeting mobile application built for the Ghanaian market.\n\n",
+        "Your tone should be professional, polite, helpful, and direct.\n\n",
+        "Your sole focus is helping users resolve registration, SMS verification OTP, sign-in, and 6-digit Secure PIN reset issues.\n",
+        "- SMS Verification OTP: SMS verification is handled via Clerk. If they aren't receiving OTPs, "
+        "suggest they check cellular signal, ensure they didn't prefix the number with another 0 "
+        "(Ghana numbers are 9 digits, e.g., 24XXXXXXX, excluding the leading 0), or check if they have "
+        "MTN Do Not Disturb (DND) active which blocks transaction SMS. "
+        "Also note that reviewers can use pre-configured Test Phone Numbers.\n",
+        "- PIN & Login: Security PINs are 6 digits and stored securely. PIN resets require a Clerk "
+        "phone re-verification step.\n",
+        "- Screenshot Vision: If the user attaches a screenshot of an error screen or OTP issue, inspect the visual details carefully and give exact step-by-step guidance.\n",
+        "- Important restriction: Since you are the Onboarding Troubleshooter, if users ask about general ledger usage, "
+        "adding transactions, or setting budgets, politely advise them that you are specialized in login/registration issues, "
+        "but once they are logged in, the General Support assistant in Settings will happily help them with budgeting.\n\n",
+        "IMPORTANT ESCALATION PROTOCOL:\n",
+        "If the user describes a bug, a server crash, asks for human support, or if the issue is complex "
+        "and you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your response. "
+        "This lets the system know it needs to offer the user a direct problem report.",
+        ACTION_TAGS_GUIDE,
+        CRITICAL_TRUTH_AND_INTEGRITY_RULES,
+        VOICE_MODE_INSTRUCTIONS,
+    ]
 )
 
-GENERAL_SYSTEM_PROMPT = (
-    "You are the CediSmart Ledger & Budgeting Co-Pilot. CediSmart is a digital ledger and budgeting "
-    "mobile application built for the Ghanaian market, supporting Cash, Mobile Money (MTN, Telecel, AT), "
-    "and Bank accounts.\n\n"
-    "Your tone should be professional, polite, reassuring, and direct. You must provide clear, trustworthy financial advice.\n\n"
-    "Your focus is helping logged-in users understand and use CediSmart's ledger, budgeting, and transaction syncing features:\n"
-    "- Ledgers: Help them understand how to set up accounts, record transactions (categorize expense vs income), and review monthly reports.\n"
-    "- Budgeting: Guide them on setting monthly category budgets and tracking spending limits.\n"
-    "- Live Budget & Report Intelligence: You have direct, real-time access to the user's active monthly budgets and financial reports in the 'LIVE X-RAY ACCOUNT & DEVICE TELEMETRY'. When the user asks about their spending, budgets, savings rate, or financial health:\n"
-    "  * Answer immediately and accurately with their actual numbers (e.g. 'You have spent GH₵ 150.00 out of your GH₵ 500.00 Food budget (30%), leaving GH₵ 350.00 remaining.').\n"
-    "  * Proactively warn them if any budget shows '[OVER BUDGET!]' or has exceeded 80% of its limit.\n"
-    "  * If they have no budgets set, encourage them to create one and provide `[ACTION:NAV_BUDGETS]`.\n"
-    "- Mobile Money Live Sync (Background SMS Sync): Guide them on how to configure automated transaction tracking:\n"
-    "  1. 🤖 Google Android: Android supports direct background intercepting. Guide the user to click 'Configure Auto-Sync' in their Accounts tab, select Android, and tap 'Grant SMS Permissions' to allow background SMS reading.\n"
-    "  2. 🍎 Apple iOS: iOS sandboxing blocks direct SMS reading. Explain that they can configure Apple's native Shortcuts app to securely forward messages via webhook:\n"
-    "     * Step 1: Open Shortcuts app ➔ Go to 'Automation' tab ➔ Tap '+' ➔ Select 'Message' as trigger (Sender: 'MobileMoney' or 'T-CASH'). Set 'Run Immediately'.\n"
-    "     * Step 2: Under actions, add 'Get Contents of URL' action, change method to 'POST', and paste the Webhook URL copied from Settings ➔ Accounts.\n"
-    "     * Step 3: Add an Authorization header: Key: 'Authorization', Value: 'Bearer <your key>' (using the copied Auth Key from Accounts tab).\n"
-    "     * Step 4: Change request body to JSON and add fields: 'sender' ➔ select Sender (from message), 'message_body' ➔ select Message/Shortcut Input, 'phone' ➔ type their registered CediSmart phone number.\n"
-    "- Paste-Any-SMS Rescue: Users can also paste any missed MTN MoMo, Telecel Cash, or AT Money SMS directly into this support chat and our system will automatically parse and log it into their wallet!\n"
-    "- Screenshot & Receipt Vision (Multi-Item Scanner & Splitter): Users can attach screenshots or photos of paper store receipts, market invoices, and checkout slips:\n"
-    "  1. Read the image carefully: Transcribe the merchant/store name, transaction date, and line items with individual prices.\n"
-    "  2. Present a clean itemized breakdown list of all items and total amount.\n"
-    "  3. In Advisor Mode (Auto-Pilot OFF): Append a `[PROPOSED_TRANSACTION: {\"amount\": <total>, \"transaction_type\": \"expense\", \"category_name\": <best category, e.g. 'Food & Dining' or 'Shopping'>, \"wallet_name\": \"Cash\", \"description\": <store name or items>, \"transaction_date\": \"YYYY-MM-DD\"}]` tag so the user can review and log the receipt with 1 tap.\n"
-    "  4. In Auto-Pilot Mode (Auto-Pilot ON): If the user asked you to log/scan the receipt, the total will be recorded automatically.\n"
-    "- Important restriction: Since you are post-login support, if the user asks about changing phone numbers or "
-    "re-registering, guide them to the profile/auth settings.\n\n"
-    "IMPORTANT ESCALATION PROTOCOL:\n"
-    "If the user describes a bug, a server crash, asks for human support, or if the issue is complex "
-    "and you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your response. "
-    "This lets the system know it needs to offer the user a direct problem report."
-    + ACTION_TAGS_GUIDE
-    + CRITICAL_TRUTH_AND_INTEGRITY_RULES
-    + VOICE_MODE_INSTRUCTIONS
+GENERAL_SYSTEM_PROMPT = "".join(
+    [
+        "You are the CediSmart Ledger & Budgeting Co-Pilot. CediSmart is a digital ledger and budgeting "
+        "mobile application built for the Ghanaian market, supporting Cash, Mobile Money (MTN, Telecel, AT), "
+        "and Bank accounts.\n\n",
+        "Your tone should be professional, polite, reassuring, and direct. You must provide clear, trustworthy financial advice.\n\n",
+        "Your focus is helping logged-in users understand and use CediSmart's ledger, budgeting, and transaction syncing features:\n",
+        "- Ledgers: Help them understand how to set up accounts, record transactions (categorize expense vs income), and review monthly reports.\n",
+        "- Budgeting: Guide them on setting monthly category budgets and tracking spending limits.\n",
+        "- Live Budget & Report Intelligence: You have direct, real-time access to the user's active monthly budgets and financial reports in the 'LIVE X-RAY ACCOUNT & DEVICE TELEMETRY'. When the user asks about their spending, budgets, savings rate, or financial health:\n",
+        "  * Answer immediately and accurately with their actual numbers (e.g. 'You have spent GH₵ 150.00 out of your GH₵ 500.00 Food budget (30%), leaving GH₵ 350.00 remaining.').\n",
+        "  * Proactively warn them if any budget shows '[OVER BUDGET!]' or has exceeded 80% of its limit.\n",
+        "  * If they have no budgets set, encourage them to create one and provide `[ACTION:NAV_BUDGETS]`.\n",
+        "- Mobile Money Live Sync (Background SMS Sync): Guide them on how to configure automated transaction tracking:\n",
+        "  1. 🤖 Google Android: Android supports direct background intercepting. Guide the user to click 'Configure Auto-Sync' in their Accounts tab, select Android, and tap 'Grant SMS Permissions' to allow background SMS reading.\n",
+        "  2. 🍎 Apple iOS: iOS sandboxing blocks direct SMS reading. Explain that they can configure Apple's native Shortcuts app to securely forward messages via webhook:\n",
+        "     * Step 1: Open Shortcuts app ➔ Go to 'Automation' tab ➔ Tap '+' ➔ Select 'Message' as trigger (Sender: 'MobileMoney' or 'T-CASH'). Set 'Run Immediately'.\n",
+        "     * Step 2: Under actions, add 'Get Contents of URL' action, change method to 'POST', and paste the Webhook URL copied from Settings ➔ Accounts.\n",
+        "     * Step 3: Add an Authorization header: Key: 'Authorization', Value: 'Bearer <your key>' (using the copied Auth Key from Accounts tab).\n",
+        "     * Step 4: Change request body to JSON and add fields: 'sender' ➔ select Sender (from message), 'message_body' ➔ select Message/Shortcut Input, 'phone' ➔ type their registered CediSmart phone number.\n",
+        "- Paste-Any-SMS Rescue: Users can also paste any missed MTN MoMo, Telecel Cash, or AT Money SMS directly into this support chat and our system will automatically parse and log it into their wallet!\n",
+        "- Screenshot & Receipt Vision (Multi-Item Scanner & Splitter): Users can attach screenshots or photos of paper store receipts, market invoices, and checkout slips:\n",
+        "  1. Read the image carefully: Transcribe the merchant/store name, transaction date, and line items with individual prices.\n",
+        "  2. Present a clean itemized breakdown list of all items and total amount.\n",
+        '  3. In Advisor Mode (Auto-Pilot OFF): Append a `[PROPOSED_TRANSACTION: {"amount": <total>, "transaction_type": "expense", "category_name": <best category, e.g. \'Food & Dining\' or \'Shopping\'>, "wallet_name": "Cash", "description": <store name or items>, "transaction_date": "YYYY-MM-DD"}]` tag so the user can review and log the receipt with 1 tap.\n',
+        "  4. In Auto-Pilot Mode (Auto-Pilot ON): If the user asked you to log/scan the receipt, the total will be recorded automatically.\n",
+        "- Important restriction: Since you are post-login support, if the user asks about changing phone numbers or ",
+        "re-registering, guide them to the profile/auth settings.\n\n",
+        "IMPORTANT ESCALATION PROTOCOL:\n",
+        "If the user describes a bug, a server crash, asks for human support, or if the issue is complex ",
+        "and you cannot solve it, add the exact tag '[ESCALATE_REQUIRED]' at the end of your response. ",
+        "This lets the system know it needs to offer the user a direct problem report.",
+        ACTION_TAGS_GUIDE,
+        CRITICAL_TRUTH_AND_INTEGRITY_RULES,
+        VOICE_MODE_INSTRUCTIONS,
+    ]
 )
 
 
@@ -160,9 +164,9 @@ def get_execution_mode_prompt(auto_pilot: bool) -> str:
             "1. Politely explain what you prepared.\n"
             "2. At the very end of your response, output a structured proposal tag on its own line so the app can render an interactive confirmation card:\n"
             "   For expenses/income:\n"
-            "   `[PROPOSED_TRANSACTION: {\"amount\": 50.0, \"transaction_type\": \"expense\", \"category_name\": \"Food & Dining\", \"wallet_name\": \"Mobile Money\", \"description\": \"Lunch\", \"transaction_date\": \"YYYY-MM-DD\"}]`\n"
+            '   `[PROPOSED_TRANSACTION: {"amount": 50.0, "transaction_type": "expense", "category_name": "Food & Dining", "wallet_name": "Mobile Money", "description": "Lunch", "transaction_date": "YYYY-MM-DD"}]`\n'
             "   For budgets:\n"
-            "   `[PROPOSED_BUDGET: {\"category_name\": \"Food & Dining\", \"monthly_limit\": 500.0}]`\n"
+            '   `[PROPOSED_BUDGET: {"category_name": "Food & Dining", "monthly_limit": 500.0}]`\n'
             "3. Ask the user to tap 'Confirm & Save' on the card to record it.\n"
         )
 
@@ -172,7 +176,7 @@ class SupportService:
     async def build_xray_telemetry(
         db: AsyncSession | None,
         phone: str | None,
-        device_diagnostics: dict | None,
+        device_diagnostics: dict[str, Any] | None,
     ) -> tuple[str, Any]:
         """Build a live X-Ray diagnostic snapshot from Postgres + client telemetry."""
         lines: list[str] = []
@@ -242,8 +246,12 @@ class SupportService:
                             acc_summaries.append(
                                 f"{a.name} ({a.account_type}/{a.provider or 'N/A'} #{a.account_number or 'N/A'}: GH₵ {bal})"
                             )
-                        lines.append(f"- Active Wallets ({len(accounts)}): " + "; ".join(acc_summaries))
-                        lines.append(f"- Mobile Money Wallet Linked: {'YES' if has_momo else 'NO (User must link a MoMo wallet in Accounts tab before SMS Auto-Sync can log transactions)'}")
+                        lines.append(
+                            f"- Active Wallets ({len(accounts)}): " + "; ".join(acc_summaries)
+                        )
+                        lines.append(
+                            f"- Mobile Money Wallet Linked: {'YES' if has_momo else 'NO (User must link a MoMo wallet in Accounts tab before SMS Auto-Sync can log transactions)'}"
+                        )
                     else:
                         lines.append("- Active Wallets: 0 linked accounts.")
 
@@ -253,7 +261,9 @@ class SupportService:
                             Transaction.user_id == user_obj.id,
                             Transaction.is_deleted.is_(False),
                         )
-                        .order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+                        .order_by(
+                            Transaction.transaction_date.desc(), Transaction.created_at.desc()
+                        )
                         .limit(3)
                     )
                     tx_res = await db.execute(tx_stmt)
@@ -272,7 +282,9 @@ class SupportService:
                         from app.modules.budgets.service import list_budgets
 
                         today_now = date.today()
-                        budgets_list = await list_budgets(user_obj.id, db, today_now.year, today_now.month)
+                        budgets_list = await list_budgets(
+                            user_obj.id, db, today_now.year, today_now.month
+                        )
                         if budgets_list:
                             b_summaries = []
                             for b in budgets_list:
@@ -285,40 +297,61 @@ class SupportService:
                                 b_summaries.append(
                                     f"{cat_name}: Limit GH₵ {budgeted}, Spent GH₵ {spent} ({pct}%){over_tag}, Remaining GH₵ {rem}"
                                 )
-                            lines.append(f"- Active Budgets ({today_now.strftime('%B %Y')}): " + " | ".join(b_summaries))
+                            lines.append(
+                                f"- Active Budgets ({today_now.strftime('%B %Y')}): "
+                                + " | ".join(b_summaries)
+                            )
                         else:
-                            lines.append(f"- Active Budgets ({today_now.strftime('%B %Y')}): None set yet for this month.")
+                            lines.append(
+                                f"- Active Budgets ({today_now.strftime('%B %Y')}): None set yet for this month."
+                            )
                     except Exception as b_err:
                         logger.warning("Failed to load budgets for X-Ray: %s", str(b_err))
 
                     # 5. Monthly Financial Report & Spending Breakdown Telemetry
                     try:
-                        from app.modules.reports.service import get_category_report, get_monthly_report
+                        from app.modules.reports.service import (
+                            get_category_report,
+                            get_monthly_report,
+                        )
 
                         today_now = date.today()
-                        m_report = await get_monthly_report(user_obj.id, today_now.year, today_now.month, db)
+                        m_report = await get_monthly_report(
+                            user_obj.id, today_now.year, today_now.month, db
+                        )
                         if m_report:
                             inc = m_report.get("total_income", "0.00")
                             exp = m_report.get("total_expense", "0.00")
                             net = m_report.get("net", "0.00")
                             tx_cnt = m_report.get("transaction_count", 0)
                             top_cat = m_report.get("top_expense_category")
-                            top_cat_str = f", Top Expense Category: {top_cat['name']} (GH₵ {top_cat['amount']})" if top_cat else ""
+                            top_cat_str = (
+                                f", Top Expense Category: {top_cat['name']} (GH₵ {top_cat['amount']})"
+                                if top_cat
+                                else ""
+                            )
                             lines.append(
                                 f"- Financial Report ({today_now.strftime('%B %Y')}): Total Income GH₵ {inc}, Total Expenses GH₵ {exp}, Net Savings GH₵ {net} ({tx_cnt} transactions{top_cat_str})"
                             )
 
                             # Top spending breakdown
                             start_of_month = date(today_now.year, today_now.month, 1)
-                            cat_report = await get_category_report(user_obj.id, start_of_month, today_now, "expense", db)
+                            cat_report = await get_category_report(
+                                user_obj.id, start_of_month, today_now, "expense", db
+                            )
                             cats = cat_report.get("categories", [])
                             if cats:
-                                top_3 = [f"{c['name']} (GH₵ {c['amount']}, {c['percentage']}%)" for c in cats[:3]]
+                                top_3 = [
+                                    f"{c['name']} (GH₵ {c['amount']}, {c['percentage']}%)"
+                                    for c in cats[:3]
+                                ]
                                 lines.append("- Top Spending Categories: " + ", ".join(top_3))
                     except Exception as r_err:
                         logger.warning("Failed to load reports for X-Ray: %s", str(r_err))
                 else:
-                    lines.append(f"- Database Lookup: No registered user found matching phone '{phone}'.")
+                    lines.append(
+                        f"- Database Lookup: No registered user found matching phone '{phone}'."
+                    )
             except Exception as exc:
                 logger.warning("X-Ray telemetry lookup non-fatal error: %s", str(exc))
 
@@ -381,7 +414,11 @@ class SupportService:
                 sub = sub.strip()
                 if sub and SupportService._looks_like_momo_sms(sub):
                     blocks.append(sub)
-        return blocks if blocks else ([text.strip()] if SupportService._looks_like_momo_sms(text) else [])
+        return (
+            blocks
+            if blocks
+            else ([text.strip()] if SupportService._looks_like_momo_sms(text) else [])
+        )
 
     @staticmethod
     async def _try_instant_sms_rescue(
@@ -400,13 +437,16 @@ class SupportService:
         if not sms_blocks:
             sms_blocks = [raw_text.strip()]
 
-        parsed_items: list[dict[str, Any]] = []
+        parsed_items: list[Any] = []
         for idx, block in enumerate(sms_blocks):
             parsed = fast_parse_sms("MobileMoney", block)
             if not parsed:
                 fb = _parse_sms_fallback(block)
                 if fb and fb.get("amount") and float(fb["amount"]) > 0:
-                    ref = fb.get("reference_id") or f"chat_sms_{int(date.today().strftime('%Y%m%d'))}_{abs(hash(block)) % 100000}_{idx}"
+                    ref = (
+                        fb.get("reference_id")
+                        or f"chat_sms_{int(date.today().strftime('%Y%m%d'))}_{abs(hash(block)) % 100000}_{idx}"
+                    )
                     parsed = {
                         "amount": float(fb["amount"]),
                         "fee": 0.0,
@@ -485,7 +525,11 @@ class SupportService:
                 if not cat_obj:
                     cat_obj = Category(
                         user_id=user_obj.id,
-                        name="Mobile Money" if item["transaction_type"] == "income" else "MoMo Transfer",
+                        name=(
+                            "Mobile Money"
+                            if item["transaction_type"] == "income"
+                            else "MoMo Transfer"
+                        ),
                         icon="wallet-outline",
                         color="#10B981",
                         category_type=item["transaction_type"],
@@ -512,6 +556,7 @@ class SupportService:
                 try:
                     from app.core.redis import init_redis, redis_pool
                     from app.modules.transactions.service import _invalidate_caches
+
                     r_client = redis_pool
                     if r_client is None:
                         r_client = await init_redis()
@@ -529,14 +574,18 @@ class SupportService:
                     lines.append(
                         f"{idx}. `{t['transaction_type'].upper()}` **GH₵ {t['amount']:.2f}** — {t['description']} (Ref: `{t['reference_id']}`)"
                     )
-                lines.append(f"\nWallet: **{account.name}**\nAll transactions have been logged directly into your ledger. Your wallet balance has been updated automatically! [ACTION:NAV_TRANSACTIONS]")
+                lines.append(
+                    f"\nWallet: **{account.name}**\nAll transactions have been logged directly into your ledger. Your wallet balance has been updated automatically! [ACTION:NAV_TRANSACTIONS]"
+                )
                 parts.append("\n".join(lines))
 
             if already_synced:
                 sync_header = f"✅ **Already Recorded in Ledger ({len(already_synced)} item{'s' if len(already_synced) > 1 else ''}):**"
                 sync_lines = [sync_header]
                 for s in already_synced:
-                    sync_lines.append(f"- **GH₵ {s['amount']:.2f}** ({s['description']} — Ref `{s['reference_id']}`)")
+                    sync_lines.append(
+                        f"- **GH₵ {s['amount']:.2f}** ({s['description']} — Ref `{s['reference_id']}`)"
+                    )
                 parts.append("\n".join(sync_lines))
 
             return "\n\n".join(parts) if parts else None
@@ -576,7 +625,9 @@ class SupportService:
         try:
             amt_val = float(match.group(1))
             raw_desc = match.group(2).strip()
-            wallet_hint = match.group(3).lower() if len(match.groups()) >= 3 and match.group(3) else ""
+            wallet_hint = (
+                match.group(3).lower() if len(match.groups()) >= 3 and match.group(3) else ""
+            )
 
             if amt_val <= 0:
                 return None, None
@@ -611,13 +662,35 @@ class SupportService:
             # Determine category
             cat_name = "Other Expense"
             lower_desc = raw_desc.lower()
-            if any(w in lower_desc for w in ["food", "lunch", "dinner", "breakfast", "eat", "chop", "groceries", "waakye", "jollof", "kfc"]):
+            if any(
+                w in lower_desc
+                for w in [
+                    "food",
+                    "lunch",
+                    "dinner",
+                    "breakfast",
+                    "eat",
+                    "chop",
+                    "groceries",
+                    "waakye",
+                    "jollof",
+                    "kfc",
+                ]
+            ):
                 cat_name = "Food & Dining"
-            elif any(w in lower_desc for w in ["fuel", "transport", "trotro", "uber", "bolt", "car", "taxi", "fare"]):
+            elif any(
+                w in lower_desc
+                for w in ["fuel", "transport", "trotro", "uber", "bolt", "car", "taxi", "fare"]
+            ):
                 cat_name = "Transportation"
-            elif any(w in lower_desc for w in ["utility", "ecg", "light", "water", "gwcl", "power", "bill"]):
+            elif any(
+                w in lower_desc
+                for w in ["utility", "ecg", "light", "water", "gwcl", "power", "bill"]
+            ):
                 cat_name = "Utilities"
-            elif any(w in lower_desc for w in ["airtime", "data", "internet", "mtn bundle", "wifi"]):
+            elif any(
+                w in lower_desc for w in ["airtime", "data", "internet", "mtn bundle", "wifi"]
+            ):
                 cat_name = "Airtime & Data"
             elif any(w in lower_desc for w in ["health", "med", "drug", "pharmacy", "hospital"]):
                 cat_name = "Health"
@@ -663,6 +736,7 @@ class SupportService:
             try:
                 from app.core.redis import init_redis, redis_pool
                 from app.modules.transactions.service import _invalidate_caches
+
                 r_client = redis_pool or await init_redis()
                 if r_client:
                     await _invalidate_caches(user_obj.id, today_date, r_client)
@@ -692,13 +766,35 @@ class SupportService:
         (e.g., 'Mr. Cliff' -> first_name='Cliff', full_name='Cliff').
         """
         source = (raw_name or "").strip()
-        if (not source or source.lower() in {"mr.", "mr", "mrs.", "mrs", "ms.", "ms", "miss", "anonymous"}) and db_user and getattr(db_user, "full_name", None):
+        if (
+            (
+                not source
+                or source.lower() in {"mr.", "mr", "mrs.", "mrs", "ms.", "ms", "miss", "anonymous"}
+            )
+            and db_user
+            and getattr(db_user, "full_name", None)
+        ):
             source = str(db_user.full_name).strip()
 
         if not source:
             return "there", "Friend"
 
-        titles = {"mr", "mr.", "mrs", "mrs.", "ms", "ms.", "miss", "dr", "dr.", "prof", "prof.", "pastor", "rev", "rev."}
+        titles = {
+            "mr",
+            "mr.",
+            "mrs",
+            "mrs.",
+            "ms",
+            "ms.",
+            "miss",
+            "dr",
+            "dr.",
+            "prof",
+            "prof.",
+            "pastor",
+            "rev",
+            "rev.",
+        }
         words = source.split()
         filtered = [w for w in words if w.lower() not in titles]
 
@@ -718,7 +814,7 @@ class SupportService:
         user_name: str | None = None,
         db: AsyncSession | None = None,
         phone: str | None = None,
-        device_diagnostics: dict | None = None,
+        device_diagnostics: dict[str, Any] | None = None,
         image_base64: str | None = None,
         image_mime_type: str | None = "image/jpeg",
         language: str = "en",
@@ -789,23 +885,25 @@ class SupportService:
             )
         elif not auto_pilot:
             system_prompt += (
-                f"\n\n=== ADVISOR MODE REMINDER ===\n"
-                f"No automatic database changes were made. If the user asks to log an expense/income or set a budget, "
-                f"construct a proposed card using `[PROPOSED_TRANSACTION: {{...}}]` or `[PROPOSED_BUDGET: {{...}}]` "
-                f"and advise them to tap 'Confirm & Save' to record it."
+                "\n\n=== ADVISOR MODE REMINDER ===\n"
+                "No automatic database changes were made. If the user asks to log an expense/income or set a budget, "
+                "construct a proposed card using `[PROPOSED_TRANSACTION: {...}]` or `[PROPOSED_BUDGET: {...}]` "
+                "and advise them to tap 'Confirm & Save' to record it."
             )
         else:
             system_prompt += (
-                f"\n\n=== CRITICAL ZERO-HALLUCINATION GUARD (MANDATORY) ===\n"
-                f"NO TRANSACTIONS WERE AUTOMATICALLY LOGGED INTO THE DATABASE FOR THIS MESSAGE.\n"
-                f"Under NO circumstances should you claim, imply, or hallucinate that you or CediSmart logged, recorded, saved, or added any transactions to the user's ledger.\n"
-                f"If the user shared SMS messages or receipts, explain clearly what is required (e.g. linking their Mobile Money wallet in Accounts tab) or invite them to tap [ACTION:NAV_ADD_EXPENSE] to record it manually."
+                "\n\n=== CRITICAL ZERO-HALLUCINATION GUARD (MANDATORY) ===\n"
+                "NO TRANSACTIONS WERE AUTOMATICALLY LOGGED INTO THE DATABASE FOR THIS MESSAGE.\n"
+                "Under NO circumstances should you claim, imply, or hallucinate that you or CediSmart logged, recorded, saved, or added any transactions to the user's ledger.\n"
+                "If the user shared SMS messages or receipts, explain clearly what is required (e.g. linking their Mobile Money wallet in Accounts tab) or invite them to tap [ACTION:NAV_ADD_EXPENSE] to record it manually."
             )
 
         # Resolve any image attached either on the request or on the last message
         effective_img_b64 = image_base64 or (messages[-1].image_base64 if messages else None)
         effective_img_mime = image_mime_type or (
-            messages[-1].image_mime_type if messages and messages[-1].image_mime_type else "image/jpeg"
+            messages[-1].image_mime_type
+            if messages and messages[-1].image_mime_type
+            else "image/jpeg"
         )
 
         final_reply: str | None = None
@@ -815,7 +913,9 @@ class SupportService:
             contents: list[dict[str, Any]] = []
             for idx, msg in enumerate(messages):
                 parts_list: list[dict[str, Any]] = [{"text": msg.content}]
-                msg_img = msg.image_base64 or (effective_img_b64 if idx == len(messages) - 1 else None)
+                msg_img = msg.image_base64 or (
+                    effective_img_b64 if idx == len(messages) - 1 else None
+                )
                 msg_mime = msg.image_mime_type or effective_img_mime or "image/jpeg"
                 if msg_img:
                     clean_b64 = msg_img.split(",")[-1] if "," in msg_img else msg_img
@@ -839,7 +939,11 @@ class SupportService:
                 "systemInstruction": {"parts": [{"text": system_prompt}]},
             }
 
-            for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
+            for model_name in [
+                "gemini-flash-lite-latest",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+            ]:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
                 try:
                     async with httpx.AsyncClient(timeout=6.0) as client:
@@ -879,7 +983,9 @@ class SupportService:
 
         # 5. Final Local Rules Engine
         if not final_reply:
-            final_reply = SupportService._fallback_support_response(messages, support_type, first_name)
+            final_reply = SupportService._fallback_support_response(
+                messages, support_type, first_name
+            )
 
         if auto_pilot_tag and auto_pilot_tag not in final_reply:
             final_reply += auto_pilot_tag
@@ -941,7 +1047,7 @@ class SupportService:
                 resp = await client.post(url, headers=headers, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()
-                    return data["choices"][0]["message"]["content"]
+                    return cast(str | None, data["choices"][0]["message"]["content"])
                 logger.warning(
                     "ChatGPT fallback returned status %d: %s",
                     resp.status_code,
@@ -968,10 +1074,12 @@ class SupportService:
 
         mistral_messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         for msg in messages:
-            mistral_messages.append({
-                "role": "assistant" if msg.role == "model" else "user",
-                "content": msg.content,
-            })
+            mistral_messages.append(
+                {
+                    "role": "assistant" if msg.role == "model" else "user",
+                    "content": msg.content,
+                }
+            )
 
         payload = {
             "model": "mistral-small-latest",
@@ -986,7 +1094,7 @@ class SupportService:
                     data = resp.json()
                     choices = data.get("choices") or []
                     if choices and "message" in choices[0]:
-                        return choices[0]["message"].get("content")
+                        return cast(str | None, choices[0]["message"].get("content"))
                 logger.warning(
                     "Mistral chat fallback returned status %d: %s",
                     resp.status_code,
@@ -1023,7 +1131,12 @@ class SupportService:
                 f"Chale {first_name}, to reset your PIN, please use the 'Forgot PIN?' link on the Login screen. "
                 "This will verify your identity via SMS before prompting you to choose a new 6-digit PIN."
             )
-        if "sync" in last_msg or "shortcut" in last_msg or "sms" in last_msg or "automation" in last_msg:
+        if (
+            "sync" in last_msg
+            or "shortcut" in last_msg
+            or "sms" in last_msg
+            or "automation" in last_msg
+        ):
             return (
                 f"Chale {first_name}, here is how to configure Mobile Money Live Sync:\n"
                 "1. Go to Settings ➔ Accounts and look for the 'Mobile Money Live Sync' panel under your linked accounts.\n"
@@ -1042,7 +1155,7 @@ class SupportService:
         phone: str,
         user_query: str,
         chat_history: list[ChatMessage],
-        device_diagnostics: dict | None = None,
+        device_diagnostics: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Save ticket to local database, escalate to GitHub (triggering ChatGPT Code Agent), and notify Discord."""
         ticket = SupportTicket(
@@ -1089,7 +1202,7 @@ class SupportService:
         phone: str,
         user_query: str,
         chat_history: list[ChatMessage],
-        device_diagnostics: dict | None,
+        device_diagnostics: dict[str, Any] | None,
         ticket_id: str,
     ) -> tuple[int, str]:
         """Call GitHub API to open a developer issue ticket labeled with `ai-autofix` for the ChatGPT Code Agent."""
@@ -1108,7 +1221,9 @@ class SupportService:
 
         diagnostics_str = "None provided"
         if device_diagnostics:
-            diagnostics_str = "\n".join([f"- **{k}**: `{v}`" for k, v in device_diagnostics.items()])
+            diagnostics_str = "\n".join(
+                [f"- **{k}**: `{v}`" for k, v in device_diagnostics.items()]
+            )
 
         body_content = (
             f"## 📱 CediSmart Support Escalation\n\n"
@@ -1151,7 +1266,7 @@ class SupportService:
         user_query: str,
         ticket_id: str,
         issue_url: str,
-        device_diagnostics: dict | None,
+        device_diagnostics: dict[str, Any] | None,
     ) -> None:
         """Trigger Discord Webhook message to notify the team instantly of a ticket creation."""
         diag_lines = []
@@ -1160,20 +1275,15 @@ class SupportService:
                 diag_lines.append(f"{k}: {v}")
         diag_str = "\n".join(diag_lines) if diag_lines else "No diagnostics provided."
 
-        embed = {
-            "title": "🚨 CediSmart Support Ticket Created",
-            "description": "A user has escalated a support issue to the developers (ChatGPT Code Agent dispatched).",
-            "color": 14034714,
-            "fields": [
-                {"name": "📞 User Phone", "value": f"`{phone}`", "inline": True},
-                {"name": "🆔 Ticket ID", "value": f"`{ticket_id}`", "inline": True},
-                {"name": "💬 User Query", "value": user_query, "inline": False},
-                {"name": "⚙️ Diagnostics", "value": f"```\n{diag_str}\n```", "inline": False},
-            ],
-        }
+        fields: list[dict[str, Any]] = [
+            {"name": "📞 User Phone", "value": f"`{phone}`", "inline": True},
+            {"name": "🆔 Ticket ID", "value": f"`{ticket_id}`", "inline": True},
+            {"name": "💬 User Query", "value": user_query, "inline": False},
+            {"name": "⚙️ Diagnostics", "value": f"```\n{diag_str}\n```", "inline": False},
+        ]
 
         if issue_url and issue_url != "database_only" and "mock" not in issue_url:
-            embed["fields"].append(
+            fields.append(
                 {
                     "name": "🌐 GitHub Issue Link",
                     "value": f"[Open GitHub Issue]({issue_url})",
@@ -1181,10 +1291,20 @@ class SupportService:
                 }
             )
 
+        embed: dict[str, Any] = {
+            "title": "🚨 CediSmart Support Ticket Created",
+            "description": "A user has escalated a support issue to the developers (ChatGPT Code Agent dispatched).",
+            "color": 14034714,
+            "fields": fields,
+        }
+
         payload = {
             "username": "CediSmart Support Bot",
             "embeds": [embed],
         }
+
+        if not settings.DISCORD_WEBHOOK_URL:
+            return
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1206,7 +1326,7 @@ class SupportService:
         user_name: str,
         feedback_type: str,
         description: str,
-        device_info: dict | None,
+        device_info: dict[str, Any] | None,
     ) -> dict[str, Any]:
         """Open a GitHub Issue with `ai-autofix` for the ChatGPT Code Agent and post to Discord."""
         diag_lines = []
@@ -1227,7 +1347,11 @@ class SupportService:
                 "Content-Type": "application/json",
             }
             is_bug = "bug" in feedback_type.lower()
-            labels = ["bug", "ai-autofix"] if is_bug else ["enhancement", "feature-request", "ai-autofix"]
+            labels = (
+                ["bug", "ai-autofix"]
+                if is_bug
+                else ["enhancement", "feature-request", "ai-autofix"]
+            )
             prefix = "Bug Report" if is_bug else "Feature Request"
             gh_body = (
                 f"## 💡 CediSmart User {prefix}\n\n"
@@ -1335,7 +1459,9 @@ class SupportService:
             "Accept": "application/vnd.github.v3+json",
         }
         issue_api_url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues/{issue_number}"
-        comments_api_url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues/{issue_number}/comments"
+        comments_api_url = (
+            f"https://api.github.com/repos/{settings.GITHUB_REPO}/issues/{issue_number}/comments"
+        )
         owner = settings.GITHUB_REPO.split("/")[0]
         branch_head = f"{owner}:chatgpt/issue-{issue_number}"
         pulls_api_url = f"https://api.github.com/repos/{settings.GITHUB_REPO}/pulls?head={branch_head}&state=all"
@@ -1359,7 +1485,11 @@ class SupportService:
                         "stage_step": 1,
                     }
                 issue_data = issue_resp.json()
-                labels = [lbl.get("name", "") for lbl in issue_data.get("labels", []) if isinstance(lbl, dict)]
+                labels = [
+                    lbl.get("name", "")
+                    for lbl in issue_data.get("labels", [])
+                    if isinstance(lbl, dict)
+                ]
 
                 pr_url = None
                 pr_state = None
@@ -1445,7 +1575,7 @@ class SupportService:
         language: str = "en",
         auto_pilot: bool = False,
         deep_audit: bool = False,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Process spoken user audio with Gemini 2.5 / 1.5 multimodal audio understanding.
 
         Transcribes speech, extracts financial actions (e.g. logging transactions, checking balances),
@@ -1527,12 +1657,18 @@ class SupportService:
 
         # 1. Primary: Gemini Multimodal Audio Understanding (Ultra-Fast Flash-Lite Models)
         if settings.GEMINI_API_KEY:
-            for model_name in ["gemini-flash-lite-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]:
+            for model_name in [
+                "gemini-flash-lite-latest",
+                "gemini-3.5-flash-lite",
+                "gemini-3.1-flash-lite",
+            ]:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={settings.GEMINI_API_KEY}"
                 contents: list[dict[str, Any]] = []
                 if messages:
                     for prev_msg in messages[-6:]:
-                        p_role = "model" if prev_msg.get("role") in ("model", "assistant") else "user"
+                        p_role = (
+                            "model" if prev_msg.get("role") in ("model", "assistant") else "user"
+                        )
                         p_text = prev_msg.get("content", "")
                         if p_text:
                             contents.append({"role": p_role, "parts": [{"text": p_text}]})
@@ -1583,7 +1719,9 @@ class SupportService:
                                 continue
                             raw_transcript = (parsed.get("transcript") or "").strip()
                             # Clean timestamp hallucinations (e.g. 00:00) and audio noise tags
-                            if re.match(r"^\[?\(?\d{1,2}:\d{2}(\.\d+)?\)?\]?$", raw_transcript) or re.match(r"^<[^>]+>$", raw_transcript):
+                            if re.match(
+                                r"^\[?\(?\d{1,2}:\d{2}(\.\d+)?\)?\]?$", raw_transcript
+                            ) or re.match(r"^<[^>]+>$", raw_transcript):
                                 raw_transcript = ""
                             transcript = raw_transcript
                             reply_text = parsed.get("response") or f"I heard you, {first_name}."
@@ -1609,7 +1747,9 @@ class SupportService:
                             resp.status_code,
                         )
                 except Exception as exc:
-                    logger.warning("Gemini audio request failed (%s): %s", model_name, type(exc).__name__)
+                    logger.warning(
+                        "Gemini audio request failed (%s): %s", model_name, type(exc).__name__
+                    )
 
         # Provider failures must not masquerade as silence or successful recognition.
         return {
@@ -1622,7 +1762,9 @@ class SupportService:
         }
 
     @staticmethod
-    async def synthesize_neural_voice(text: str, voice_name: str = "Kore") -> tuple[str | None, str | None]:
+    async def synthesize_neural_voice(
+        text: str, voice_name: str = "Kore"
+    ) -> tuple[str | None, str | None]:
         """Synthesize natural neural speech using Gemini Flash TTS models. Returns (base64_audio, mime_type)."""
         if not settings.GEMINI_API_KEY or not text or not text.strip():
             return None, None
@@ -1661,8 +1803,11 @@ class SupportService:
                             continue
                         parts = (candidates[0].get("content") or {}).get("parts") or []
                         inline_data = next(
-                            (part["inlineData"] for part in parts
-                             if part.get("inlineData", {}).get("data")),
+                            (
+                                part["inlineData"]
+                                for part in parts
+                                if part.get("inlineData", {}).get("data")
+                            ),
                             None,
                         )
                         if not inline_data:
@@ -1673,9 +1818,10 @@ class SupportService:
                         # If raw L16 PCM without WAV header is returned, wrap into standard WAV so mobile players handle it seamlessly
                         if "audio/l16" in raw_mime.lower() or "codec=pcm" in raw_mime.lower():
                             try:
+                                import base64
                                 import io
                                 import wave
-                                import base64
+
                                 pcm_bytes = base64.b64decode(raw_data)
                                 wav_io = io.BytesIO()
                                 with wave.open(wav_io, "wb") as wf:
@@ -1686,7 +1832,9 @@ class SupportService:
                                 raw_data = base64.b64encode(wav_io.getvalue()).decode("utf-8")
                                 raw_mime = "audio/wav"
                             except Exception as wav_err:
-                                logger.warning("PCM to WAV packaging error: %s", type(wav_err).__name__)
+                                logger.warning(
+                                    "PCM to WAV packaging error: %s", type(wav_err).__name__
+                                )
                                 continue
 
                         return raw_data, raw_mime
@@ -1709,7 +1857,9 @@ class SupportService:
         return None, None
 
     @staticmethod
-    async def _synthesize_with_mistral(text: str, voice: str = "en_paul_neutral") -> tuple[str | None, str | None]:
+    async def _synthesize_with_mistral(
+        text: str, voice: str = "en_paul_neutral"
+    ) -> tuple[str | None, str | None]:
         """Synthesize natural neural speech using Mistral Voxtral 3 Realtime TTS API."""
         if not settings.MISTRAL_API_KEY or not text or not text.strip():
             return None, None
@@ -1749,7 +1899,9 @@ class SupportService:
         return None, None
 
     @staticmethod
-    async def _synthesize_with_openai(text: str, voice: str = "nova") -> tuple[str | None, str | None]:
+    async def _synthesize_with_openai(
+        text: str, voice: str = "nova"
+    ) -> tuple[str | None, str | None]:
         """Synthesize natural neural speech using OpenAI tts-1 API."""
         if not settings.OPENAI_API_KEY or not text or not text.strip():
             return None, None
@@ -1777,6 +1929,7 @@ class SupportService:
                 resp = await client.post(url, json=payload, headers=headers)
                 if resp.status_code == 200:
                     import base64
+
                     audio_b64 = base64.b64encode(resp.content).decode("utf-8")
                     return audio_b64, "audio/mp3"
                 logger.warning(
@@ -1787,5 +1940,3 @@ class SupportService:
         except Exception as exc:
             logger.warning("OpenAI TTS connection error: %s", str(exc))
         return None, None
-
-

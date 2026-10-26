@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,7 +35,7 @@ DBSession = Annotated[AsyncSession, Depends(get_db)]
 @limiter.limit("30/15minutes")
 async def chat_with_support(request: Request, body: ChatRequest, db: DBSession) -> ChatResponse:
     """Generate a response using Gemini (with ChatGPT fallback), live X-Ray telemetry, SMS paste rescue, and vision."""
-    extra_kwargs: dict = {}
+    extra_kwargs: dict[str, Any] = {}
     if body.phone is not None:
         extra_kwargs["phone"] = body.phone
     if body.device_diagnostics is not None:
@@ -89,7 +89,9 @@ async def voice_chat_with_support(request: Request, body: VoiceRequest) -> Voice
     summary="Synthesize text to high-fidelity natural neural speech via Gemini TTS",
 )
 @limiter.limit("60/15minutes")
-async def synthesize_voice(request: Request, body: VoiceSynthesizeRequest) -> VoiceSynthesizeResponse:
+async def synthesize_voice(
+    request: Request, body: VoiceSynthesizeRequest
+) -> VoiceSynthesizeResponse:
     """Returns base64 audio bytes for natural sounding spoken playback."""
     audio_b64, mime = await SupportService.synthesize_neural_voice(
         text=body.text,

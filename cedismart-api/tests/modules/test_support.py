@@ -1,34 +1,43 @@
 from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
+
+from tests.conftest import make_auth_headers
+
 
 @pytest.mark.asyncio
 async def test_support_chat_mock(client: AsyncClient) -> None:
     # Mock SupportService.generate_chat_response to avoid actual Gemini API calls
-    with patch("app.modules.support.router.SupportService.generate_chat_response", new_callable=AsyncMock) as mock_chat:
-        mock_chat.return_value = "Hello! I am the CediSmart Support Assistant. How can I help you today?"
+    with patch(
+        "app.modules.support.router.SupportService.generate_chat_response", new_callable=AsyncMock
+    ) as mock_chat:
+        mock_chat.return_value = (
+            "Hello! I am the CediSmart Support Assistant. How can I help you today?"
+        )
 
         resp = await client.post(
-            "/api/v1/support/chat",
-            json={
-                "messages": [
-                    {"role": "user", "content": "Hello"}
-                ]
-            }
+            "/api/v1/support/chat", json={"messages": [{"role": "user", "content": "Hello"}]}
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["response"] == "Hello! I am the CediSmart Support Assistant. How can I help you today?"
+        assert (
+            body["response"]
+            == "Hello! I am the CediSmart Support Assistant. How can I help you today?"
+        )
         mock_chat.assert_called_once()
+
 
 @pytest.mark.asyncio
 async def test_support_escalate_mock(client: AsyncClient) -> None:
     # Mock SupportService.escalate_ticket to avoid actual db / GitHub / Discord calls in tests
-    with patch("app.modules.support.router.SupportService.escalate_ticket", new_callable=AsyncMock) as mock_escalate:
+    with patch(
+        "app.modules.support.router.SupportService.escalate_ticket", new_callable=AsyncMock
+    ) as mock_escalate:
         mock_escalate.return_value = {
             "ticket_id": "test-ticket-uuid-123",
             "issue_number": 123,
-            "issue_url": "https://github.com/cliff-de-tech/CediSmart/issues/123"
+            "issue_url": "https://github.com/cliff-de-tech/CediSmart/issues/123",
         }
 
         resp = await client.post(
@@ -38,14 +47,13 @@ async def test_support_escalate_mock(client: AsyncClient) -> None:
                 "user_query": "The app keeps crashing when loading the report page",
                 "chat_history": [
                     {"role": "user", "content": "The app keeps crashing"},
-                    {"role": "model", "content": "I am sorry to hear that. I've noted down the crash."}
+                    {
+                        "role": "model",
+                        "content": "I am sorry to hear that. I've noted down the crash.",
+                    },
                 ],
-                "device_diagnostics": {
-                    "os": "ios",
-                    "os_version": "17.2",
-                    "app_version": "1.0.0"
-                }
-            }
+                "device_diagnostics": {"os": "ios", "os_version": "17.2", "app_version": "1.0.0"},
+            },
         )
         assert resp.status_code == 201
         body = resp.json()
@@ -56,25 +64,22 @@ async def test_support_escalate_mock(client: AsyncClient) -> None:
         mock_escalate.assert_called_once()
 
 
-from tests.conftest import make_auth_headers
-
 @pytest.mark.asyncio
 async def test_support_feedback(client: AsyncClient, make_user) -> None:
     user = await make_user(phone="+233241234567")
     headers = make_auth_headers(user.id)
-    
-    with patch("app.modules.support.router.SupportService.submit_user_feedback", new_callable=AsyncMock) as mock_feedback:
+
+    with patch(
+        "app.modules.support.router.SupportService.submit_user_feedback", new_callable=AsyncMock
+    ) as mock_feedback:
         resp = await client.post(
             "/api/v1/support/feedback",
             json={
                 "feedback_type": "feature_request",
                 "description": "Please add dark mode support to the main ledger screen.",
-                "device_info": {
-                    "os": "android",
-                    "app_version": "1.0.0"
-                }
+                "device_info": {"os": "android", "app_version": "1.0.0"},
             },
-            headers=headers
+            headers=headers,
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -85,13 +90,15 @@ async def test_support_feedback(client: AsyncClient, make_user) -> None:
             user_name="Test User",
             feedback_type="feature_request",
             description="Please add dark mode support to the main ledger screen.",
-            device_info={"os": "android", "app_version": "1.0.0"}
+            device_info={"os": "android", "app_version": "1.0.0"},
         )
 
 
 @pytest.mark.asyncio
 async def test_support_ticket_status_mock(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock) as mock_status:
+    with patch(
+        "app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock
+    ) as mock_status:
         mock_status.return_value = {
             "issue_number": 42,
             "state": "open",
@@ -100,7 +107,7 @@ async def test_support_ticket_status_mock(client: AsyncClient) -> None:
             "labels": ["support", "escalated", "ai-autofix"],
             "pr_url": "https://github.com/cliff-de-tech/CediSmart/pull/43",
             "pr_state": "open",
-            "latest_agent_comment": "ChatGPT (gpt-4o) Code Agent opened PR #43."
+            "latest_agent_comment": "ChatGPT (gpt-4o) Code Agent opened PR #43.",
         }
 
         resp = await client.get("/api/v1/support/ticket-status/42")
@@ -124,8 +131,9 @@ def test_looks_like_momo_sms() -> None:
 
 
 def test_extract_display_name_honorifics() -> None:
-    from app.modules.support.service import SupportService
     from collections import namedtuple
+
+    from app.modules.support.service import SupportService
 
     MockUser = namedtuple("MockUser", ["full_name"])
 
@@ -153,7 +161,9 @@ def test_extract_display_name_honorifics() -> None:
 
 @pytest.mark.asyncio
 async def test_ticket_status_user_facing_stages(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock) as mock_status:
+    with patch(
+        "app.modules.support.router.SupportService.get_ticket_status", new_callable=AsyncMock
+    ) as mock_status:
         mock_status.return_value = {
             "issue_number": 42,
             "state": "open",
@@ -197,7 +207,9 @@ async def test_multi_sms_rescue_parsing() -> None:
 
 @pytest.mark.asyncio
 async def test_support_voice_mock(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock) as mock_voice:
+    with patch(
+        "app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock
+    ) as mock_voice:
         mock_voice.return_value = {
             "transcript": "log 50 cedis for lunch on momo",
             "response": "Done Clifford! Recorded 50 cedis for lunch from your Mobile Money wallet.",
@@ -234,7 +246,9 @@ async def test_support_voice_mock(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock) as mock_synth:
+    with patch(
+        "app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock
+    ) as mock_synth:
         mock_synth.return_value = ("dGVzdC1hdWRpby1ieXRlcw==", "audio/wav")
 
         resp = await client.post(
@@ -251,18 +265,20 @@ async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
         mock_synth.assert_called_once_with(text="Hi Clifford, I'm listening.", voice_name="Kore")
 
 
-
-
-
-
 @pytest.mark.asyncio
 async def test_voice_recognition_failure_is_explicit(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock) as mock_voice:
+    with patch(
+        "app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock
+    ) as mock_voice:
         mock_voice.return_value = {
-            "transcript": "", "response": "Please retry.", "action": None,
+            "transcript": "",
+            "response": "Please retry.",
+            "action": None,
             "error_code": "recognition_unavailable",
         }
-        resp = await client.post("/api/v1/support/voice", json={"audio_base64": "test", "synthesize_audio": False})
+        resp = await client.post(
+            "/api/v1/support/voice", json={"audio_base64": "test", "synthesize_audio": False}
+        )
         assert resp.status_code == 200
         assert resp.json()["error_code"] == "recognition_unavailable"
         assert resp.json()["action"] is None
@@ -271,7 +287,9 @@ async def test_voice_recognition_failure_is_explicit(client: AsyncClient) -> Non
 
 @pytest.mark.asyncio
 async def test_voice_synthesis_failure_returns_503(client: AsyncClient) -> None:
-    with patch("app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock) as mock_synth:
+    with patch(
+        "app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock
+    ) as mock_synth:
         mock_synth.return_value = (None, None)
         resp = await client.post("/api/v1/support/voice/synthesize", json={"text": "Hello"})
         assert resp.status_code == 503
@@ -281,9 +299,11 @@ async def test_voice_synthesis_failure_returns_503(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_missing_voice_provider_does_not_claim_to_hear_user() -> None:
     from app.modules.support.service import SupportService
-    with patch("app.modules.support.service.settings.GEMINI_API_KEY", ""), patch.object(
-        SupportService, "synthesize_neural_voice", new_callable=AsyncMock
-    ) as synth:
+
+    with (
+        patch("app.modules.support.service.settings.GEMINI_API_KEY", ""),
+        patch.object(SupportService, "synthesize_neural_voice", new_callable=AsyncMock) as synth,
+    ):
         result = await SupportService.process_voice("test")
     assert result["error_code"] == "recognition_unavailable"
     assert result["transcript"] == ""
@@ -294,9 +314,12 @@ async def test_missing_voice_provider_does_not_claim_to_hear_user() -> None:
 @pytest.mark.asyncio
 async def test_voice_synthesis_falls_back_to_mistral() -> None:
     from app.modules.support.service import SupportService
-    with patch("app.modules.support.service.settings.GEMINI_API_KEY", "dummy"), \
-         patch("app.modules.support.service.settings.MISTRAL_API_KEY", "dummy_mistral"), \
-         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+
+    with (
+        patch("app.modules.support.service.settings.GEMINI_API_KEY", "dummy"),
+        patch("app.modules.support.service.settings.MISTRAL_API_KEY", "dummy_mistral"),
+        patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+    ):
         resp_gemini = AsyncMock(status_code=503)
         resp_mistral = AsyncMock(status_code=200)
         resp_mistral.json = lambda: {"audio_data": "bXAzX2Jhc2U2NA=="}
@@ -310,17 +333,19 @@ async def test_voice_synthesis_falls_back_to_mistral() -> None:
 @pytest.mark.asyncio
 async def test_voice_synthesis_falls_back_to_openai() -> None:
     from app.modules.support.service import SupportService
-    with patch("app.modules.support.service.settings.GEMINI_API_KEY", "dummy"), \
-         patch("app.modules.support.service.settings.MISTRAL_API_KEY", ""), \
-         patch("app.modules.support.service.settings.OPENAI_API_KEY", "dummy_openai"), \
-         patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
+
+    with (
+        patch("app.modules.support.service.settings.GEMINI_API_KEY", "dummy"),
+        patch("app.modules.support.service.settings.MISTRAL_API_KEY", ""),
+        patch("app.modules.support.service.settings.OPENAI_API_KEY", "dummy_openai"),
+        patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post,
+    ):
         resp_gemini = AsyncMock(status_code=503)
         resp_openai = AsyncMock(status_code=200, content=b"fake_mp3_data")
         mock_post.side_effect = [resp_gemini, resp_gemini, resp_openai]
 
         audio_b64, mime = await SupportService.synthesize_neural_voice("Test fallback")
         import base64
+
         assert audio_b64 == base64.b64encode(b"fake_mp3_data").decode("utf-8")
         assert mime == "audio/mp3"
-
-

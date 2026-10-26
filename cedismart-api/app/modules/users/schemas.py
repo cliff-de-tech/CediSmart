@@ -2,8 +2,8 @@
 
 import uuid
 from datetime import datetime
-
 from typing import Any
+
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 SUPPORTED_CURRENCIES = {"GHS", "USD", "EUR", "GBP"}
@@ -100,4 +100,3 @@ class DeviceTokenRegisterRequest(BaseModel):
 
 class DeviceTokenRemoveRequest(BaseModel):
     token: str = Field(..., min_length=1, max_length=255)
-

@@ -8,9 +8,9 @@ Business rules enforced here:
 - PIN and phone are never returned in any response.
 """
 
-import hashlib
 import time
 import uuid
+from typing import Any
 
 import httpx
 import redis.asyncio as aioredis
@@ -21,11 +21,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppException
 from app.modules.auth.models import User, UserDeviceToken
 from app.modules.users.schemas import (
-    UserUpdateRequest,
-    KYCVerifyRequest,
     BugReportRequest,
     DeviceTokenRegisterRequest,
     DeviceTokenRemoveRequest,
+    KYCVerifyRequest,
+    UserUpdateRequest,
 )
 
 # Matches the prefix defined in auth/service.py
@@ -112,7 +112,7 @@ async def verify_user_kyc(
     db: AsyncSession,
 ) -> User:
     """Verify user identity with Ghana Card using Smile ID enhanced KYC.
-    
+
     If the name and DOB match official registry data, user is upgraded to verified.
     """
     from app.core.config import settings
@@ -145,7 +145,11 @@ async def verify_user_kyc(
             message="Smile ID integration is not configured. Please contact support.",
         )
 
-    base_url = "https://api.smileidentity.com/v1" if env != "sandbox" else "https://sandbox.smileidentity.com/v1"
+    base_url = (
+        "https://api.smileidentity.com/v1"
+        if env != "sandbox"
+        else "https://sandbox.smileidentity.com/v1"
+    )
     timestamp = str(int(time.time() * 1000))
     signature = generate_smile_id_signature(api_key, partner_id, timestamp)
 
@@ -157,19 +161,23 @@ async def verify_user_kyc(
         "id_type": "GHANA_CARD",
         "id_number": payload.ghana_card_number,
         "first_name": payload.full_name.split(" ")[0],
-        "last_name": payload.full_name.split(" ")[-1] if len(payload.full_name.split(" ")) > 1 else "",
+        "last_name": (
+            payload.full_name.split(" ")[-1] if len(payload.full_name.split(" ")) > 1 else ""
+        ),
         "dob": payload.dob,
         "partner_params": {
             "user_id": str(user_id),
             "job_id": f"kyc_{int(time.time())}",
-            "job_type": 5
-        }
+            "job_type": 5,
+        },
     }
 
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.post(f"{base_url}/id_verification", json=smile_payload, timeout=15.0)
-            result = response.json()
+            response = await client.post(
+                f"{base_url}/id_verification", json=smile_payload, timeout=15.0
+            )
+            res_json: dict[str, Any] = response.json()
         except Exception as e:
             raise AppException(
                 status_code=504,
@@ -179,15 +187,17 @@ async def verify_user_kyc(
 
     # Smile ID returns 1012 for "Enhanced KYC successfully validated"
     # (Some sandbox integrations return 1011 depending on test flow)
-    result_code = result.get("ResultCode")
+    result_code = res_json.get("ResultCode")
     if response.status_code != 200 or str(result_code) not in ["1012", "1011"]:
         raise AppException(
             status_code=400,
             error_code="KYC_VERIFICATION_FAILED",
-            message=result.get("ResultText", "Identity verification failed. Please check your card number."),
+            message=res_json.get(
+                "ResultText", "Identity verification failed. Please check your card number."
+            ),
         )
 
-    actions = result.get("Actions", {})
+    actions = res_json.get("Actions", {})
     dob_match = actions.get("Verify_DOB") in ["Passed", "Matched"]
     name_match = actions.get("Verify_Name") in ["Passed", "Matched"]
 
@@ -212,13 +222,14 @@ async def _send_discord_bug_alert(
     user_name: str,
     title: str,
     description: str,
-    device_info: dict | None,
-    issue_url: str | None
+    device_info: dict[str, Any] | None,
+    issue_url: str | None,
 ) -> None:
     """Post bug report details to the designated Discord bugs channel or general channel."""
-    from app.core.config import settings
     import httpx
-    
+
+    from app.core.config import settings
+
     webhook_url = settings.DISCORD_BUGS_WEBHOOK_URL or settings.DISCORD_WEBHOOK_URL
     if not webhook_url:
         return
@@ -229,31 +240,37 @@ async def _send_discord_bug_alert(
             diag_lines.append(f"{k}: {v}")
     diag_str = "\n".join(diag_lines) if diag_lines else "None provided."
 
-    embed = {
+    fields: list[dict[str, Any]] = [
+        {"name": "📞 User Phone", "value": f"`{user_phone}`", "inline": True},
+        {"name": "👤 User Name", "value": user_name, "inline": True},
+        {"name": "📝 Bug Description", "value": description, "inline": False},
+        {"name": "⚙️ Device Info", "value": f"```\n{diag_str}\n```", "inline": False},
+    ]
+
+    if issue_url:
+        fields.append(
+            {
+                "name": "🌐 GitHub Issue",
+                "value": f"[View GitHub Issue]({issue_url})",
+                "inline": False,
+            }
+        )
+
+    embed: dict[str, Any] = {
         "title": f"🐛 CediSmart Bug Report: {title}",
         "description": "A user has manually reported a bug from Settings.",
         "color": 15548997,  # Orange/Red color decimal
-        "fields": [
-            {"name": "📞 User Phone", "value": f"`{user_phone}`", "inline": True},
-            {"name": "👤 User Name", "value": user_name, "inline": True},
-            {"name": "📝 Bug Description", "value": description, "inline": False},
-            {"name": "⚙️ Device Info", "value": f"```\n{diag_str}\n```", "inline": False}
-        ]
+        "fields": fields,
     }
 
-    if issue_url:
-        embed["fields"].append({"name": "🌐 GitHub Issue", "value": f"[View GitHub Issue]({issue_url})", "inline": False})
-
-    payload = {
-        "username": "CediSmart Bug Reporter",
-        "embeds": [embed]
-    }
+    payload = {"username": "CediSmart Bug Reporter", "embeds": [embed]}
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             await client.post(webhook_url, json=payload)
     except Exception as e:
         import logging
+
         logging.getLogger(__name__).error("Failed to notify Discord of user bug: %s", str(e))
 
 
@@ -261,11 +278,13 @@ async def report_user_bug(
     user_id: uuid.UUID,
     payload: BugReportRequest,
     db: AsyncSession,
-) -> dict:
+) -> dict[str, Any]:
     """Submit a user bug report to GitHub and log alerts on Discord."""
-    from app.core.config import settings
     import logging
+
     import httpx
+
+    from app.core.config import settings
 
     logger = logging.getLogger(__name__)
     user = await get_current_user(user_id, db)
@@ -350,11 +369,11 @@ async def report_user_bug(
     # Post notification to Discord (e.g. #bugs channel)
     await _send_discord_bug_alert(
         user_phone=user.phone,
-        user_name=user.full_name or 'N/A',
+        user_name=user.full_name or "N/A",
         title=payload.title,
         description=payload.description,
         device_info=payload.device_info,
-        issue_url=issue_url
+        issue_url=issue_url,
     )
 
     return {
@@ -374,9 +393,7 @@ async def register_device_token(
     If the token is already registered to a different user, we re-associate it with
     the current user.
     """
-    result = await db.execute(
-        select(UserDeviceToken).where(UserDeviceToken.token == payload.token)
-    )
+    result = await db.execute(select(UserDeviceToken).where(UserDeviceToken.token == payload.token))
     existing_token = result.scalar_one_or_none()
 
     if existing_token:
@@ -411,4 +428,3 @@ async def remove_device_token(
 
     if existing_token:
         await db.delete(existing_token)
-

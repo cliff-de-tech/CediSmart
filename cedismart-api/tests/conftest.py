@@ -168,7 +168,10 @@ async def client(
 def mock_verify_clerk_user() -> AsyncGenerator[AsyncMock, None]:
     """Mock Clerk user verification for all backend tests."""
     with patch("app.core.clerk.verify_clerk_user", new_callable=AsyncMock) as m:
-        m.return_value = {"id": "user_mock123", "phone_numbers": [{"phone_number": "+233200000000"}]}
+        m.return_value = {
+            "id": "user_mock123",
+            "phone_numbers": [{"phone_number": "+233200000000"}],
+        }
         yield m
 
 

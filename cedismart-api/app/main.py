@@ -6,8 +6,8 @@ Configures middleware, exception handlers, routers, and lifecycle hooks.
 import logging
 import uuid
 from collections.abc import AsyncGenerator, Awaitable, Callable
-from typing import Any
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware

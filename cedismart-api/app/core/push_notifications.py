@@ -2,9 +2,12 @@
 
 import logging
 import uuid
+from typing import Any
+
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.modules.auth.models import UserDeviceToken
 
 logger = logging.getLogger(__name__)
@@ -16,7 +19,7 @@ async def send_push_notification(
     user_id: uuid.UUID,
     title: str,
     body: str,
-    data: dict | None = None,
+    data: dict[str, Any] | None = None,
     db: AsyncSession | None = None,
 ) -> None:
     """Send a push notification to all active devices of a given user.
@@ -30,8 +33,7 @@ async def send_push_notification(
     # Fetch active device tokens for the user
     result = await db.execute(
         select(UserDeviceToken).where(
-            UserDeviceToken.user_id == user_id,
-            UserDeviceToken.is_active == True
+            UserDeviceToken.user_id == user_id, UserDeviceToken.is_active == True
         )
     )
     device_tokens = result.scalars().all()
@@ -41,16 +43,18 @@ async def send_push_notification(
         return
 
     # Build the payload list for Expo
-    payloads = []
-    token_map = {}
+    payloads: list[dict[str, Any]] = []
+    token_map: dict[str, UserDeviceToken] = {}
     for dt in device_tokens:
-        payloads.append({
-            "to": dt.token,
-            "title": title,
-            "body": body,
-            "sound": "default",
-            "data": data or {},
-        })
+        payloads.append(
+            {
+                "to": dt.token,
+                "title": title,
+                "body": body,
+                "sound": "default",
+                "data": data or {},
+            }
+        )
         token_map[dt.token] = dt
 
     try:
@@ -61,40 +65,42 @@ async def send_push_notification(
                 headers={"Accept": "application/json", "Content-Type": "application/json"},
                 timeout=10.0,
             )
-            
+
             if response.status_code == 200:
                 response_data = response.json()
                 # Expo sends back a list of ticket statuses matching the order of payloads
                 tickets = response_data.get("data", [])
-                
-                for payload, ticket in zip(payloads, tickets):
+
+                for payload, ticket in zip(payloads, tickets, strict=False):
                     token = payload["to"]
                     status = ticket.get("status")
-                    
+
                     if status == "error":
                         error_detail = ticket.get("details", {})
                         error_code = error_detail.get("error")
-                        
+
                         logger.warning(
                             "Failed to deliver notification to token %s: %s (code: %s)",
                             token,
                             ticket.get("message"),
-                            error_code
+                            error_code,
                         )
-                        
+
                         # Cleanup dead/invalid tokens
                         if error_code in ("DeviceNotRegistered", "InvalidCredentials"):
-                            dt_to_delete = token_map.get(token)
+                            dt_to_delete = token_map.get(str(token))
                             if dt_to_delete:
-                                logger.info("Removing inactive/unregistered device token: %s", token)
+                                logger.info(
+                                    "Removing inactive/unregistered device token: %s", token
+                                )
                                 await db.delete(dt_to_delete)
-                
+
                 await db.commit()
             else:
                 logger.error(
                     "Expo Push Service returned HTTP status %d: %s",
                     response.status_code,
-                    response.text
+                    response.text,
                 )
     except Exception as e:
         logger.error("Exception occurred while sending push notifications via Expo: %s", str(e))
