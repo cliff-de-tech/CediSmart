@@ -1291,22 +1291,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                         <View style={styles.attachMenuIconBadge}>
                           <Volume2 size={19} color="#F3F4F6" />
                         </View>
-                        <View
-                          style={{
-                            flex: 1,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            paddingRight: 4,
-                          }}
-                        >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <Text style={styles.attachMenuText}>Select Voice</Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Text style={{ fontSize: 13, color: '#9CA3AF' }}>
-                              {VOICE_PERSONAS[voicePersona].name}
-                            </Text>
-                            <ChevronRight size={16} color="#9CA3AF" />
-                          </View>
+                          <ChevronRight size={16} color="#9CA3AF" />
                         </View>
                       </TouchableOpacity>
                     </>
