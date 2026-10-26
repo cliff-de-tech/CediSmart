@@ -2,7 +2,9 @@
 
 **Production-grade React Native budget management app for iOS and Android.**
 
-A modern, offline-capable mobile app for the CediSmart fintech platform. Built with Expo, TypeScript, and NativeWind for a fast, responsive experience on limited bandwidth networks.
+A modern, offline-capable mobile app for the CediSmart fintech platform. Built with Expo SDK 58, TypeScript, and NativeWind for a fast, responsive experience on limited bandwidth networks.
+
+📖 **Complete User Guide:** See [HOW_TO_USE_CEDISMART.md](../HOW_TO_USE_CEDISMART.md) for an end-to-end user manual covering setup, MoMo auto-sync, budgeting, AI support, and offline workflows.
 
 ---
 
@@ -29,7 +31,12 @@ A modern, offline-capable mobile app for the CediSmart fintech platform. Built w
 ✅ **Live ChatGPT Voice Mode** — Full-screen liquid glass voice orb with dynamic physics, fluid resizing (large ↔ mini orb), and live speech-synced typography  
 ✅ **Natural Neural Voice (Gemini TTS)** — Warm, authentic spoken responses using Google's prebuilt `Kore` neural voice  
 ✅ **Hands-Free Conversational Turn-Taking** — Real-time Voice Activity Detection (VAD) with snappy 500ms pause turnaround, barge-in interruption, and 00:00 timestamp filtering  
-✅ **Spoken Financial Actions** — Hands-free expense logging (e.g., *"Spent 50 on fuel with MoMo"*), live multi-wallet balance checks, and monthly budget status inquiries  
+✅ **Spoken & Autonomous Financial Actions** — Hands-free expense logging (e.g., *"Spent 50 on fuel with MoMo"*), live multi-wallet balance checks, and monthly budget status inquiries  
+✅ **Live Budget & Reports X-Ray Telemetry** — Direct live access to active monthly budgets (spent, remaining, % used) and monthly cash flow reports (income, expenses, net savings, top categories)  
+✅ **Tri-Lingual Intelligence** — Real-time switching between Standard Ghanaian English, authentic Ghanaian Pidgin, and Twi / Akan  
+✅ **AI Command Center (`+` Sheet)** — Quick controls for Media (Camera, Photos, Files), Language pills, Auto-Pilot Toggle, Deep Financial Audit, and Auto-Speak Voice  
+✅ **Advisor Mode vs. Auto-Pilot Mode** — Interactive in-chat confirmation cards (`[ Confirm & Save to Ledger ]` and `[ Edit in Form ]`) or autonomous execution with a 10s undo banner  
+✅ **Receipt & Invoice Multimodal Scanner** — Visual OCR extraction for supermarket and store receipts with itemized breakdown and 1-tap ledger saving  
 ✅ **Reassuring Verbal Bridges** — Immediate active verbal bridges (*"Checking your balance real quick…"*, *"Logging that for you right away…"*) rotated dynamically across turns  
 ✅ **Unified Voice & Chat Thread** — Voice turns automatically append to the shared persistent conversation thread with in-voice typing and OpenAI-style attachment popup (Camera, Photos, Files)  
 ✅ **Phone-first authentication** — OTP via SMS & secure PIN entry  
@@ -43,7 +50,6 @@ A modern, offline-capable mobile app for the CediSmart fintech platform. Built w
 ✅ **Dark mode** — Native system theme & radio-style toggling  
 ✅ **Push notifications** — Budget alerts and transaction confirmations  
 ✅ **Offline Help Guides & Self-Heal** — Built-in offline knowledge base cards and plain-language diagnostic checks  
-✅ **Multi-language ready** — Ghanaian Pidgin & English language intelligence  
 
 ---
 
@@ -51,7 +57,7 @@ A modern, offline-capable mobile app for the CediSmart fintech platform. Built w
 
 | Layer | Technology | Why |
 |---|---|---|
-| **Framework** | Expo (SDK 57) | Managed workflow — no native code needed for MVP |
+| **Framework** | Expo (SDK 58) | Managed workflow — no native code needed for MVP |
 | **Language** | TypeScript (strict) | Type safety across the entire app |
 | **React** | React 19.2.3 | Latest hooks, concurrent rendering |
 | **Navigation** | React Navigation v6 | Industry-standard, production-proven |

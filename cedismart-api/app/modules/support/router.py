@@ -50,6 +50,9 @@ async def chat_with_support(request: Request, body: ChatRequest, db: DBSession) 
         body.messages,
         support_type=body.support_type,
         user_name=body.user_name,
+        language=body.language,
+        auto_pilot=body.auto_pilot,
+        deep_audit=body.deep_audit,
         **extra_kwargs,
     )
     return ChatResponse(response=response_text)
@@ -72,6 +75,9 @@ async def voice_chat_with_support(request: Request, body: VoiceRequest) -> Voice
         initial_context=body.initial_context,
         synthesize_audio=body.synthesize_audio,
         messages=body.messages,
+        language=body.language,
+        auto_pilot=body.auto_pilot,
+        deep_audit=body.deep_audit,
     )
     return VoiceResponse(**result)
 

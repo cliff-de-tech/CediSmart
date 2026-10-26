@@ -58,6 +58,7 @@ import { useAuthStore } from '../../stores/authStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import { Message } from '../shared/SupportModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import {
   PRECACHED_BALANCE_BRIDGES,
@@ -149,6 +150,30 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   // In-Voice Typing States (allows typing inside voice mode without closing)
   const [isTypingInVoice, setIsTypingInVoice] = useState(false);
   const [voiceInputText, setVoiceInputText] = useState('');
+
+  // CFO Intelligence & Dialect Preferences
+  const [language, setLanguage] = useState<'en' | 'pidgin' | 'twi'>('en');
+  const [autoPilot, setAutoPilot] = useState<boolean>(false);
+  const [deepAudit, setDeepAudit] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    const loadPreferences = async () => {
+      try {
+        const [savedLang, savedAutoPilot, savedDeepAudit] = await Promise.all([
+          AsyncStorage.getItem('cedismart_ai_language'),
+          AsyncStorage.getItem('cedismart_ai_autopilot'),
+          AsyncStorage.getItem('cedismart_ai_deep_audit'),
+        ]);
+        if (savedLang === 'en' || savedLang === 'pidgin' || savedLang === 'twi') {
+          setLanguage(savedLang);
+        }
+        if (savedAutoPilot !== null) setAutoPilot(savedAutoPilot === 'true');
+        if (savedDeepAudit !== null) setDeepAudit(savedDeepAudit === 'true');
+      } catch {}
+    };
+    void loadPreferences();
+  }, [visible]);
 
   // Attachment Handlers for ChatGPT-style '+' Menu inside Voice Mode
   const handleLaunchCamera = async () => {
@@ -592,6 +617,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         initial_context: initialContext,
         synthesize_audio: true,
         messages: messagesRef.current.slice(-12).map(({ role, content }) => ({ role, content })),
+        language,
+        auto_pilot: autoPilot,
+        deep_audit: deepAudit,
       }, { signal: controller.signal, timeout: VOICE_RECOGNITION_TIMEOUT_MS });
       if (!isCurrentTurn(turn)) return;
 
@@ -824,6 +852,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         phone: phone || 'Anonymous',
         user_name: cleanName || userName,
         support_type: 'general',
+        language: language,
+        auto_pilot: autoPilot,
+        deep_audit: deepAudit,
       };
       if (currentAttachment) {
         chatPayload.image_base64 = currentAttachment.base64;

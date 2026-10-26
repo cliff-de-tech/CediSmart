@@ -37,7 +37,9 @@ def _cache_key(report_type: str, user_id: uuid.UUID, *parts: object) -> str:
     return f"{REPORT_CACHE_PREFIX}{report_type}:{user_id}:{suffix}"
 
 
-async def _get_cached(key: str, redis: aioredis.Redis) -> dict[str, Any] | None:
+async def _get_cached(key: str, redis: aioredis.Redis | None = None) -> dict[str, Any] | None:
+    if redis is None:
+        return None
     cached = await redis.get(key)
     if cached:
         try:
@@ -47,7 +49,9 @@ async def _get_cached(key: str, redis: aioredis.Redis) -> dict[str, Any] | None:
     return None
 
 
-async def _set_cached(key: str, data: object, redis: aioredis.Redis) -> None:
+async def _set_cached(key: str, data: object, redis: aioredis.Redis | None = None) -> None:
+    if redis is None:
+        return
     await redis.set(key, json.dumps(data), ex=REPORT_CACHE_TTL)
 
 
@@ -84,7 +88,7 @@ async def get_monthly_report(
     year: int,
     month: int,
     db: AsyncSession,
-    redis: aioredis.Redis,
+    redis: aioredis.Redis | None = None,
 ) -> dict[str, Any]:
     """Monthly income/expense summary with top category and activity count.
 
@@ -179,7 +183,7 @@ async def get_category_report(
     end_date: date,
     transaction_type: str,
     db: AsyncSession,
-    redis: aioredis.Redis,
+    redis: aioredis.Redis | None = None,
 ) -> dict[str, Any]:
     """Spending breakdown by category for a date range.
 
@@ -273,7 +277,7 @@ async def get_trends_report(
     user_id: uuid.UUID,
     months: int,
     db: AsyncSession,
-    redis: aioredis.Redis,
+    redis: aioredis.Redis | None = None,
     end_year: int | None = None,
     end_month: int | None = None,
 ) -> dict[str, Any]:

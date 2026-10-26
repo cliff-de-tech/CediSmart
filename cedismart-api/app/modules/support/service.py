@@ -3,6 +3,7 @@ import json
 import logging
 import re
 from datetime import date
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -31,14 +32,13 @@ ACTION_TAGS_GUIDE = (
 CRITICAL_TRUTH_AND_INTEGRITY_RULES = (
     "\n\n=== CRITICAL TRUTH & TRANSACTION INTEGRITY RULES (ZERO HALLUCINATIONS) ===\n"
     "1. You CANNOT directly create, edit, delete, or categorize transactions in the database from chat messages unless "
-    "the system explicitly attached a verified '=== INSTANT SMS RESCUE EXECUTED ===' block in your context.\n"
+    "the system explicitly attached a verified '=== INSTANT SMS RESCUE EXECUTED ===' or '=== AUTONOMOUS ACTION EXECUTED ===' block in your context.\n"
     "2. NEVER claim, pretend, or tell the user that you 'logged', 'saved', 'recorded', or 'categorized' a transaction unless you see "
-    "the explicit '=== INSTANT SMS RESCUE EXECUTED ===' banner in this prompt!\n"
-    "3. If the user asks 'Did you do it?', 'Did you log it?', or asks you verbally to record an expense (e.g. 'log 51 cedi for chop money'), "
-    "truthfully and politely explain that you cannot record manual transactions directly from chat messages. Advise them to use the "
-    "'Add Expense' button on the Home screen or paste the exact MoMo SMS alert. Provide `[ACTION:NAV_ADD_EXPENSE]`.\n"
+    "an explicit '=== INSTANT SMS RESCUE EXECUTED ===' or '=== AUTONOMOUS ACTION EXECUTED ===' banner in this prompt!\n"
+    "3. In Advisor Mode (Auto-Pilot OFF), when the user asks to record an expense, log income, or scan a receipt, "
+    "output the structured `[PROPOSED_TRANSACTION: {...}]` or `[PROPOSED_BUDGET: {...}]` tag at the end of your message so the user can review and tap 'Confirm & Save' with 1 touch.\n"
     "4. Always verify facts against the 'LIVE X-RAY ACCOUNT & DEVICE TELEMETRY' provided below. "
-    "If the telemetry lists their recent transactions or wallets, cite the actual data accurately rather than inventing amounts.\n"
+    "If the telemetry lists their recent transactions, budgets, or reports, cite the actual numbers accurately rather than inventing amounts.\n"
 )
 
 VOICE_MODE_INSTRUCTIONS = (
@@ -83,6 +83,10 @@ GENERAL_SYSTEM_PROMPT = (
     "Your focus is helping logged-in users understand and use CediSmart's ledger, budgeting, and transaction syncing features:\n"
     "- Ledgers: Help them understand how to set up accounts, record transactions (categorize expense vs income), and review monthly reports.\n"
     "- Budgeting: Guide them on setting monthly category budgets and tracking spending limits.\n"
+    "- Live Budget & Report Intelligence: You have direct, real-time access to the user's active monthly budgets and financial reports in the 'LIVE X-RAY ACCOUNT & DEVICE TELEMETRY'. When the user asks about their spending, budgets, savings rate, or financial health:\n"
+    "  * Answer immediately and accurately with their actual numbers (e.g. 'You have spent GH₵ 150.00 out of your GH₵ 500.00 Food budget (30%), leaving GH₵ 350.00 remaining.').\n"
+    "  * Proactively warn them if any budget shows '[OVER BUDGET!]' or has exceeded 80% of its limit.\n"
+    "  * If they have no budgets set, encourage them to create one and provide `[ACTION:NAV_BUDGETS]`.\n"
     "- Mobile Money Live Sync (Background SMS Sync): Guide them on how to configure automated transaction tracking:\n"
     "  1. 🤖 Google Android: Android supports direct background intercepting. Guide the user to click 'Configure Auto-Sync' in their Accounts tab, select Android, and tap 'Grant SMS Permissions' to allow background SMS reading.\n"
     "  2. 🍎 Apple iOS: iOS sandboxing blocks direct SMS reading. Explain that they can configure Apple's native Shortcuts app to securely forward messages via webhook:\n"
@@ -91,7 +95,11 @@ GENERAL_SYSTEM_PROMPT = (
     "     * Step 3: Add an Authorization header: Key: 'Authorization', Value: 'Bearer <your key>' (using the copied Auth Key from Accounts tab).\n"
     "     * Step 4: Change request body to JSON and add fields: 'sender' ➔ select Sender (from message), 'message_body' ➔ select Message/Shortcut Input, 'phone' ➔ type their registered CediSmart phone number.\n"
     "- Paste-Any-SMS Rescue: Users can also paste any missed MTN MoMo, Telecel Cash, or AT Money SMS directly into this support chat and our system will automatically parse and log it into their wallet!\n"
-    "- Screenshot & Receipt Vision: Users can attach screenshots of UI issues, MoMo SMS alerts, or paper receipts, and you can read and diagnose them visually.\n"
+    "- Screenshot & Receipt Vision (Multi-Item Scanner & Splitter): Users can attach screenshots or photos of paper store receipts, market invoices, and checkout slips:\n"
+    "  1. Read the image carefully: Transcribe the merchant/store name, transaction date, and line items with individual prices.\n"
+    "  2. Present a clean itemized breakdown list of all items and total amount.\n"
+    "  3. In Advisor Mode (Auto-Pilot OFF): Append a `[PROPOSED_TRANSACTION: {\"amount\": <total>, \"transaction_type\": \"expense\", \"category_name\": <best category, e.g. 'Food & Dining' or 'Shopping'>, \"wallet_name\": \"Cash\", \"description\": <store name or items>, \"transaction_date\": \"YYYY-MM-DD\"}]` tag so the user can review and log the receipt with 1 tap.\n"
+    "  4. In Auto-Pilot Mode (Auto-Pilot ON): If the user asked you to log/scan the receipt, the total will be recorded automatically.\n"
     "- Important restriction: Since you are post-login support, if the user asks about changing phone numbers or "
     "re-registering, guide them to the profile/auth settings.\n\n"
     "IMPORTANT ESCALATION PROTOCOL:\n"
@@ -102,6 +110,61 @@ GENERAL_SYSTEM_PROMPT = (
     + CRITICAL_TRUTH_AND_INTEGRITY_RULES
     + VOICE_MODE_INSTRUCTIONS
 )
+
+
+LANGUAGE_PROMPTS = {
+    "en": (
+        "\n\n=== LANGUAGE: STANDARD GHANAIAN ENGLISH ===\n"
+        "- Respond in clear, professional English with light Ghanaian cultural warmth.\n"
+        "- State all currency amounts clearly (e.g. 'GH₵ 50.00').\n"
+    ),
+    "pidgin": (
+        "\n\n=== LANGUAGE: GHANAIAN PIDGIN MODE ===\n"
+        "- Respond in warm, authentic Ghanaian Pidgin!\n"
+        "- Use natural phrases such as: 'Charley', 'Chop money', 'No wahala', 'You dey balance well', 'I don check am', 'Ledger clean', 'Sika no dey move'.\n"
+        "- Keep all numbers, currency figures, and dates crystal clear (e.g. 'GH₵ 50.00', 'MTN MoMo').\n"
+        "- Keep financial advice supportive and realistic.\n"
+    ),
+    "twi": (
+        "\n\n=== LANGUAGE: TWI / AKAN MODE ===\n"
+        "- Respond in respectful, authentic Twi (Akan) with light English loanwords for financial technicalities!\n"
+        "- Use authentic Akan phrases such as: 'Medaase', 'Wo sika kɔkɔɔ', 'Wo sika a aka', 'Wo ledger mu', 'Ɛbɛyɛ yie', 'Sika nhyehyɛe (budget)', 'MoMo sika'.\n"
+        "- Keep all numbers, currency figures, and dates crystal clear (e.g. 'GH₵ 50.00').\n"
+        "- Keep financial advice respectful and supportive.\n"
+    ),
+}
+
+DEEP_AUDIT_PROMPT = (
+    "\n\n=== DEEP FINANCIAL AUDIT MODE ACTIVE ===\n"
+    "The user has toggled ON Deep Financial Audit. Provide an in-depth CFO-level analysis:\n"
+    "1. Comprehensive Diagnosis: Analyze the user's spending against their monthly income and active budgets from the telemetry.\n"
+    "2. Burn-Rate & Velocity: Assess if their daily spending velocity is sustainable for the rest of the month.\n"
+    "3. Outlier Categories: Highlight the biggest money drain (top expense category) and calculate what % of total expenses it represents.\n"
+    "4. Strategic Savings Advice: Provide 2 specific, realistic cost-cutting moves relevant in Ghana (e.g., preparing meals, grouping errands to save fuel/trotro, managing peak MoMo E-Levy charges).\n"
+)
+
+
+def get_execution_mode_prompt(auto_pilot: bool) -> str:
+    if auto_pilot:
+        return (
+            "\n\n=== AUTO-PILOT EXECUTION MODE ACTIVE ===\n"
+            "Autonomous execution is enabled by the user. If the user explicitly asks to record an expense, log income, or set a budget:\n"
+            "- If the system executed the database mutation, you will see '=== AUTONOMOUS ACTION EXECUTED ===' below. Confirm the action with concise celebration.\n"
+            "- Emphasize that the ledger was updated automatically and an instant undo is available in the chat.\n"
+        )
+    else:
+        return (
+            "\n\n=== ADVISOR MODE ACTIVE (CONFIRMATION FIRST) ===\n"
+            "Auto-Pilot is OFF (Advisor Mode). You CANNOT write directly to the database without user confirmation.\n"
+            "When the user asks you to log an expense, record income, or adjust a budget:\n"
+            "1. Politely explain what you prepared.\n"
+            "2. At the very end of your response, output a structured proposal tag on its own line so the app can render an interactive confirmation card:\n"
+            "   For expenses/income:\n"
+            "   `[PROPOSED_TRANSACTION: {\"amount\": 50.0, \"transaction_type\": \"expense\", \"category_name\": \"Food & Dining\", \"wallet_name\": \"Mobile Money\", \"description\": \"Lunch\", \"transaction_date\": \"YYYY-MM-DD\"}]`\n"
+            "   For budgets:\n"
+            "   `[PROPOSED_BUDGET: {\"category_name\": \"Food & Dining\", \"monthly_limit\": 500.0}]`\n"
+            "3. Ask the user to tap 'Confirm & Save' on the card to record it.\n"
+        )
 
 
 class SupportService:
@@ -203,6 +266,57 @@ class SupportService:
                         lines.append("- Latest 3 Ledger Transactions: " + " | ".join(tx_strs))
                     else:
                         lines.append("- Latest Ledger Transactions: None recorded yet.")
+
+                    # 4. Active Monthly Budgets Telemetry
+                    try:
+                        from app.modules.budgets.service import list_budgets
+
+                        today_now = date.today()
+                        budgets_list = await list_budgets(user_obj.id, db, today_now.year, today_now.month)
+                        if budgets_list:
+                            b_summaries = []
+                            for b in budgets_list:
+                                cat_name = b.get("category", {}).get("name", "Unknown")
+                                budgeted = b.get("budgeted_amount", "0.00")
+                                spent = b.get("spent_amount", "0.00")
+                                rem = b.get("remaining_amount", "0.00")
+                                pct = b.get("percentage_used", "0.00")
+                                over_tag = " [OVER BUDGET!]" if b.get("is_over_budget") else ""
+                                b_summaries.append(
+                                    f"{cat_name}: Limit GH₵ {budgeted}, Spent GH₵ {spent} ({pct}%){over_tag}, Remaining GH₵ {rem}"
+                                )
+                            lines.append(f"- Active Budgets ({today_now.strftime('%B %Y')}): " + " | ".join(b_summaries))
+                        else:
+                            lines.append(f"- Active Budgets ({today_now.strftime('%B %Y')}): None set yet for this month.")
+                    except Exception as b_err:
+                        logger.warning("Failed to load budgets for X-Ray: %s", str(b_err))
+
+                    # 5. Monthly Financial Report & Spending Breakdown Telemetry
+                    try:
+                        from app.modules.reports.service import get_category_report, get_monthly_report
+
+                        today_now = date.today()
+                        m_report = await get_monthly_report(user_obj.id, today_now.year, today_now.month, db)
+                        if m_report:
+                            inc = m_report.get("total_income", "0.00")
+                            exp = m_report.get("total_expense", "0.00")
+                            net = m_report.get("net", "0.00")
+                            tx_cnt = m_report.get("transaction_count", 0)
+                            top_cat = m_report.get("top_expense_category")
+                            top_cat_str = f", Top Expense Category: {top_cat['name']} (GH₵ {top_cat['amount']})" if top_cat else ""
+                            lines.append(
+                                f"- Financial Report ({today_now.strftime('%B %Y')}): Total Income GH₵ {inc}, Total Expenses GH₵ {exp}, Net Savings GH₵ {net} ({tx_cnt} transactions{top_cat_str})"
+                            )
+
+                            # Top spending breakdown
+                            start_of_month = date(today_now.year, today_now.month, 1)
+                            cat_report = await get_category_report(user_obj.id, start_of_month, today_now, "expense", db)
+                            cats = cat_report.get("categories", [])
+                            if cats:
+                                top_3 = [f"{c['name']} (GH₵ {c['amount']}, {c['percentage']}%)" for c in cats[:3]]
+                                lines.append("- Top Spending Categories: " + ", ".join(top_3))
+                    except Exception as r_err:
+                        logger.warning("Failed to load reports for X-Ray: %s", str(r_err))
                 else:
                     lines.append(f"- Database Lookup: No registered user found matching phone '{phone}'.")
             except Exception as exc:
@@ -431,6 +545,147 @@ class SupportService:
             return None
 
     @staticmethod
+    async def _try_autonomous_chat_execution(
+        db: AsyncSession | None,
+        user_obj: Any,
+        raw_text: str,
+    ) -> tuple[str | None, str | None]:
+        """
+        In Auto-Pilot mode, parse intent to log an expense/income directly into Postgres.
+        Returns (banner_for_system_prompt, autonomous_tag_for_response).
+        """
+        if not db or not user_obj:
+            return None, None
+
+        text = raw_text.strip()
+        match = re.search(
+            r"(?:log|record|spent|paid|add)\s+(?:ghs|ghc|₵)?\s*(\d+(?:\.\d{1,2})?)\s*(?:cedis?|ghs|ghc|₵)?\s*(?:for|on)\s+([a-zA-Z0-9\s]+?)(?:\s+(?:from|via|with|on|in)\s+(momo|mobile\s*money|cash|bank))?$",
+            text,
+            re.IGNORECASE,
+        )
+        if not match:
+            match = re.search(
+                r"(?:log|record|spent|paid|add)\s+(\d+(?:\.\d{1,2})?)\s+(?:cedis?|ghs|ghc|₵)?\s*(?:for|on)?\s*([a-zA-Z0-9\s]+)",
+                text,
+                re.IGNORECASE,
+            )
+
+        if not match:
+            return None, None
+
+        try:
+            amt_val = float(match.group(1))
+            raw_desc = match.group(2).strip()
+            wallet_hint = match.group(3).lower() if len(match.groups()) >= 3 and match.group(3) else ""
+
+            if amt_val <= 0:
+                return None, None
+
+            from app.modules.accounts.models import FinancialAccount
+            from app.modules.categories.models import Category
+            from app.modules.transactions.models import Transaction
+
+            # Determine account
+            acc_type = "mobile_money"
+            if "cash" in wallet_hint or "cash" in text.lower():
+                acc_type = "cash"
+            elif "bank" in wallet_hint or "bank" in text.lower():
+                acc_type = "bank"
+
+            acc_stmt = (
+                select(FinancialAccount)
+                .where(
+                    FinancialAccount.user_id == user_obj.id,
+                    FinancialAccount.is_active.is_(True),
+                )
+                .order_by(
+                    (FinancialAccount.account_type == acc_type).desc(),
+                    FinancialAccount.created_at.asc(),
+                )
+            )
+            acc_res = await db.execute(acc_stmt)
+            account = acc_res.scalars().first()
+            if not account:
+                return None, None
+
+            # Determine category
+            cat_name = "Other Expense"
+            lower_desc = raw_desc.lower()
+            if any(w in lower_desc for w in ["food", "lunch", "dinner", "breakfast", "eat", "chop", "groceries", "waakye", "jollof", "kfc"]):
+                cat_name = "Food & Dining"
+            elif any(w in lower_desc for w in ["fuel", "transport", "trotro", "uber", "bolt", "car", "taxi", "fare"]):
+                cat_name = "Transportation"
+            elif any(w in lower_desc for w in ["utility", "ecg", "light", "water", "gwcl", "power", "bill"]):
+                cat_name = "Utilities"
+            elif any(w in lower_desc for w in ["airtime", "data", "internet", "mtn bundle", "wifi"]):
+                cat_name = "Airtime & Data"
+            elif any(w in lower_desc for w in ["health", "med", "drug", "pharmacy", "hospital"]):
+                cat_name = "Health"
+            elif any(w in lower_desc for w in ["shop", "cloth", "shoe", "market", "item"]):
+                cat_name = "Shopping"
+
+            cat_stmt = select(Category).where(
+                or_(Category.user_id == user_obj.id, Category.is_system.is_(True)),
+                Category.category_type == "expense",
+                Category.name.ilike(f"%{cat_name.split()[0]}%"),
+            )
+            cat_res = await db.execute(cat_stmt)
+            cat_obj = cat_res.scalars().first()
+            if not cat_obj:
+                cat_obj = Category(
+                    user_id=user_obj.id,
+                    name=cat_name,
+                    icon="receipt-outline",
+                    color="#0d631b",
+                    category_type="expense",
+                    is_system=False,
+                )
+                db.add(cat_obj)
+                await db.flush()
+
+            clean_desc = raw_desc.capitalize()
+            today_date = date.today()
+            new_tx = Transaction(
+                user_id=user_obj.id,
+                account_id=account.id,
+                category_id=cat_obj.id,
+                amount=Decimal(str(amt_val)),
+                transaction_type="expense",
+                description=clean_desc[:250],
+                transaction_date=today_date,
+                notes="Logged autonomously via AI Support Auto-Pilot",
+            )
+            db.add(new_tx)
+            await db.commit()
+            await db.refresh(new_tx)
+
+            # Invalidate caches
+            try:
+                from app.core.redis import init_redis, redis_pool
+                from app.modules.transactions.service import _invalidate_caches
+                r_client = redis_pool or await init_redis()
+                if r_client:
+                    await _invalidate_caches(user_obj.id, today_date, r_client)
+            except Exception as c_err:
+                logger.warning("Cache invalidation failed: %s", str(c_err))
+
+            banner = (
+                f"=== AUTONOMOUS ACTION EXECUTED ===\n"
+                f"You successfully logged an expense of GH₵ {amt_val:.2f} for '{clean_desc}' under category '{cat_obj.name}' from wallet '{account.name}' on {today_date.isoformat()}.\n"
+                f"Confirm this clearly and assure the user that their ledger and balance have been updated immediately."
+            )
+            tag = (
+                f'\n\n[AUTONOMOUS_TRANSACTION: {{"id": "{new_tx.id}", "amount": {amt_val:.2f}, '
+                f'"transaction_type": "expense", "category_name": "{cat_obj.name}", '
+                f'"wallet_name": "{account.name}", "description": "{clean_desc}", '
+                f'"transaction_date": "{today_date.isoformat()}"}}]'
+            )
+            return banner, tag
+        except Exception as err:
+            logger.warning("Autonomous execution failed: %s", str(err))
+            return None, None
+
+    @staticmethod
     def _extract_display_name(raw_name: str | None, db_user: Any = None) -> tuple[str, str]:
         """
         Extract the user's actual first name and full display name, stripping honorific titles
@@ -466,6 +721,9 @@ class SupportService:
         device_diagnostics: dict | None = None,
         image_base64: str | None = None,
         image_mime_type: str | None = "image/jpeg",
+        language: str = "en",
+        auto_pilot: bool = False,
+        deep_audit: bool = False,
     ) -> str:
         """Generate a supportive assistant response using Gemini 2.5 Flash with automatic ChatGPT (gpt-4o-mini) fallback."""
         xray_block, user_obj = await SupportService.build_xray_telemetry(
@@ -483,9 +741,6 @@ class SupportService:
             f"Always use '{first_name}' to personalize your answer whenever greeting or advising them. NEVER address them as 'Mr.!', 'boss', 'don', 'Friend', or other generic nicknames when their name is known.\n"
             f"- Tone: Professional, reassuring, calm, and trustworthy. CediSmart is a real personal finance and ledger application. "
             f"Keep all financial information, numbers, dates, and instructions clear and articulate.\n"
-            f"- Adaptive Pidgin Rule: Mirror the user's language! If the user writes in Ghanaian Pidgin, you may respond in warm, natural Ghanaian Pidgin. "
-            f"If the user writes in standard English, answer in clean, professional English with light cultural warmth. "
-            f"Never force slang into financial confirmations, balances, or diagnostics.\n"
             f"- Greeting & Confirmation Rule: Do NOT start every response or ongoing reply with 'Akwaaba' (Welcome). Only use 'Akwaaba' if it is the very beginning of a new conversation or user onboarding. For routine confirmations, pasted SMS messages, and follow-ups, start directly and naturally without welcoming them repeatedly (e.g., 'Got it, {first_name}!', 'All set, {first_name}.', or 'Here are the details:')."
         )
 
@@ -498,8 +753,22 @@ class SupportService:
                 raw_text=messages[-1].content,
             )
 
+        # Check for autonomous execution if auto_pilot is enabled
+        auto_pilot_banner = None
+        auto_pilot_tag = None
+        if auto_pilot and messages and not sms_rescue_banner:
+            auto_pilot_banner, auto_pilot_tag = await SupportService._try_autonomous_chat_execution(
+                db=db,
+                user_obj=user_obj,
+                raw_text=messages[-1].content,
+            )
+
         base_prompt = AUTH_SYSTEM_PROMPT if support_type == "auth" else GENERAL_SYSTEM_PROMPT
-        system_prompt = f"{base_prompt}\n\n{personalization}{xray_block}"
+        lang_prompt = LANGUAGE_PROMPTS.get(language, LANGUAGE_PROMPTS["en"])
+        audit_prompt = DEEP_AUDIT_PROMPT if deep_audit else ""
+        exec_mode_prompt = get_execution_mode_prompt(auto_pilot)
+
+        system_prompt = f"{base_prompt}\n\n{personalization}{lang_prompt}{audit_prompt}{exec_mode_prompt}{xray_block}"
         if sms_rescue_banner:
             system_prompt += (
                 f"\n\n=== INSTANT SMS RESCUE EXECUTED ===\n"
@@ -509,6 +778,21 @@ class SupportService:
                 f"2. Explicitly assure {first_name} that CediSmart has already automatically synced their balance and updated their ledger in real-time.\n"
                 f"3. Do NOT tell the user to tap any 'refresh button'—the app updates automatically in real-time. If you offer an action button, use `[ACTION:NAV_TRANSACTIONS]` so they can view their transactions.\n"
                 f"4. Do NOT start your message with 'Akwaaba'."
+            )
+        elif auto_pilot_banner:
+            system_prompt += (
+                f"\n\n{auto_pilot_banner}\n"
+                f"Instructions for your response:\n"
+                f"1. Clearly confirm that the transaction was logged directly into their ledger.\n"
+                f"2. Mention the amount, category, and wallet.\n"
+                f"3. Note that an undo option is active in their chat."
+            )
+        elif not auto_pilot:
+            system_prompt += (
+                f"\n\n=== ADVISOR MODE REMINDER ===\n"
+                f"No automatic database changes were made. If the user asks to log an expense/income or set a budget, "
+                f"construct a proposed card using `[PROPOSED_TRANSACTION: {{...}}]` or `[PROPOSED_BUDGET: {{...}}]` "
+                f"and advise them to tap 'Confirm & Save' to record it."
             )
         else:
             system_prompt += (
@@ -523,6 +807,8 @@ class SupportService:
         effective_img_mime = image_mime_type or (
             messages[-1].image_mime_type if messages and messages[-1].image_mime_type else "image/jpeg"
         )
+
+        final_reply: str | None = None
 
         # 1. Primary Engine: High-Speed Gemini Flash-Lite Models
         if settings.GEMINI_API_KEY:
@@ -560,8 +846,8 @@ class SupportService:
                         response = await client.post(url, json=payload)
                         if response.status_code == 200:
                             resp_json = response.json()
-                            ai_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
-                            return ai_text
+                            final_reply = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+                            break
                         logger.warning(
                             "Gemini Chat API error (%s status %d): %s",
                             model_name,
@@ -572,29 +858,33 @@ class SupportService:
                     logger.warning("Gemini chat connection failed (%s): %s", model_name, str(exc))
 
         # 2. Secondary Engine: Mistral Pro (`mistral-small-latest`) via MISTRAL_API_KEY
-        mistral_reply = await SupportService._call_mistral_fallback(
-            messages=messages,
-            system_prompt=system_prompt,
-        )
-        if mistral_reply:
-            return mistral_reply
+        if not final_reply:
+            final_reply = await SupportService._call_mistral_fallback(
+                messages=messages,
+                system_prompt=system_prompt,
+            )
 
         # 3. Tertiary Engine: ChatGPT (gpt-4o-mini) via OpenAI API or Free GitHub Models
-        chatgpt_reply = await SupportService._call_chatgpt_fallback(
-            messages=messages,
-            system_prompt=system_prompt,
-            image_base64=effective_img_b64,
-            image_mime_type=effective_img_mime,
-        )
-        if chatgpt_reply:
-            return chatgpt_reply
+        if not final_reply:
+            final_reply = await SupportService._call_chatgpt_fallback(
+                messages=messages,
+                system_prompt=system_prompt,
+                image_base64=effective_img_b64,
+                image_mime_type=effective_img_mime,
+            )
 
-        # 3. If an SMS was rescued even when offline from LLMs, return the rescue banner directly
-        if sms_rescue_banner:
-            return sms_rescue_banner
+        # 4. If an SMS was rescued even when offline from LLMs, return the rescue banner directly
+        if not final_reply and sms_rescue_banner:
+            final_reply = sms_rescue_banner
 
-        # 4. Final Local Rules Engine
-        return SupportService._fallback_support_response(messages, support_type, first_name)
+        # 5. Final Local Rules Engine
+        if not final_reply:
+            final_reply = SupportService._fallback_support_response(messages, support_type, first_name)
+
+        if auto_pilot_tag and auto_pilot_tag not in final_reply:
+            final_reply += auto_pilot_tag
+
+        return final_reply
 
     @staticmethod
     async def _call_chatgpt_fallback(
@@ -1152,6 +1442,9 @@ class SupportService:
         initial_context: str | None = "dashboard",
         synthesize_audio: bool = True,
         messages: list[dict[str, str]] | None = None,
+        language: str = "en",
+        auto_pilot: bool = False,
+        deep_audit: bool = False,
     ) -> dict:
         """Process spoken user audio with Gemini 2.5 / 1.5 multimodal audio understanding.
 
@@ -1204,8 +1497,17 @@ class SupportService:
             "     * For 'check_balance': e.g., 'Checking your balance real quick...', 'Let me pull up your account balances for you...', 'Getting your current balance right now...', 'Let me look at your wallets real quick...', 'Checking how much you have across your accounts...', 'Pulling up your total balance right away...', 'Let me check your available funds real quick...'\n"
             "     * For 'create_transaction': e.g., 'Logging that for you right away...', 'Recording that expense now...', 'Adding that to your records real quick...', 'Got it, saving that transaction for you...', 'Putting that into your ledger now...', 'Let me log that for you real quick...'\n"
             "     * For 'check_budget': e.g., 'Pulling up your budget now...', 'Let me check how your monthly budget is looking...', 'Checking your budget limits real quick...', 'Looking up your budget status for you...', 'Let me inspect your spending limits right away...'\n"
-            "   - Never use static or robotic wording. Keep it reassuring, varied, and lively.\n\n"
-            "Return valid JSON matching this schema:\n"
+            "   - Never use static or robotic wording. Keep it reassuring, varied, and lively.\n"
+            + (
+                "4. Language / Dialect: Spoken response and transcript MUST be in authentic Ghanaian Pidgin ('Charley', 'No wahala', 'I dey check am').\n\n"
+                if language == "pidgin"
+                else (
+                    "4. Language / Dialect: Spoken response and transcript MUST be in respectful Akan/Twi ('Medaase', 'Mede sika no bɛto ledger mu', 'Ɛbɛyɛ yie').\n\n"
+                    if language == "twi"
+                    else "4. Language: Standard Ghanaian English with polite cultural warmth.\n\n"
+                )
+            )
+            + "Return valid JSON matching this schema:\n"
             "{\n"
             '  "transcript": "Transcribed user speech here",\n'
             '  "response": "Concise spoken reply here",\n'

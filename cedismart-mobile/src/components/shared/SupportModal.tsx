@@ -19,6 +19,7 @@ import {
   StyleSheet,
   Keyboard,
   PanResponder,
+  Switch,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -28,7 +29,7 @@ import * as SecureStore from 'expo-secure-store';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   X,
   ArrowUp,
@@ -64,8 +65,68 @@ import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import uuid from 'react-native-uuid';
 import { GlassSurface } from '../glass/GlassSurface';
 import { VoiceSupportModal } from '../voice/VoiceSupportModal';
+import { voiceService } from '../../services/voiceService';
+import { formatGHS } from '../../utils/currency';
+
+export interface ProposedTx {
+  amount: number;
+  transaction_type: 'expense' | 'income';
+  category_name: string;
+  wallet_name?: string;
+  description?: string;
+  transaction_date?: string;
+}
+
+export interface AutonomousTx {
+  id: string;
+  amount: number;
+  transaction_type: string;
+  category_name: string;
+  wallet_name?: string;
+  description?: string;
+  transaction_date?: string;
+}
+
+export interface ProposedBudget {
+  category_name: string;
+  monthly_limit: number;
+}
+
+export function parseAssistantInteractivePayloads(content: string) {
+  let cleanText = content;
+  let proposedTx: ProposedTx | null = null;
+  let autonomousTx: AutonomousTx | null = null;
+  let proposedBudget: ProposedBudget | null = null;
+
+  const propTxMatch = cleanText.match(/\[PROPOSED_TRANSACTION:\s*(\{.*?\})\]/s);
+  if (propTxMatch) {
+    try {
+      proposedTx = JSON.parse(propTxMatch[1]);
+      cleanText = cleanText.replace(propTxMatch[0], '').trim();
+    } catch {}
+  }
+
+  const autoTxMatch = cleanText.match(/\[AUTONOMOUS_TRANSACTION:\s*(\{.*?\})\]/s);
+  if (autoTxMatch) {
+    try {
+      autonomousTx = JSON.parse(autoTxMatch[1]);
+      cleanText = cleanText.replace(autoTxMatch[0], '').trim();
+    } catch {}
+  }
+
+  const propBudgetMatch = cleanText.match(/\[PROPOSED_BUDGET:\s*(\{.*?\})\]/s);
+  if (propBudgetMatch) {
+    try {
+      proposedBudget = JSON.parse(propBudgetMatch[1]);
+      cleanText = cleanText.replace(propBudgetMatch[0], '').trim();
+    } catch {}
+  }
+
+  return { cleanText, proposedTx, autonomousTx, proposedBudget };
+}
 
 export type ActionTag =
   | 'GENERATE_MOMO_KEY'
@@ -433,6 +494,80 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     hour: new Date().getHours(),
     variation: Math.floor(Math.random() * 20),
   }));
+
+  // Fetch accounts & categories for intelligent ledger action execution
+  const { data: accounts } = useQuery<any[]>({
+    queryKey: ['accounts'],
+    queryFn: async () => {
+      const res = await apiClient.get('/accounts/');
+      return res.data;
+    },
+    enabled: visible,
+  });
+
+  const { data: categories } = useQuery<any[]>({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const res = await apiClient.get('/categories/');
+      return res.data;
+    },
+    enabled: visible,
+  });
+
+  // Tri-Lingual & Autonomous CFO Controls
+  const [language, setLanguage] = useState<'en' | 'pidgin' | 'twi'>('en');
+  const [autoPilot, setAutoPilot] = useState<boolean>(false);
+  const [deepAudit, setDeepAudit] = useState<boolean>(false);
+  const [autoSpeak, setAutoSpeak] = useState<boolean>(false);
+
+  // Proposed & Autonomous Action Card States
+  const [cardActionStates, setCardActionStates] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'undone'>>({});
+
+  useEffect(() => {
+    const loadAiPreferences = async () => {
+      try {
+        const [savedLang, savedAutoPilot, savedDeepAudit, savedAutoSpeak] = await Promise.all([
+          AsyncStorage.getItem('cedismart_ai_language'),
+          AsyncStorage.getItem('cedismart_ai_autopilot'),
+          AsyncStorage.getItem('cedismart_ai_deep_audit'),
+          AsyncStorage.getItem('cedismart_ai_autospeak'),
+        ]);
+        if (savedLang === 'en' || savedLang === 'pidgin' || savedLang === 'twi') {
+          setLanguage(savedLang);
+        }
+        if (savedAutoPilot !== null) setAutoPilot(savedAutoPilot === 'true');
+        if (savedDeepAudit !== null) setDeepAudit(savedDeepAudit === 'true');
+        if (savedAutoSpeak !== null) setAutoSpeak(savedAutoSpeak === 'true');
+      } catch {}
+    };
+    if (visible) {
+      loadAiPreferences();
+    }
+  }, [visible]);
+
+  const handleSetLanguage = (lang: 'en' | 'pidgin' | 'twi') => {
+    setLanguage(lang);
+    AsyncStorage.setItem('cedismart_ai_language', lang).catch(() => {});
+    Haptics.selectionAsync().catch(() => {});
+  };
+
+  const handleToggleAutoPilot = (val: boolean) => {
+    setAutoPilot(val);
+    AsyncStorage.setItem('cedismart_ai_autopilot', String(val)).catch(() => {});
+    Haptics.selectionAsync().catch(() => {});
+  };
+
+  const handleToggleDeepAudit = (val: boolean) => {
+    setDeepAudit(val);
+    AsyncStorage.setItem('cedismart_ai_deep_audit', String(val)).catch(() => {});
+    Haptics.selectionAsync().catch(() => {});
+  };
+
+  const handleToggleAutoSpeak = (val: boolean) => {
+    setAutoSpeak(val);
+    AsyncStorage.setItem('cedismart_ai_autospeak', String(val)).catch(() => {});
+    Haptics.selectionAsync().catch(() => {});
+  };
 
   // Refresh on opening or switching chats, never on typing or other UI updates.
   useEffect(() => {
@@ -1057,6 +1192,183 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     }
   };
 
+  // Speak text aloud using Gemini Neural TTS when auto-speak is active
+  const speakText = async (textToSpeak: string) => {
+    if (!textToSpeak || !textToSpeak.trim()) return;
+    try {
+      const res = await apiClient.post('/support/voice/synthesize', {
+        text: textToSpeak,
+        voice_name: 'Kore',
+      }, { timeout: 6000 });
+      if (res.data?.audio_base64) {
+        await voiceService.speakNeural(res.data.audio_base64);
+      }
+    } catch (err) {
+      console.warn('[AI Support] Speech synthesis skipped:', err);
+    }
+  };
+
+  // 1-Tap Execution for Proposed Advisor Transactions
+  const handleConfirmProposedTransaction = async (msgId: string, tx: ProposedTx) => {
+    setCardActionStates((prev) => ({ ...prev, [msgId]: 'saving' }));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try {
+      let accList = accounts;
+      if (!accList || accList.length === 0) {
+        const res = await apiClient.get('/accounts/');
+        accList = res.data;
+      }
+      const activeAccs = (accList || []).filter((a: any) => a.is_active !== false);
+      let targetAcc = activeAccs.find((a: any) =>
+        tx.wallet_name && (a.name.toLowerCase().includes(tx.wallet_name.toLowerCase()) || tx.wallet_name.toLowerCase().includes(a.name.toLowerCase()))
+      );
+      if (!targetAcc && tx.wallet_name) {
+        const lowerWallet = tx.wallet_name.toLowerCase();
+        if (lowerWallet.includes('momo') || lowerWallet.includes('mobile')) {
+          targetAcc = activeAccs.find((a: any) => a.account_type === 'mobile_money');
+        } else if (lowerWallet.includes('cash')) {
+          targetAcc = activeAccs.find((a: any) => a.account_type === 'cash');
+        } else if (lowerWallet.includes('bank')) {
+          targetAcc = activeAccs.find((a: any) => a.account_type === 'bank');
+        }
+      }
+      if (!targetAcc && activeAccs.length > 0) {
+        targetAcc = activeAccs[0];
+      }
+
+      let catList = categories;
+      if (!catList || catList.length === 0) {
+        const res = await apiClient.get('/categories/');
+        catList = res.data;
+      }
+      const txType = tx.transaction_type || 'expense';
+      let targetCat = (catList || []).find((c: any) =>
+        c.category_type === txType &&
+        tx.category_name &&
+        (c.name.toLowerCase().includes(tx.category_name.toLowerCase()) || tx.category_name.toLowerCase().includes(c.name.toLowerCase()))
+      );
+      if (!targetCat) {
+        targetCat = (catList || []).find((c: any) => c.category_type === txType);
+      }
+
+      if (!targetAcc || !targetCat) {
+        Alert.alert('Unable to Save', 'Could not find an active wallet or category. Please use the Add Expense form.');
+        setCardActionStates((prev) => ({ ...prev, [msgId]: 'idle' }));
+        return;
+      }
+
+      const txPayload = {
+        account_id: targetAcc.id,
+        category_id: targetCat.id,
+        amount: Number(tx.amount),
+        transaction_type: txType,
+        description: tx.description || tx.category_name || 'Expense',
+        transaction_date: tx.transaction_date || new Date().toISOString().split('T')[0],
+        client_id: uuid.v4().toString(),
+        notes: 'Confirmed via AI Support Advisor Card',
+      };
+
+      await apiClient.post('/transactions/', txPayload);
+      void Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['budgets'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
+      setCardActionStates((prev) => ({ ...prev, [msgId]: 'saved' }));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+      if (autoSpeak) {
+        speakText(`Recorded ${formatGHS(tx.amount)} for ${tx.description || tx.category_name} in your ledger.`).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[AI Support] Error saving proposed transaction:', err);
+      Alert.alert('Error', 'Failed to save transaction to ledger. Please try again.');
+      setCardActionStates((prev) => ({ ...prev, [msgId]: 'idle' }));
+    }
+  };
+
+  // Undo Autonomous Auto-Pilot Mutation
+  const handleUndoAutonomousTransaction = async (msgId: string, txId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try {
+      await apiClient.delete(`/transactions/${txId}`);
+      void Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['budgets'] }),
+        queryClient.invalidateQueries({ queryKey: ['reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
+      setCardActionStates((prev) => ({ ...prev, [msgId]: 'undone' }));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (autoSpeak) {
+        speakText('Transaction undone and removed from your ledger.').catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[AI Support] Error undoing transaction:', err);
+      Alert.alert('Error', 'Could not undo this transaction.');
+    }
+  };
+
+  // Confirm Proposed Budget Limit
+  const handleConfirmProposedBudget = async (msgId: string, budget: ProposedBudget) => {
+    setCardActionStates((prev) => ({ ...prev, [msgId]: 'saving' }));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try {
+      let catList = categories;
+      if (!catList || catList.length === 0) {
+        const res = await apiClient.get('/categories/');
+        catList = res.data;
+      }
+      const targetCat = (catList || []).find((c: any) =>
+        c.category_type === 'expense' &&
+        budget.category_name &&
+        (c.name.toLowerCase().includes(budget.category_name.toLowerCase()) || budget.category_name.toLowerCase().includes(c.name.toLowerCase()))
+      );
+      if (!targetCat) {
+        Alert.alert('Category Not Found', `Could not find category "${budget.category_name}". Please create it first in Budgets.`);
+        setCardActionStates((prev) => ({ ...prev, [msgId]: 'idle' }));
+        return;
+      }
+      const now = new Date();
+      await apiClient.post('/budgets/', {
+        category_id: targetCat.id,
+        amount: Number(budget.monthly_limit),
+        period_type: 'monthly',
+        alert_at_percent: 80,
+        budget_year: now.getFullYear(),
+        budget_month: now.getMonth() + 1,
+      });
+      void Promise.allSettled([
+        queryClient.invalidateQueries({ queryKey: ['budgets'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+      ]);
+      setCardActionStates((prev) => ({ ...prev, [msgId]: 'saved' }));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      if (autoSpeak) {
+        speakText(`Budget limit of ${formatGHS(budget.monthly_limit)} set for ${targetCat.name}.`).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('[AI Support] Error saving budget:', err);
+      Alert.alert('Error', 'Failed to update budget. Please try again.');
+      setCardActionStates((prev) => ({ ...prev, [msgId]: 'idle' }));
+    }
+  };
+
+  const handleEditInForm = (tx: ProposedTx) => {
+    onClose();
+    if (nav?.navigate) {
+      nav.navigate('AddTransaction', {
+        initialAmount: tx.amount ? String(tx.amount) : '',
+        initialType: tx.transaction_type || 'expense',
+        initialCategoryName: tx.category_name || '',
+        initialDescription: tx.description || '',
+      });
+    }
+  };
+
   // Retry failed user message
   const handleRetryMessage = (failedMsg: Message) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
@@ -1096,6 +1408,9 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         phone: phone,
         image_base64: payload.imageBase64,
         image_mime_type: payload.imageMimeType,
+        language: language,
+        auto_pilot: autoPilot,
+        deep_audit: deepAudit,
       });
       return {
         responseText: response.data.response as string,
@@ -1155,6 +1470,19 @@ export const SupportModal: React.FC<SupportModalProps> = ({
       });
       if (needsEscalation && !escalatedTicket) {
         setShowEscalate(true);
+      }
+
+      if (autoSpeak && cleanText) {
+        const spoken = cleanText
+          .replace(/\[PROPOSED_TRANSACTION:[\s\S]*?\]/g, '')
+          .replace(/\[AUTONOMOUS_TRANSACTION:[\s\S]*?\]/g, '')
+          .replace(/\[PROPOSED_BUDGET:[\s\S]*?\]/g, '')
+          .replace(/\[ACTION:[^\]]+\]/g, '')
+          .replace(/[*_#`]/g, '')
+          .trim();
+        if (spoken) {
+          speakText(spoken).catch(() => {});
+        }
       }
     },
     onError: (err: any, variables) => {
@@ -1466,9 +1794,185 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                       </View>
                     ) : (
                       <View>
-                        <TouchableOpacity onLongPress={() => handleMessagePress(msg)} delayLongPress={300} activeOpacity={0.9}>
-                          {parseMarkdown(msg.content, isDark)}
-                        </TouchableOpacity>
+                        {(() => {
+                          const { cleanText, proposedTx, autonomousTx, proposedBudget } = parseAssistantInteractivePayloads(msg.content);
+                          const cardState = cardActionStates[msg.id] || 'idle';
+                          return (
+                            <View>
+                              <TouchableOpacity onLongPress={() => handleMessagePress(msg)} delayLongPress={300} activeOpacity={0.9}>
+                                {parseMarkdown(cleanText, isDark)}
+                              </TouchableOpacity>
+
+                              {/* 1. Proposed Advisor Transaction Confirmation Card */}
+                              {proposedTx && (
+                                <View style={[chatStyles.interactiveCard, { backgroundColor: colors.surface, borderColor: isDark ? 'rgba(74, 222, 128, 0.35)' : 'rgba(13, 99, 27, 0.25)' }]}>
+                                  <View style={chatStyles.cardBadgeRow}>
+                                    <View style={[chatStyles.cardBadgePill, { backgroundColor: isDark ? 'rgba(74, 222, 128, 0.18)' : 'rgba(13, 99, 27, 0.12)' }]}>
+                                      <Zap size={13} color={colors.accent} />
+                                      <Text style={[chatStyles.cardBadgeText, { color: colors.accent }]}>
+                                        {proposedTx.transaction_type === 'income' ? 'Proposed Income' : 'Proposed Expense'}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <Text style={[chatStyles.cardAmount, { color: colors.accent }]}>
+                                    {formatGHS(proposedTx.amount)}
+                                  </Text>
+
+                                  <View style={chatStyles.cardDetails}>
+                                    <Text style={[chatStyles.cardDetailText, { color: colors.text }]}>
+                                      <Text style={{ color: colors.muted }}>Category: </Text>
+                                      {proposedTx.category_name}
+                                    </Text>
+                                    {proposedTx.wallet_name && (
+                                      <Text style={[chatStyles.cardDetailText, { color: colors.text }]}>
+                                        <Text style={{ color: colors.muted }}>Wallet: </Text>
+                                        {proposedTx.wallet_name}
+                                      </Text>
+                                    )}
+                                    {proposedTx.description && (
+                                      <Text style={[chatStyles.cardDetailText, { color: colors.text }]}>
+                                        <Text style={{ color: colors.muted }}>Note: </Text>
+                                        {proposedTx.description}
+                                      </Text>
+                                    )}
+                                  </View>
+
+                                  {cardState === 'saved' ? (
+                                    <View style={[chatStyles.cardSavedBanner, { backgroundColor: isDark ? 'rgba(74, 222, 128, 0.15)' : 'rgba(13, 99, 27, 0.1)' }]}>
+                                      <CheckCircle2 size={16} color={colors.accent} />
+                                      <Text style={[chatStyles.cardSavedText, { color: colors.accent }]}>
+                                        Saved to Ledger • Balance updated
+                                      </Text>
+                                    </View>
+                                  ) : (
+                                    <View style={chatStyles.cardButtonRow}>
+                                      <TouchableOpacity
+                                        onPress={() => handleConfirmProposedTransaction(msg.id, proposedTx)}
+                                        disabled={cardState === 'saving'}
+                                        style={[chatStyles.cardPrimaryBtn, { backgroundColor: colors.accent }]}
+                                      >
+                                        {cardState === 'saving' ? (
+                                          <ActivityIndicator size="small" color="white" />
+                                        ) : (
+                                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Check size={16} color="white" style={{ marginRight: 6 }} />
+                                            <Text style={chatStyles.cardPrimaryBtnText}>Confirm & Save</Text>
+                                          </View>
+                                        )}
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        onPress={() => handleEditInForm(proposedTx)}
+                                        disabled={cardState === 'saving'}
+                                        style={[chatStyles.cardSecondaryBtn, { borderColor: colors.border }]}
+                                      >
+                                        <Edit3 size={15} color={colors.muted} />
+                                        <Text style={[chatStyles.cardSecondaryBtnText, { color: colors.muted }]}>Edit</Text>
+                                      </TouchableOpacity>
+                                    </View>
+                                  )}
+                                </View>
+                              )}
+
+                              {/* 2. Autonomous Auto-Pilot Mutation with Instant Undo */}
+                              {autonomousTx && (
+                                <View style={[chatStyles.interactiveCard, { backgroundColor: colors.surface, borderColor: isDark ? 'rgba(74, 222, 128, 0.4)' : 'rgba(13, 99, 27, 0.3)' }]}>
+                                  <View style={chatStyles.cardBadgeRow}>
+                                    <View style={[chatStyles.cardBadgePill, { backgroundColor: isDark ? 'rgba(74, 222, 128, 0.18)' : 'rgba(13, 99, 27, 0.12)' }]}>
+                                      <Zap size={13} color={colors.accent} />
+                                      <Text style={[chatStyles.cardBadgeText, { color: colors.accent }]}>
+                                        ⚡ Auto-Pilot Executed
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <Text style={[chatStyles.cardAmount, { color: colors.accent }]}>
+                                    {formatGHS(autonomousTx.amount)}
+                                  </Text>
+
+                                  <View style={chatStyles.cardDetails}>
+                                    <Text style={[chatStyles.cardDetailText, { color: colors.text }]}>
+                                      <Text style={{ color: colors.muted }}>Category: </Text>
+                                      {autonomousTx.category_name}
+                                    </Text>
+                                    {autonomousTx.wallet_name && (
+                                      <Text style={[chatStyles.cardDetailText, { color: colors.text }]}>
+                                        <Text style={{ color: colors.muted }}>Wallet: </Text>
+                                        {autonomousTx.wallet_name}
+                                      </Text>
+                                    )}
+                                  </View>
+
+                                  {cardState === 'undone' ? (
+                                    <View style={[chatStyles.cardSavedBanner, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(220, 38, 38, 0.1)' }]}>
+                                      <RotateCcw size={15} color="#ef4444" />
+                                      <Text style={[chatStyles.cardSavedText, { color: '#ef4444' }]}>
+                                        Undone • Removed from Ledger
+                                      </Text>
+                                    </View>
+                                  ) : (
+                                    <TouchableOpacity
+                                      onPress={() => handleUndoAutonomousTransaction(msg.id, autonomousTx.id)}
+                                      style={[chatStyles.cardUndoBtn, { borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : 'rgba(220, 38, 38, 0.3)' }]}
+                                    >
+                                      <RotateCcw size={15} color={isDark ? '#f87171' : '#dc2626'} style={{ marginRight: 6 }} />
+                                      <Text style={[chatStyles.cardUndoBtnText, { color: isDark ? '#f87171' : '#dc2626' }]}>
+                                        Undo Transaction (Remove)
+                                      </Text>
+                                    </TouchableOpacity>
+                                  )}
+                                </View>
+                              )}
+
+                              {/* 3. Proposed Budget Confirmation Card */}
+                              {proposedBudget && (
+                                <View style={[chatStyles.interactiveCard, { backgroundColor: colors.surface, borderColor: isDark ? 'rgba(168, 85, 247, 0.4)' : 'rgba(147, 51, 234, 0.3)' }]}>
+                                  <View style={chatStyles.cardBadgeRow}>
+                                    <View style={[chatStyles.cardBadgePill, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.18)' : 'rgba(147, 51, 234, 0.12)' }]}>
+                                      <PieChart size={13} color="#a855f7" />
+                                      <Text style={[chatStyles.cardBadgeText, { color: '#a855f7' }]}>
+                                        Proposed Monthly Budget
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <Text style={[chatStyles.cardAmount, { color: '#a855f7' }]}>
+                                    {formatGHS(proposedBudget.monthly_limit)}
+                                  </Text>
+
+                                  <Text style={[chatStyles.cardDetailText, { color: colors.text, marginBottom: 12 }]}>
+                                    <Text style={{ color: colors.muted }}>Category: </Text>
+                                    {proposedBudget.category_name}
+                                  </Text>
+
+                                  {cardState === 'saved' ? (
+                                    <View style={[chatStyles.cardSavedBanner, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : 'rgba(147, 51, 234, 0.1)' }]}>
+                                      <CheckCircle2 size={16} color="#a855f7" />
+                                      <Text style={[chatStyles.cardSavedText, { color: '#a855f7' }]}>
+                                        Budget limit active
+                                      </Text>
+                                    </View>
+                                  ) : (
+                                    <TouchableOpacity
+                                      onPress={() => handleConfirmProposedBudget(msg.id, proposedBudget)}
+                                      disabled={cardState === 'saving'}
+                                      style={[chatStyles.cardPrimaryBtn, { backgroundColor: '#a855f7' }]}
+                                    >
+                                      {cardState === 'saving' ? (
+                                        <ActivityIndicator size="small" color="white" />
+                                      ) : (
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                          <Check size={16} color="white" style={{ marginRight: 6 }} />
+                                          <Text style={chatStyles.cardPrimaryBtnText}>Set Budget Limit</Text>
+                                        </View>
+                                      )}
+                                    </TouchableOpacity>
+                                  )}
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })()}
                         {msg.actions && msg.actions.length > 0 && (
                           <View style={chatStyles.actionRow}>
                             {msg.actions.map((act) => {
@@ -1656,6 +2160,53 @@ export const SupportModal: React.FC<SupportModalProps> = ({
           </View>
 
           <View style={[chatStyles.composerArea, { paddingBottom: Math.max(insets.bottom, 12), backgroundColor: colors.background }]}>
+            {(autoPilot || deepAudit || language !== 'en' || autoSpeak) && (
+              <View style={chatStyles.activeModesBar}>
+                {autoPilot && (
+                  <TouchableOpacity
+                    onPress={() => handleToggleAutoPilot(false)}
+                    style={[chatStyles.modeBadge, { backgroundColor: isDark ? 'rgba(74, 222, 128, 0.15)' : 'rgba(13, 99, 27, 0.12)', borderColor: colors.accent }]}
+                  >
+                    <Zap size={11} color={colors.accent} />
+                    <Text style={[chatStyles.modeBadgeText, { color: colors.accent }]}>Auto-Pilot ON ✕</Text>
+                  </TouchableOpacity>
+                )}
+                {deepAudit && (
+                  <TouchableOpacity
+                    onPress={() => handleToggleDeepAudit(false)}
+                    style={[chatStyles.modeBadge, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : 'rgba(147, 51, 234, 0.12)', borderColor: '#a855f7' }]}
+                  >
+                    <Sparkles size={11} color="#a855f7" />
+                    <Text style={[chatStyles.modeBadgeText, { color: '#a855f7' }]}>Deep Audit ✕</Text>
+                  </TouchableOpacity>
+                )}
+                {language === 'pidgin' && (
+                  <TouchableOpacity
+                    onPress={() => handleSetLanguage('en')}
+                    style={[chatStyles.modeBadge, { backgroundColor: isDark ? 'rgba(234, 179, 8, 0.15)' : 'rgba(202, 138, 4, 0.12)', borderColor: '#eab308' }]}
+                  >
+                    <Text style={[chatStyles.modeBadgeText, { color: '#eab308' }]}>🇬🇭 Pidgin ✕</Text>
+                  </TouchableOpacity>
+                )}
+                {language === 'twi' && (
+                  <TouchableOpacity
+                    onPress={() => handleSetLanguage('en')}
+                    style={[chatStyles.modeBadge, { backgroundColor: isDark ? 'rgba(234, 179, 8, 0.15)' : 'rgba(202, 138, 4, 0.12)', borderColor: '#eab308' }]}
+                  >
+                    <Text style={[chatStyles.modeBadgeText, { color: '#eab308' }]}>🇬🇭 Twi ✕</Text>
+                  </TouchableOpacity>
+                )}
+                {autoSpeak && (
+                  <TouchableOpacity
+                    onPress={() => handleToggleAutoSpeak(false)}
+                    style={[chatStyles.modeBadge, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(2, 132, 199, 0.12)', borderColor: '#38bdf8' }]}
+                  >
+                    <AudioLines size={11} color="#38bdf8" />
+                    <Text style={[chatStyles.modeBadgeText, { color: '#38bdf8' }]}>Auto-Speak ✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
             <View style={[chatStyles.composer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {attachedImage && (
                 <View style={chatStyles.attachmentPreview}>
@@ -1716,14 +2267,16 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         <Modal visible={showAttachMenu} transparent animationType="fade" onRequestClose={() => setShowAttachMenu(false)}>
           <View style={chatStyles.sheetBackdrop}>
             <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowAttachMenu(false)} accessibilityRole="button" accessibilityLabel="Dismiss chat tools" />
-            <View style={[chatStyles.sheet, { backgroundColor: colors.surface, maxHeight: '85%', paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <View style={[chatStyles.sheet, { backgroundColor: colors.surface, maxHeight: '90%', paddingBottom: Math.max(insets.bottom, 20) }]}>
               <View style={chatStyles.sheetHeader}>
-                <Text style={[chatStyles.sheetTitle, { color: colors.text }]}>Add to your chat</Text>
+                <Text style={[chatStyles.sheetTitle, { color: colors.text }]}>AI Tools & Controls</Text>
                 <TouchableOpacity onPress={() => setShowAttachMenu(false)} style={chatStyles.iconButton} accessibilityRole="button" accessibilityLabel="Close chat tools">
                   <X size={20} color={colors.muted} />
                 </TouchableOpacity>
               </View>
-              <ScrollView keyboardShouldPersistTaps="handled">
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                {/* 1. Media & Attachments */}
+                <Text style={[chatStyles.sheetSectionLabel, { color: colors.muted }]}>Media & Attachments</Text>
                 <View style={chatStyles.attachmentOptions}>
                   {[
                     { label: 'Camera', icon: Camera, onPress: handleLaunchCamera },
@@ -1731,17 +2284,120 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                     { label: 'Files', icon: Paperclip, onPress: handlePickDocument },
                   ].map(({ label, icon: Icon, onPress }) => (
                     <TouchableOpacity key={label} onPress={onPress} style={[chatStyles.attachmentOption, { borderColor: colors.border }]} accessibilityRole="button">
-                      <Icon size={23} color={colors.accent} strokeWidth={1.7} />
-                      <Text style={{ color: colors.text, fontSize: 14 }}>{label}</Text>
+                      <Icon size={22} color={colors.accent} strokeWidth={1.7} />
+                      <Text style={{ color: colors.text, fontSize: 13, marginTop: 4 }}>{label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
+
+                {/* 2. Ghanaian Language / Dialect */}
+                <Text style={[chatStyles.sheetSectionLabel, { color: colors.muted, marginTop: 18 }]}>Language & Dialect</Text>
+                <View style={[chatStyles.segmentedPillContainer, { backgroundColor: isDark ? '#141a16' : '#f0f3f0', borderColor: colors.border }]}>
+                  {[
+                    { key: 'en', label: '🇬🇭 English' },
+                    { key: 'pidgin', label: '💬 Pidgin' },
+                    { key: 'twi', label: '🇬🇭 Twi' },
+                  ].map(({ key, label }) => {
+                    const isSelected = language === key;
+                    return (
+                      <TouchableOpacity
+                        key={key}
+                        onPress={() => handleSetLanguage(key as any)}
+                        style={[
+                          chatStyles.segmentedPillItem,
+                          isSelected && { backgroundColor: colors.accent, elevation: 1 },
+                        ]}
+                      >
+                        <Text style={[
+                          chatStyles.segmentedPillText,
+                          { color: isSelected ? '#ffffff' : colors.text, fontWeight: isSelected ? '700' : '500' }
+                        ]}>
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* 3. Autonomous AI Modes & Controls */}
+                <Text style={[chatStyles.sheetSectionLabel, { color: colors.muted, marginTop: 18 }]}>Autonomous CFO Controls</Text>
+                <View style={[chatStyles.toolGroupCard, { backgroundColor: isDark ? '#141a16' : '#f9fbf9', borderColor: colors.border }]}>
+                  {/* Auto-Pilot Toggle */}
+                  <View style={chatStyles.toolControlRow}>
+                    <View style={chatStyles.toolControlLeft}>
+                      <View style={[chatStyles.toolControlBadge, { backgroundColor: isDark ? 'rgba(74, 222, 128, 0.15)' : 'rgba(13, 99, 27, 0.1)' }]}>
+                        <Zap size={16} color={colors.accent} />
+                      </View>
+                      <View style={{ flex: 1, marginRight: 12 }}>
+                        <Text style={[chatStyles.toolControlTitle, { color: colors.text }]}>⚡ Auto-Pilot Execution</Text>
+                        <Text style={[chatStyles.toolControlDesc, { color: colors.muted }]}>
+                          Directly logs transactions with a 10s instant undo. When OFF, CediSmart prepares confirmation cards.
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={autoPilot}
+                      onValueChange={handleToggleAutoPilot}
+                      trackColor={{ false: isDark ? '#333' : '#d1d5db', true: colors.accent }}
+                      thumbColor="#ffffff"
+                    />
+                  </View>
+
+                  <View style={[chatStyles.toolCardDivider, { backgroundColor: colors.border }]} />
+
+                  {/* Deep Financial Audit Toggle */}
+                  <View style={chatStyles.toolControlRow}>
+                    <View style={chatStyles.toolControlLeft}>
+                      <View style={[chatStyles.toolControlBadge, { backgroundColor: isDark ? 'rgba(168, 85, 247, 0.15)' : 'rgba(147, 51, 234, 0.1)' }]}>
+                        <Sparkles size={16} color="#a855f7" />
+                      </View>
+                      <View style={{ flex: 1, marginRight: 12 }}>
+                        <Text style={[chatStyles.toolControlTitle, { color: colors.text }]}>🧠 Deep Financial Audit</Text>
+                        <Text style={[chatStyles.toolControlDesc, { color: colors.muted }]}>
+                          CFO-grade deep diagnosis: velocity burn rates, spending anomalies & local cost-cutting tips.
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={deepAudit}
+                      onValueChange={handleToggleDeepAudit}
+                      trackColor={{ false: isDark ? '#333' : '#d1d5db', true: '#a855f7' }}
+                      thumbColor="#ffffff"
+                    />
+                  </View>
+
+                  <View style={[chatStyles.toolCardDivider, { backgroundColor: colors.border }]} />
+
+                  {/* Auto-Speak Responses */}
+                  <View style={chatStyles.toolControlRow}>
+                    <View style={chatStyles.toolControlLeft}>
+                      <View style={[chatStyles.toolControlBadge, { backgroundColor: isDark ? 'rgba(56, 189, 248, 0.15)' : 'rgba(2, 132, 199, 0.1)' }]}>
+                        <AudioLines size={16} color="#38bdf8" />
+                      </View>
+                      <View style={{ flex: 1, marginRight: 12 }}>
+                        <Text style={[chatStyles.toolControlTitle, { color: colors.text }]}>🔊 Auto-Speak Responses</Text>
+                        <Text style={[chatStyles.toolControlDesc, { color: colors.muted }]}>
+                          Reads text responses aloud automatically in natural Ghanaian voice.
+                        </Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={autoSpeak}
+                      onValueChange={handleToggleAutoSpeak}
+                      trackColor={{ false: isDark ? '#333' : '#d1d5db', true: '#38bdf8' }}
+                      thumbColor="#ffffff"
+                    />
+                  </View>
+                </View>
+
+                {/* 4. Action Shortcuts */}
                 {supportType !== 'auth' && (
-                  <View style={{ marginTop: 12 }}>
+                  <View style={{ marginTop: 18 }}>
+                    <Text style={[chatStyles.sheetSectionLabel, { color: colors.muted }]}>Quick Shortcuts</Text>
                     {['Paste MoMo SMS to Auto-Log', 'Check for problems', 'Help Guides (Offline)'].map((prompt) => (
                       <TouchableOpacity key={prompt} onPress={() => { setShowAttachMenu(false); handleQuickPrompt(prompt); }} style={chatStyles.toolRow} accessibilityRole="button">
-                        <Text style={{ color: colors.text, fontSize: 15, flexShrink: 1 }}>{prompt}</Text>
-                        <ArrowUpRight size={17} color={colors.muted} />
+                        <Text style={{ color: colors.text, fontSize: 14, flexShrink: 1 }}>{prompt}</Text>
+                        <ArrowUpRight size={16} color={colors.muted} />
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -2002,4 +2658,34 @@ const chatStyles = StyleSheet.create({
   attachmentOptions: { flexDirection: 'row', gap: 12 },
   attachmentOption: { flex: 1, borderWidth: 1, borderRadius: 18, alignItems: 'center', paddingVertical: 18, gap: 10 },
   toolRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  activeModesBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 4, marginBottom: 8 },
+  modeBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1 },
+  modeBadgeText: { fontSize: 11, fontWeight: '600' },
+  interactiveCard: { borderRadius: 20, borderWidth: 1, padding: 16, marginTop: 12, marginBottom: 8 },
+  cardBadgeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  cardBadgePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  cardBadgeText: { fontSize: 12, fontWeight: '700' },
+  cardAmount: { fontSize: 26, fontWeight: '800', marginVertical: 6, letterSpacing: -0.5 },
+  cardDetails: { marginBottom: 14, gap: 4 },
+  cardDetailText: { fontSize: 13, lineHeight: 19 },
+  cardSavedBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12 },
+  cardSavedText: { fontSize: 13, fontWeight: '600' },
+  cardButtonRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  cardPrimaryBtn: { flex: 1, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  cardPrimaryBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  cardSecondaryBtn: { minHeight: 44, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 },
+  cardSecondaryBtnText: { fontSize: 13, fontWeight: '600' },
+  cardUndoBtn: { minHeight: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', paddingHorizontal: 12 },
+  cardUndoBtnText: { fontSize: 13, fontWeight: '600' },
+  sheetSectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 10 },
+  segmentedPillContainer: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 4, gap: 6 },
+  segmentedPillItem: { flex: 1, minHeight: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  segmentedPillText: { fontSize: 13 },
+  toolGroupCard: { borderRadius: 18, borderWidth: 1, padding: 14 },
+  toolControlRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 6 },
+  toolControlLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  toolControlBadge: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  toolControlTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  toolControlDesc: { fontSize: 11, lineHeight: 16 },
+  toolCardDivider: { height: StyleSheet.hairlineWidth, marginVertical: 10 },
 });

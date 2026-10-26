@@ -40,6 +40,18 @@ class ChatRequest(BaseModel):
         default="image/jpeg",
         description="MIME type of the attached image",
     )
+    language: str = Field(
+        default="en",
+        description="User dialect/language preference: 'en' (English), 'pidgin' (Ghanaian Pidgin), 'twi' (Twi / Akan)",
+    )
+    auto_pilot: bool = Field(
+        default=False,
+        description="Whether autonomous execution mode is active (executes transactions directly instead of proposing confirmation cards)",
+    )
+    deep_audit: bool = Field(
+        default=False,
+        description="Whether deep financial audit analysis is requested",
+    )
 
 
 class ChatResponse(BaseModel):
@@ -116,6 +128,18 @@ class VoiceRequest(BaseModel):
     initial_context: str | None = "dashboard"
     synthesize_audio: bool = True
     messages: list[dict[str, str]] | None = None
+    language: str = Field(
+        default="en",
+        description="User dialect/language preference: 'en', 'pidgin', 'twi'",
+    )
+    auto_pilot: bool = Field(
+        default=False,
+        description="Whether autonomous execution mode is active",
+    )
+    deep_audit: bool = Field(
+        default=False,
+        description="Whether deep financial audit analysis is requested",
+    )
 
 
 class VoiceResponse(BaseModel):

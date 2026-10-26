@@ -12,7 +12,7 @@
 ![License](https://img.shields.io/badge/license-Proprietary-red)
 
 **📚 Documentation:**
-[API README](./cedismart-api/README.md) · [Mobile README](./cedismart-mobile/README.md) · [Web README](./cedismart-web/README.md) · [OpenAPI Docs (local)](http://localhost:8000/docs)
+[User Guide (End-to-End)](./HOW_TO_USE_CEDISMART.md) · [API README](./cedismart-api/README.md) · [Mobile README](./cedismart-mobile/README.md) · [Web README](./cedismart-web/README.md) · [OpenAPI Docs (local)](http://localhost:8000/docs)
 
 ---
 
@@ -20,6 +20,7 @@
 
 | I'm a... | Start here |
 |---|---|
+| **App User / Reviewer** | [Complete User Guide](./HOW_TO_USE_CEDISMART.md) — Step-by-step walkthrough of all features |
 | **Backend Engineer** | [API README](./cedismart-api/README.md) — Full setup, architecture, testing |
 | **Mobile Developer** | [Mobile README](./cedismart-mobile/README.md) — Expo setup, navigation, offline sync |
 | **Frontend/Web Dev** | [Web README](./cedismart-web/README.md) — HTML/CSS/JS setup, API integration |
@@ -79,14 +80,19 @@ CediSmart/
 └── cedismart-web/      # Landing Page Website & APK Download Portal
 ```
 
-### 🤖 Gemini AI Voice & Intelligence Superpowers
+### 🤖 Gemini AI Voice & Financial Intelligence Superpowers
 
 CediSmart integrates Google's high-speed **Gemini Flash-Lite** models and **Gemini Neural TTS** (via Google AI Studio) to deliver advanced local features:
 * **Live ChatGPT-Style Voice Mode**: Real-time hands-free voice assistant featuring a liquid glass voice orb (`VoiceOrb.tsx`) with dynamic physics, fluid scaling (large ↔ mini orb), and live speech-synced typography.
 * **Natural Neural Voice (Kore)**: Warm, lifelike spoken responses synthesized using Gemini TTS models with standard WAV packaging and seamless iOS/Android audio session management.
-* **Direct Voice Action Execution**: Users can record expenses (*"Log 50 cedis for fuel on MoMo"*), query multi-wallet balances (*"What is my balance?"*), and inspect monthly budget limits hands-free. The assistant speaks dynamic reassuring verbal bridges (*"Checking your balance real quick…"*, *"Logging that for you right away…"*) while executing, then speaks the verified outcome aloud.
-* **Gemini SMS Parser & Instant Rescue**: In Ghana, transaction syncing via open banking APIs is unavailable. CediSmart solves this by automatically parsing Mobile Money (MTN MoMo, Telecel Cash, AT Money) and bank transaction SMS alerts into structured ledger records with zero manual entry.
-* **Adaptive Tone & X-Ray Diagnostics**: Intelligent support engine that provides warm, clear financial guidance in English or Ghanaian Pidgin without technical jargon, backed by plain-language diagnostic checks.
+* **Direct Voice & Chat Action Execution**: Users can record expenses (*"Log 50 cedis for fuel on MoMo"*), query multi-wallet balances (*"What is my balance?"*), and inspect monthly budget limits hands-free. The assistant speaks dynamic reassuring verbal bridges (*"Checking your balance real quick…"*, *"Logging that for you right away…"*) while executing, then speaks the verified outcome aloud.
+* **Live Budget & Financial Reports X-Ray**: Direct telemetry access to live active category budgets and monthly cash flow reports. The AI answers queries like *"How is my food budget doing?"* or *"What is my biggest expense?"* with exact numbers and percentage progress.
+* **Tri-Lingual Intelligence**: Seamlessly switch between **Standard Ghanaian English**, **Ghanaian Pidgin Mode** (*"Charley, you dey balance well!"*), and **Twi / Akan Mode** (*"Wo sika a aka wɔ MoMo mu yɛ..."*).
+* **AI Command Center & Interactive Controls**: Floating `+` action menu with media attachments, language segmented pills, **Auto-Pilot Execution Toggle** (`OFF` by default), **Deep Financial Audit Toggle**, and **Auto-Speak** voice toggles.
+* **Advisor Mode vs. Auto-Pilot Mode**: In Advisor Mode, AI generates native in-chat confirmation cards (`[ Confirm & Save to Ledger ]` and `[ Edit in Form ]`) requiring 1 touch to record. In Auto-Pilot Mode, the system updates the database autonomously with an instant 10-second Undo button.
+* **Receipt & Invoice Multimodal Scanner**: Snaps photos of receipts, extracts merchant details and itemized breakdowns, and provides 1-tap confirmation cards to save to the ledger.
+* **Gemini SMS Parser & Instant Rescue**: Automatically parses Mobile Money (MTN MoMo, Telecel Cash, AT Money) and bank transaction SMS alerts into structured ledger records with zero manual entry.
+* **Adaptive Tone & X-Ray Diagnostics**: Intelligent support engine that provides warm, clear financial guidance without technical jargon, backed by plain-language diagnostic checks.
 
 ---
 
