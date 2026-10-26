@@ -369,13 +369,9 @@ def test_normalize_currency_for_speech() -> None:
         SupportService.normalize_currency_for_speech("Paid GHS 75 for waakye")
         == "Paid 75 Ghana Cedis for waakye"
     )
+    assert SupportService.normalize_currency_for_speech("Total is ₵20") == "Total is 20 Ghana Cedis"
     assert (
-        SupportService.normalize_currency_for_speech("Total is ₵20")
-        == "Total is 20 Ghana Cedis"
-    )
-    assert (
-        SupportService.normalize_currency_for_speech("Cost is $30.00")
-        == "Cost is 30 Ghana Cedis"
+        SupportService.normalize_currency_for_speech("Cost is $30.00") == "Cost is 30 Ghana Cedis"
     )
 
     # 2. Pesewas conversion
