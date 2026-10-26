@@ -322,6 +322,10 @@ async def test_report_bug_submitted(client: AsyncClient, make_user) -> None:
 
     with (
         patch("app.core.config.settings.GITHUB_ACCESS_TOKEN", "mock_token"),
+        patch(
+            "app.core.config.settings.DISCORD_BUGS_WEBHOOK_URL",
+            "https://discord.com/api/webhooks/mock",
+        ),
         patch("app.modules.users.service.httpx.AsyncClient") as mock_client_class,
     ):
 
