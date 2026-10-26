@@ -76,6 +76,7 @@ async def voice_chat_with_support(request: Request, body: VoiceRequest) -> Voice
         synthesize_audio=body.synthesize_audio,
         messages=body.messages,
         language=body.language,
+        voice_persona=body.voice_persona,
         auto_pilot=body.auto_pilot,
         deep_audit=body.deep_audit,
     )
@@ -96,6 +97,7 @@ async def synthesize_voice(
     audio_b64, mime = await SupportService.synthesize_neural_voice(
         text=body.text,
         voice_name=body.voice_name,
+        voice_persona=body.voice_persona,
     )
     if not audio_b64:
         raise AppException(

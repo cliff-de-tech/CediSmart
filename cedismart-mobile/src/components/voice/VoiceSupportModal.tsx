@@ -90,6 +90,17 @@ const isInvalidTranscript = (text: string) => {
   return false;
 };
 
+export type VoicePersona = 'akosua' | 'kwame' | 'esi';
+
+export const VOICE_PERSONAS: Record<
+  VoicePersona,
+  { name: string; label: string; gender: 'female' | 'male'; desc: string }
+> = {
+  akosua: { name: 'Akosua', label: '👩 Akosua', gender: 'female', desc: 'Warm Female' },
+  kwame: { name: 'Kwame', label: '👨 Kwame', gender: 'male', desc: 'Confident Male' },
+  esi: { name: 'Esi', label: '👩 Esi', gender: 'female', desc: 'Energetic Female' },
+};
+
 export interface VoiceSupportModalProps {
   visible: boolean;
   onClose: () => void;
@@ -151,8 +162,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const [isTypingInVoice, setIsTypingInVoice] = useState(false);
   const [voiceInputText, setVoiceInputText] = useState('');
 
-  // CFO Intelligence & Dialect Preferences
+  // CFO Intelligence, Dialect & Voice Persona Preferences
   const [language, setLanguage] = useState<'en' | 'pidgin' | 'twi'>('en');
+  const [voicePersona, setVoicePersona] = useState<VoicePersona>('akosua');
   const [autoPilot, setAutoPilot] = useState<boolean>(false);
   const [deepAudit, setDeepAudit] = useState<boolean>(false);
 
@@ -160,13 +172,21 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     if (!visible) return;
     const loadPreferences = async () => {
       try {
-        const [savedLang, savedAutoPilot, savedDeepAudit] = await Promise.all([
+        const [savedLang, savedAutoPilot, savedDeepAudit, savedVoicePersona] = await Promise.all([
           AsyncStorage.getItem('cedismart_ai_language'),
           AsyncStorage.getItem('cedismart_ai_autopilot'),
           AsyncStorage.getItem('cedismart_ai_deep_audit'),
+          AsyncStorage.getItem('cedismart_voice_persona'),
         ]);
         if (savedLang === 'en' || savedLang === 'pidgin' || savedLang === 'twi') {
           setLanguage(savedLang);
+        }
+        if (
+          savedVoicePersona === 'akosua' ||
+          savedVoicePersona === 'kwame' ||
+          savedVoicePersona === 'esi'
+        ) {
+          setVoicePersona(savedVoicePersona);
         }
         if (savedAutoPilot !== null) setAutoPilot(savedAutoPilot === 'true');
         if (savedDeepAudit !== null) setDeepAudit(savedDeepAudit === 'true');
@@ -174,6 +194,16 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     };
     void loadPreferences();
   }, [visible]);
+
+  const handleCycleVoicePersona = async () => {
+    const nextPersona: VoicePersona =
+      voicePersona === 'akosua' ? 'kwame' : voicePersona === 'kwame' ? 'esi' : 'akosua';
+    setVoicePersona(nextPersona);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      await AsyncStorage.setItem('cedismart_voice_persona', nextPersona);
+    } catch {}
+  };
 
   // Attachment Handlers for ChatGPT-style '+' Menu inside Voice Mode
   const handleLaunchCamera = async () => {
@@ -491,6 +521,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       const response = await apiClient.post('/support/voice/synthesize', {
         text: reply,
         voice_name: 'Kore',
+        voice_persona: voicePersona,
       }, { timeout: VOICE_SYNTHESIS_TIMEOUT_MS, signal });
       if (!response.data?.audio_base64) throw new Error('missing_audio');
       return response.data.audio_base64;
@@ -618,6 +649,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         synthesize_audio: true,
         messages: messagesRef.current.slice(-12).map(({ role, content }) => ({ role, content })),
         language,
+        voice_persona: voicePersona,
         auto_pilot: autoPilot,
         deep_audit: deepAudit,
       }, { signal: controller.signal, timeout: VOICE_RECOGNITION_TIMEOUT_MS });
@@ -668,8 +700,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Recording expense…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : getPrecachedBridge('expense');
-        const bridgePromise = playBridgePhrase(bridge.text, bridge.base64, turn);
+          : voicePersona === 'kwame'
+            ? null
+            : getPrecachedBridge('expense');
+        const bridgePromise = bridge
+          ? playBridgePhrase(bridge.text, bridge.base64, turn)
+          : Promise.resolve();
         const actionPromise = handleExecuteVoiceTransaction(action.payload, turn);
         const [_, outcomeText] = await Promise.all([bridgePromise, actionPromise]);
         if (!isCurrentTurn(turn)) return;
@@ -679,8 +715,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Checking your balances…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : getPrecachedBridge('balance');
-        const bridgePromise = playBridgePhrase(bridge.text, bridge.base64, turn);
+          : voicePersona === 'kwame'
+            ? null
+            : getPrecachedBridge('balance');
+        const bridgePromise = bridge
+          ? playBridgePhrase(bridge.text, bridge.base64, turn)
+          : Promise.resolve();
         const fetchPromise = (async () => {
           setActionToast(null);
           try {
@@ -727,8 +767,12 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Checking your budgets…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : getPrecachedBridge('budget');
-        const bridgePromise = playBridgePhrase(bridge.text, bridge.base64, turn);
+          : voicePersona === 'kwame'
+            ? null
+            : getPrecachedBridge('budget');
+        const bridgePromise = bridge
+          ? playBridgePhrase(bridge.text, bridge.base64, turn)
+          : Promise.resolve();
         const budgetPromise = (async () => {
           setActionToast(null);
           try {
@@ -1054,15 +1098,33 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     >
       {/* Pure, immersive OpenAI ChatGPT Voice background */}
       <View style={[styles.container, { backgroundColor: theme === 'dark' ? '#080a08' : '#f5f8f5' }]}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.topBar}>
-            <View style={{ flex: 1 }}>
+        <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
+          <View style={[styles.topBar, { paddingTop: Math.max(insets.top, Platform.OS === 'ios' ? 44 : 20) + 8 }]}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
               <Text style={[styles.voiceTitle, { color: theme === 'dark' ? '#e1e3e0' : '#1c1b1f' }]}>CediSmart Voice</Text>
               <Text accessibilityLiveRegion="polite" style={[styles.voiceStatus, { color: theme === 'dark' ? '#b2b6b1' : '#40493d' }]}>{statusLabel}</Text>
             </View>
-            <TouchableOpacity onPress={() => setIsCompactView((value) => !value)} style={styles.transcriptToggle} accessibilityRole="button" accessibilityLabel={isCompactView ? 'Hide transcript' : 'Show transcript'} accessibilityState={{ selected: isCompactView }}>
-              <MessageSquare size={21} color={theme === 'dark' ? '#4ade80' : '#0d631b'} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                onPress={handleCycleVoicePersona}
+                style={[
+                  styles.personaPill,
+                  {
+                    backgroundColor: theme === 'dark' ? 'rgba(74, 222, 128, 0.12)' : 'rgba(13, 99, 27, 0.08)',
+                    borderColor: theme === 'dark' ? 'rgba(74, 222, 128, 0.28)' : 'rgba(13, 99, 27, 0.2)',
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Voice: ${VOICE_PERSONAS[voicePersona].name}. Tap to switch voice`}
+              >
+                <Text style={[styles.personaPillText, { color: theme === 'dark' ? '#4ade80' : '#0d631b' }]}>
+                  {VOICE_PERSONAS[voicePersona].label}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setIsCompactView((value) => !value)} style={styles.transcriptToggle} accessibilityRole="button" accessibilityLabel={isCompactView ? 'Hide transcript' : 'Show transcript'} accessibilityState={{ selected: isCompactView }}>
+                <MessageSquare size={21} color={theme === 'dark' ? '#4ade80' : '#0d631b'} />
+              </TouchableOpacity>
+            </View>
           </View>
           {voiceError && (
             <View style={styles.errorPanel}>
@@ -1325,8 +1387,19 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingHorizontal: 20,
+  },
+  personaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+  },
+  personaPillText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
   },
   topIndicator: {
     flexDirection: 'row',

@@ -65,6 +65,7 @@ ignore = [
     "TC001",    # Type-checking imports - SQLAlchemy models need runtime imports for relationships
     "TC002",
     "TC003",
+    "TC006",
 ]
 
 [tool.ruff.lint.isort]

@@ -262,7 +262,9 @@ async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
         body = resp.json()
         assert body["audio_base64"] == "dGVzdC1hdWRpby1ieXRlcw=="
         assert body["audio_mime_type"] == "audio/wav"
-        mock_synth.assert_called_once_with(text="Hi Clifford, I'm listening.", voice_name="Kore")
+        mock_synth.assert_called_once_with(
+            text="Hi Clifford, I'm listening.", voice_name="Kore", voice_persona="akosua"
+        )
 
 
 @pytest.mark.asyncio
@@ -349,3 +351,41 @@ async def test_voice_synthesis_falls_back_to_openai() -> None:
 
         assert audio_b64 == base64.b64encode(b"fake_mp3_data").decode("utf-8")
         assert mime == "audio/mp3"
+
+
+def test_normalize_currency_for_speech() -> None:
+    from app.modules.support.service import SupportService
+
+    # 1. Whole amounts in GH₵, GHS, ₵, $
+    assert (
+        SupportService.normalize_currency_for_speech("Spent GH₵ 50.00 on fuel")
+        == "Spent 50 Ghana Cedis on fuel"
+    )
+    assert (
+        SupportService.normalize_currency_for_speech("Balance is GH₵1,200")
+        == "Balance is 1200 Ghana Cedis"
+    )
+    assert (
+        SupportService.normalize_currency_for_speech("Paid GHS 75 for waakye")
+        == "Paid 75 Ghana Cedis for waakye"
+    )
+    assert (
+        SupportService.normalize_currency_for_speech("Total is ₵20")
+        == "Total is 20 Ghana Cedis"
+    )
+    assert (
+        SupportService.normalize_currency_for_speech("Cost is $30.00")
+        == "Cost is 30 Ghana Cedis"
+    )
+
+    # 2. Pesewas conversion
+    assert (
+        SupportService.normalize_currency_for_speech("Spent GH₵ 12.50 on airtime")
+        == "Spent 12 Ghana Cedis and 50 Pesewas on airtime"
+    )
+
+    # 3. Forbids "dollars" and "cents"
+    assert (
+        SupportService.normalize_currency_for_speech("You have 100 dollars and 50 cents")
+        == "You have 100 Cedis and 50 Pesewas"
+    )

@@ -47,7 +47,8 @@ VOICE_MODE_INSTRUCTIONS = (
     "1. Speak naturally as a friendly, reassuring Ghanaian financial companion (mimicking ChatGPT Voice).\n"
     "2. Keep your spoken response brief, conversational, and direct (1 to 2 short sentences max).\n"
     "3. Never include markdown bullet points, asterisks, or raw symbols that sound awkward when read out loud by text-to-speech.\n"
-    "4. Mention currency naturally (e.g. '50 cedis' rather than 'GHS 50.00').\n"
+    "4. Pronounce all currency strictly in Cedis or Ghana Cedis (e.g. '50 Cedis' or '50 Ghana Cedis'). NEVER say 'Dollars', and NEVER use dollar signs ($).\n"
+    "5. When reporting pesewas, say e.g. '12 Cedis and 50 Pesewas'.\n"
 )
 
 AUTH_SYSTEM_PROMPT = "".join(
@@ -101,8 +102,8 @@ GENERAL_SYSTEM_PROMPT = "".join(
         "- Screenshot & Receipt Vision (Multi-Item Scanner & Splitter): Users can attach screenshots or photos of paper store receipts, market invoices, and checkout slips:\n",
         "  1. Read the image carefully: Transcribe the merchant/store name, transaction date, and line items with individual prices.\n",
         "  2. Present a clean itemized breakdown list of all items and total amount.\n",
-        '  3. In Advisor Mode (Auto-Pilot OFF): Append a `[PROPOSED_TRANSACTION: {"amount": <total>, "transaction_type": "expense", "category_name": <best category, e.g. \'Food & Dining\' or \'Shopping\'>, "wallet_name": "Cash", "description": <store name or items>, "transaction_date": "YYYY-MM-DD"}]` tag so the user can review and log the receipt with 1 tap.\n',
-        "  4. In Auto-Pilot Mode (Auto-Pilot ON): If the user asked you to log/scan the receipt, the total will be recorded automatically.\n",
+        "  3. In Advisor Mode (Auto-Pilot OFF): Append one `[PROPOSED_TRANSACTION: {...}]` tag on its own line for EACH distinct receipt line item (or for the total if preferred) so the user can review and log items with 1 tap.\n",
+        "  4. In Auto-Pilot Mode (Auto-Pilot ON): If the user asked you to log/scan the receipt, the items will be recorded automatically.\n",
         "- Important restriction: Since you are post-login support, if the user asks about changing phone numbers or ",
         "re-registering, guide them to the profile/auth settings.\n\n",
         "IMPORTANT ESCALATION PROTOCOL:\n",
@@ -130,11 +131,36 @@ LANGUAGE_PROMPTS = {
         "- Keep financial advice supportive and realistic.\n"
     ),
     "twi": (
-        "\n\n=== LANGUAGE: TWI / AKAN MODE ===\n"
-        "- Respond in respectful, authentic Twi (Akan) with light English loanwords for financial technicalities!\n"
-        "- Use authentic Akan phrases such as: 'Medaase', 'Wo sika kɔkɔɔ', 'Wo sika a aka', 'Wo ledger mu', 'Ɛbɛyɛ yie', 'Sika nhyehyɛe (budget)', 'MoMo sika'.\n"
-        "- Keep all numbers, currency figures, and dates crystal clear (e.g. 'GH₵ 50.00').\n"
-        "- Keep financial advice respectful and supportive.\n"
+        "\n\n=== LANGUAGE: AUTHENTIC TWI / AKAN FINANCIAL MODE ===\n"
+        "- Respond in respectful, natural Asante Twi (Akan) with clear financial vocabulary!\n"
+        "- Use authentic Akan financial concepts:\n"
+        "  * Balance / Funds: 'Wo sika a ɛwɔ wo akontabuo mu' or 'Wo kotokuo mu sika'\n"
+        "  * Total Balance: 'Wo sika nyinaa bom yɛ...'\n"
+        "  * Expenses / Money spent: 'Sika a woasɛe no' or 'Sika a ɛkɔeɛ'\n"
+        "  * Income / Received funds: 'Sika a ɛbaaeɛ' or 'Sika foforɔ a wunyaeɛ'\n"
+        "  * Remaining limit: 'Sika a aka a wobɛtumi asɛe'\n"
+        "  * Budget / Plan: 'Sika nhyehyɛeɛ'\n"
+        "  * Record in ledger: 'Mede ahyɛ wo ledger no mu' or 'Yɛatwerɛ no wɔ wo akontabuo mu'\n"
+        "  * Food / Dining: 'Aduane sika' (e.g., waakye, fufu, jollof)\n"
+        "  * Transportation: 'Akwantuo / lɔre sika / trotro / petrol'\n"
+        "  * Utilities: 'Anyinam ahoɔden (light bill) ne nsuo gye sika'\n"
+        "  * Airtime & Data: 'Kasa mfidie sika (airtime) ne intanɛt data'\n"
+        "  * Savings: 'Sika a woakora'\n"
+        "- Natural Conversational Akan Expressions:\n"
+        "  * Greetings & Politeness: 'Akwaaba', 'Medaase pa ara', 'Yɛsrɛ wo', 'Ɛnyɛ hwee koraa' (No problem at all).\n"
+        "  * Encouragement: 'Wo sika nhyehyɛeɛ rekɔ yie pa ara' (Your budget is doing very well), 'Wo reyɛ adwuma pa!'\n"
+        "- Always state numbers and currency figures crystal clear in Cedis (e.g. '50 Cedis' or 'GH₵ 50.00').\n"
+        "- Tone: Warm, respectful, supportive, and knowledgeable.\n"
+        "- Few-Shot Spoken Dialogue Examples in Twi:\n"
+        "  * Example 1 (Logging an expense):\n"
+        "    User: 'Mede 50 cedis atɔ petrol' or 'Log 50 cedis for fuel'\n"
+        "    Assistant: 'Medaase, mate aseɛ. Me de GH₵ 50.00 a wode tɔɔ petrol no ahyɛ wo akontabuo mu. Wo sika nhyehyɛeɛ no kɔ so yie.'\n"
+        "  * Example 2 (Balance query):\n"
+        "    User: 'Me sika a ɛwɔ me MoMo mu yɛ ahe?'\n"
+        "    Assistant: 'Wo MTN MoMo akontabuo mu sika nyinaa yɛ GH₵ 450.00. Sika nyinaa a ɛwɔ wo nsa ne wo bank mu nso yɛ GH₵ 1,200.00.'\n"
+        "  * Example 3 (Budget status):\n"
+        "    User: 'Me aduane sika nhyehyɛeɛ no te sɛn?'\n"
+        "    Assistant: 'Wode GH₵ 240.00 atɔ aduane afiri GH₵ 500.00 a wode sii hɔ bosome yi mu. Sika a aka a wobɛtumi asɛe yɛ GH₵ 260.00.'\n"
     ),
 }
 
@@ -162,12 +188,15 @@ def get_execution_mode_prompt(auto_pilot: bool) -> str:
             "Auto-Pilot is OFF (Advisor Mode). You CANNOT write directly to the database without user confirmation.\n"
             "When the user asks you to log an expense, record income, or adjust a budget:\n"
             "1. Politely explain what you prepared.\n"
-            "2. At the very end of your response, output a structured proposal tag on its own line so the app can render an interactive confirmation card:\n"
-            "   For expenses/income:\n"
+            "2. At the very end of your response, output structured proposal tags on their own lines so the app can render interactive confirmation cards:\n"
+            "   For single expense/income:\n"
             '   `[PROPOSED_TRANSACTION: {"amount": 50.0, "transaction_type": "expense", "category_name": "Food & Dining", "wallet_name": "Mobile Money", "description": "Lunch", "transaction_date": "YYYY-MM-DD"}]`\n'
+            "   For multiple expenses or receipt line items, output ONE tag per line for EACH distinct item:\n"
+            '   `[PROPOSED_TRANSACTION: {"amount": 50.0, "transaction_type": "expense", "category_name": "Transportation", "wallet_name": "Mobile Money", "description": "Fuel", "transaction_date": "YYYY-MM-DD"}]`\n'
+            '   `[PROPOSED_TRANSACTION: {"amount": 30.0, "transaction_type": "expense", "category_name": "Food & Dining", "wallet_name": "Cash", "description": "Lunch", "transaction_date": "YYYY-MM-DD"}]`\n'
             "   For budgets:\n"
             '   `[PROPOSED_BUDGET: {"category_name": "Food & Dining", "monthly_limit": 500.0}]`\n'
-            "3. Ask the user to tap 'Confirm & Save' on the card to record it.\n"
+            "3. Ask the user to tap 'Confirm & Save' (or 'Confirm All') on the cards to record them.\n"
         )
 
 
@@ -599,138 +628,359 @@ class SupportService:
         user_obj: Any,
         raw_text: str,
     ) -> tuple[str | None, str | None]:
-        """
-        In Auto-Pilot mode, parse intent to log an expense/income directly into Postgres.
-        Returns (banner_for_system_prompt, autonomous_tag_for_response).
+        """In Auto-Pilot mode, parse intent to log expenses/income or update budgets directly into Postgres.
+
+        Supports:
+        - Multi-item expenses & income in compound prompts (e.g. '50 for fuel and 30 for lunch')
+        - Natural Ghanaian English, Pidgin ('I chop 25 for waakye'), and Twi ('Mede 40 atɔ aduane')
+        - Monthly budget adjustments ('set food budget to 500')
+        Returns (banner_for_system_prompt, autonomous_tags_for_response).
         """
         if not db or not user_obj:
             return None, None
 
         text = raw_text.strip()
-        match = re.search(
-            r"(?:log|record|spent|paid|add)\s+(?:ghs|ghc|₵)?\s*(\d+(?:\.\d{1,2})?)\s*(?:cedis?|ghs|ghc|₵)?\s*(?:for|on)\s+([a-zA-Z0-9\s]+?)(?:\s+(?:from|via|with|on|in)\s+(momo|mobile\s*money|cash|bank))?$",
+        today_date = date.today()
+
+        from app.modules.accounts.models import FinancialAccount
+        from app.modules.budgets.models import Budget
+        from app.modules.categories.models import Category
+        from app.modules.transactions.models import Transaction
+
+        # 1. Check for autonomous budget adjustment intent
+        b_match = re.search(
+            r"(?:set|update|change|create|make)\s+(?:my\s+)?([a-zA-Z\s&]+?)\s+budget\s+(?:to|at)?\s*(?:ghs|ghc|₵|\$)?\s*(\d+(?:\.\d{1,2})?)",
             text,
             re.IGNORECASE,
         )
-        if not match:
-            match = re.search(
-                r"(?:log|record|spent|paid|add)\s+(\d+(?:\.\d{1,2})?)\s+(?:cedis?|ghs|ghc|₵)?\s*(?:for|on)?\s*([a-zA-Z0-9\s]+)",
-                text,
+        if b_match:
+            try:
+                cat_hint = b_match.group(1).strip()
+                limit_val = float(b_match.group(2))
+                if limit_val > 0:
+                    cat_stmt = select(Category).where(
+                        or_(Category.user_id == user_obj.id, Category.is_system.is_(True)),
+                        Category.category_type == "expense",
+                        Category.name.ilike(f"%{cat_hint.split()[0]}%"),
+                    )
+                    cat_res = await db.execute(cat_stmt)
+                    cat_obj = cat_res.scalars().first()
+                    if not cat_obj:
+                        cat_obj = Category(
+                            user_id=user_obj.id,
+                            name=cat_hint.title(),
+                            icon="wallet-outline",
+                            color="#0d631b",
+                            category_type="expense",
+                            is_system=False,
+                        )
+                        db.add(cat_obj)
+                        await db.flush()
+
+                    budget_stmt = select(Budget).where(
+                        Budget.user_id == user_obj.id,
+                        Budget.category_id == cat_obj.id,
+                        Budget.budget_year == today_date.year,
+                        Budget.budget_month == today_date.month,
+                    )
+                    b_res = await db.execute(budget_stmt)
+                    budget_obj = b_res.scalars().first()
+                    if budget_obj:
+                        budget_obj.amount = float(limit_val)
+                    else:
+                        budget_obj = Budget(
+                            user_id=user_obj.id,
+                            category_id=cat_obj.id,
+                            amount=float(limit_val),
+                            budget_year=today_date.year,
+                            budget_month=today_date.month,
+                            alert_at_percent=80,
+                        )
+                        db.add(budget_obj)
+
+                    await db.commit()
+                    await db.refresh(budget_obj)
+
+                    # Invalidate caches
+                    try:
+                        from app.core.redis import init_redis, redis_pool
+
+                        r_client = redis_pool or await init_redis()
+                        if r_client:
+                            await r_client.delete(
+                                f"budgets:user:{user_obj.id}:{today_date.year}:{today_date.month}"
+                            )
+                    except Exception:
+                        pass
+
+                    banner = (
+                        f"=== AUTONOMOUS ACTION EXECUTED ===\n"
+                        f"You successfully updated the monthly budget for '{cat_obj.name}' to GH₵ {limit_val:.2f} for this month.\n"
+                        f"Confirm this clearly and advise the user that their budget targets have been updated live."
+                    )
+                    tag = (
+                        f'\n\n[PROPOSED_BUDGET: {{"category_name": "{cat_obj.name}", '
+                        f'"monthly_limit": {limit_val:.2f}}}]'
+                    )
+                    return banner, tag
+            except Exception as b_err:
+                logger.warning("Autonomous budget update failed: %s", str(b_err))
+
+        # 2. Extract multi-item or single-item transactions
+        clauses = re.split(r"\b(?:and|&|plus)\b|[\n;]", text, flags=re.IGNORECASE)
+        extracted_items: list[dict[str, Any]] = []
+
+        for clause in clauses:
+            clause = clause.strip()
+            if not clause:
+                continue
+
+            # Check income pattern
+            inc_match = re.search(
+                r"(?:received|got|income|earned|manya)\s+(?:ghs|ghc|₵|\$)?\s*(\d+(?:\.\d{1,2})?)\s*(?:cedis?|ghs|ghc|₵)?\s*(.*)",
+                clause,
                 re.IGNORECASE,
             )
+            if inc_match:
+                amt = float(inc_match.group(1))
+                rest = inc_match.group(2).strip()
+                wallet = ""
+                w_match = re.search(
+                    r"\b(?:via|into|with|in|from|through)\s+(mtn\s*momo|momo|mobile\s*money|cash|bank|telecel|at)\b",
+                    rest,
+                    re.IGNORECASE,
+                )
+                if w_match:
+                    wallet = w_match.group(1).lower()
+                    rest = rest[: w_match.start()] + rest[w_match.end() :]
+                desc = (
+                    re.sub(r"^(?:for|as|from)\s+", "", rest.strip(), flags=re.IGNORECASE).strip()
+                    or "Income"
+                )
+                if amt > 0:
+                    extracted_items.append(
+                        {
+                            "action": "income",
+                            "amount": amt,
+                            "description": desc,
+                            "wallet": wallet,
+                        }
+                    )
+                continue
 
-        if not match:
+            # Check expense pattern
+            exp_match = re.search(
+                r"(?:(?:log|record|spent|paid|add|chop|mede)\s+)?(?:ghs|ghc|₵|\$)?\s*(\d+(?:\.\d{1,2})?)\s*(?:cedis?|ghs|ghc|₵)?\s*(.*)",
+                clause,
+                re.IGNORECASE,
+            )
+            if exp_match:
+                amt = float(exp_match.group(1))
+                rest = exp_match.group(2).strip()
+                wallet = ""
+                w_match = re.search(
+                    r"\b(?:from|via|with|on|in|through)\s+(mtn\s*momo|momo|mobile\s*money|cash|bank|telecel|at)\b",
+                    rest,
+                    re.IGNORECASE,
+                )
+                if w_match:
+                    wallet = w_match.group(1).lower()
+                    rest = rest[: w_match.start()] + rest[w_match.end() :]
+                desc = re.sub(
+                    r"^(?:for|on|atɔ|kɔ|in)\s+", "", rest.strip(), flags=re.IGNORECASE
+                ).strip()
+                if amt > 0 and desc:
+                    extracted_items.append(
+                        {
+                            "action": "expense",
+                            "amount": amt,
+                            "description": desc,
+                            "wallet": wallet,
+                        }
+                    )
+
+        if not extracted_items:
             return None, None
 
         try:
-            amt_val = float(match.group(1))
-            raw_desc = match.group(2).strip()
-            wallet_hint = (
-                match.group(3).lower() if len(match.groups()) >= 3 and match.group(3) else ""
-            )
-
-            if amt_val <= 0:
-                return None, None
-
-            from app.modules.accounts.models import FinancialAccount
-            from app.modules.categories.models import Category
-            from app.modules.transactions.models import Transaction
-
-            # Determine account
-            acc_type = "mobile_money"
-            if "cash" in wallet_hint or "cash" in text.lower():
-                acc_type = "cash"
-            elif "bank" in wallet_hint or "bank" in text.lower():
-                acc_type = "bank"
-
-            acc_stmt = (
-                select(FinancialAccount)
-                .where(
-                    FinancialAccount.user_id == user_obj.id,
-                    FinancialAccount.is_active.is_(True),
-                )
-                .order_by(
-                    (FinancialAccount.account_type == acc_type).desc(),
-                    FinancialAccount.created_at.asc(),
-                )
+            # Fetch active user accounts
+            acc_stmt = select(FinancialAccount).where(
+                FinancialAccount.user_id == user_obj.id,
+                FinancialAccount.is_active.is_(True),
             )
             acc_res = await db.execute(acc_stmt)
-            account = acc_res.scalars().first()
-            if not account:
+            accounts_list = list(acc_res.scalars().all())
+            if not accounts_list:
                 return None, None
 
-            # Determine category
-            cat_name = "Other Expense"
-            lower_desc = raw_desc.lower()
-            if any(
-                w in lower_desc
-                for w in [
-                    "food",
-                    "lunch",
-                    "dinner",
-                    "breakfast",
-                    "eat",
-                    "chop",
-                    "groceries",
-                    "waakye",
-                    "jollof",
-                    "kfc",
-                ]
-            ):
-                cat_name = "Food & Dining"
-            elif any(
-                w in lower_desc
-                for w in ["fuel", "transport", "trotro", "uber", "bolt", "car", "taxi", "fare"]
-            ):
-                cat_name = "Transportation"
-            elif any(
-                w in lower_desc
-                for w in ["utility", "ecg", "light", "water", "gwcl", "power", "bill"]
-            ):
-                cat_name = "Utilities"
-            elif any(
-                w in lower_desc for w in ["airtime", "data", "internet", "mtn bundle", "wifi"]
-            ):
-                cat_name = "Airtime & Data"
-            elif any(w in lower_desc for w in ["health", "med", "drug", "pharmacy", "hospital"]):
-                cat_name = "Health"
-            elif any(w in lower_desc for w in ["shop", "cloth", "shoe", "market", "item"]):
-                cat_name = "Shopping"
+            recorded_transactions = []
+            autonomous_tags = []
 
-            cat_stmt = select(Category).where(
-                or_(Category.user_id == user_obj.id, Category.is_system.is_(True)),
-                Category.category_type == "expense",
-                Category.name.ilike(f"%{cat_name.split()[0]}%"),
-            )
-            cat_res = await db.execute(cat_stmt)
-            cat_obj = cat_res.scalars().first()
-            if not cat_obj:
-                cat_obj = Category(
-                    user_id=user_obj.id,
-                    name=cat_name,
-                    icon="receipt-outline",
-                    color="#0d631b",
-                    category_type="expense",
-                    is_system=False,
+            for item in extracted_items:
+                amt_val = item["amount"]
+                raw_desc = item["description"]
+                wallet_hint = item["wallet"]
+                tx_type = item["action"]
+
+                acc_type = "mobile_money"
+                if "cash" in wallet_hint or "cash" in text.lower():
+                    acc_type = "cash"
+                elif "bank" in wallet_hint or "bank" in text.lower():
+                    acc_type = "bank"
+
+                target_account = next(
+                    (a for a in accounts_list if a.account_type == acc_type),
+                    accounts_list[0],
                 )
-                db.add(cat_obj)
-                await db.flush()
 
-            clean_desc = raw_desc.capitalize()
-            today_date = date.today()
-            new_tx = Transaction(
-                user_id=user_obj.id,
-                account_id=account.id,
-                category_id=cat_obj.id,
-                amount=Decimal(str(amt_val)),
-                transaction_type="expense",
-                description=clean_desc[:250],
-                transaction_date=today_date,
-                notes="Logged autonomously via AI Support Auto-Pilot",
-            )
-            db.add(new_tx)
+                cat_name = "Salary" if tx_type == "income" else "Other Expense"
+                lower_desc = raw_desc.lower()
+
+                if tx_type == "expense":
+                    if any(
+                        w in lower_desc
+                        for w in [
+                            "food",
+                            "lunch",
+                            "dinner",
+                            "breakfast",
+                            "eat",
+                            "chop",
+                            "groceries",
+                            "waakye",
+                            "jollof",
+                            "kfc",
+                            "fufu",
+                            "gob3",
+                            "gobe",
+                            "aduane",
+                        ]
+                    ):
+                        cat_name = "Food & Dining"
+                    elif any(
+                        w in lower_desc
+                        for w in [
+                            "fuel",
+                            "petrol",
+                            "diesel",
+                            "transport",
+                            "trotro",
+                            "uber",
+                            "bolt",
+                            "car",
+                            "taxi",
+                            "fare",
+                            "lɔre",
+                            "lore",
+                            "akwantuo",
+                        ]
+                    ):
+                        cat_name = "Transportation"
+                    elif any(
+                        w in lower_desc
+                        for w in [
+                            "utility",
+                            "ecg",
+                            "light",
+                            "water",
+                            "gwcl",
+                            "power",
+                            "bill",
+                            "anyinam",
+                            "nsuo",
+                        ]
+                    ):
+                        cat_name = "Utilities"
+                    elif any(
+                        w in lower_desc
+                        for w in [
+                            "airtime",
+                            "data",
+                            "internet",
+                            "mtn bundle",
+                            "wifi",
+                            "kasa",
+                        ]
+                    ):
+                        cat_name = "Airtime & Data"
+                    elif any(
+                        w in lower_desc
+                        for w in [
+                            "health",
+                            "med",
+                            "drug",
+                            "pharmacy",
+                            "hospital",
+                            "ayaresabea",
+                        ]
+                    ):
+                        cat_name = "Health"
+                    elif any(
+                        w in lower_desc
+                        for w in [
+                            "shop",
+                            "cloth",
+                            "shoe",
+                            "market",
+                            "item",
+                            "ntoma",
+                            "mpaboa",
+                        ]
+                    ):
+                        cat_name = "Shopping"
+
+                cat_stmt = select(Category).where(
+                    or_(Category.user_id == user_obj.id, Category.is_system.is_(True)),
+                    Category.category_type == tx_type,
+                    Category.name.ilike(f"%{cat_name.split()[0]}%"),
+                )
+                cat_res = await db.execute(cat_stmt)
+                cat_obj = cat_res.scalars().first()
+                if not cat_obj:
+                    cat_obj = Category(
+                        user_id=user_obj.id,
+                        name=cat_name,
+                        icon="wallet-outline" if tx_type == "income" else "receipt-outline",
+                        color="#10B981" if tx_type == "income" else "#0d631b",
+                        category_type=tx_type,
+                        is_system=False,
+                    )
+                    db.add(cat_obj)
+                    await db.flush()
+
+                clean_desc = raw_desc.capitalize()
+                new_tx = Transaction(
+                    user_id=user_obj.id,
+                    account_id=target_account.id,
+                    category_id=cat_obj.id,
+                    amount=Decimal(str(amt_val)),
+                    transaction_type=tx_type,
+                    description=clean_desc[:250],
+                    transaction_date=today_date,
+                    notes="Logged autonomously via AI Support Auto-Pilot",
+                )
+                db.add(new_tx)
+                await db.flush()
+                await db.refresh(new_tx)
+
+                recorded_transactions.append(
+                    {
+                        "id": str(new_tx.id),
+                        "amount": amt_val,
+                        "type": tx_type,
+                        "category": cat_obj.name,
+                        "wallet": target_account.name,
+                        "description": clean_desc,
+                    }
+                )
+                autonomous_tags.append(
+                    f'[AUTONOMOUS_TRANSACTION: {{"id": "{new_tx.id}", "amount": {amt_val:.2f}, '
+                    f'"transaction_type": "{tx_type}", "category_name": "{cat_obj.name}", '
+                    f'"wallet_name": "{target_account.name}", "description": "{clean_desc}", '
+                    f'"transaction_date": "{today_date.isoformat()}"}}]'
+                )
+
             await db.commit()
-            await db.refresh(new_tx)
 
             # Invalidate caches
             try:
@@ -743,17 +993,25 @@ class SupportService:
             except Exception as c_err:
                 logger.warning("Cache invalidation failed: %s", str(c_err))
 
-            banner = (
-                f"=== AUTONOMOUS ACTION EXECUTED ===\n"
-                f"You successfully logged an expense of GH₵ {amt_val:.2f} for '{clean_desc}' under category '{cat_obj.name}' from wallet '{account.name}' on {today_date.isoformat()}.\n"
-                f"Confirm this clearly and assure the user that their ledger and balance have been updated immediately."
+            # Build banner
+            banner_lines = [
+                "=== AUTONOMOUS ACTION EXECUTED ===",
+                (
+                    f"You successfully logged {len(recorded_transactions)} transaction(s) directly into "
+                    f"the user's ledger on {today_date.isoformat()}:"
+                ),
+            ]
+            for rec in recorded_transactions:
+                banner_lines.append(
+                    f"- {rec['type'].upper()}: GH₵ {rec['amount']:.2f} for '{rec['description']}' "
+                    f"({rec['category']}) from wallet '{rec['wallet']}' (ID: `{rec['id']}`)"
+                )
+            banner_lines.append(
+                "Confirm all recorded items clearly and assure the user that their balances have been updated live with instant undo available."
             )
-            tag = (
-                f'\n\n[AUTONOMOUS_TRANSACTION: {{"id": "{new_tx.id}", "amount": {amt_val:.2f}, '
-                f'"transaction_type": "expense", "category_name": "{cat_obj.name}", '
-                f'"wallet_name": "{account.name}", "description": "{clean_desc}", '
-                f'"transaction_date": "{today_date.isoformat()}"}}]'
-            )
+            banner = "\n".join(banner_lines)
+            tag = "\n\n" + "\n".join(autonomous_tags)
+
             return banner, tag
         except Exception as err:
             logger.warning("Autonomous execution failed: %s", str(err))
@@ -1047,7 +1305,7 @@ class SupportService:
                 resp = await client.post(url, headers=headers, json=payload)
                 if resp.status_code == 200:
                     data = resp.json()
-                    return cast(str | None, data["choices"][0]["message"]["content"])
+                    return cast("str | None", data["choices"][0]["message"]["content"])
                 logger.warning(
                     "ChatGPT fallback returned status %d: %s",
                     resp.status_code,
@@ -1094,7 +1352,7 @@ class SupportService:
                     data = resp.json()
                     choices = data.get("choices") or []
                     if choices and "message" in choices[0]:
-                        return cast(str | None, choices[0]["message"].get("content"))
+                        return cast("str | None", choices[0]["message"].get("content"))
                 logger.warning(
                     "Mistral chat fallback returned status %d: %s",
                     resp.status_code,
@@ -1573,6 +1831,7 @@ class SupportService:
         synthesize_audio: bool = True,
         messages: list[dict[str, str]] | None = None,
         language: str = "en",
+        voice_persona: str = "akosua",
         auto_pilot: bool = False,
         deep_audit: bool = False,
     ) -> dict[str, Any]:
@@ -1729,7 +1988,9 @@ class SupportService:
 
                             # Synthesize natural neural voice audio via Gemini TTS if requested
                             audio_b64, audio_mime = (
-                                await SupportService.synthesize_neural_voice(reply_text)
+                                await SupportService.synthesize_neural_voice(
+                                    reply_text, voice_persona=voice_persona
+                                )
                                 if synthesize_audio and transcript
                                 else (None, "audio/wav")
                             )
@@ -1762,19 +2023,83 @@ class SupportService:
         }
 
     @staticmethod
+    def normalize_currency_for_speech(text: str) -> str:
+        """Phonetically normalizes currency symbols and figures for TTS models.
+
+        Converts GH₵/GHS/GH¢/₵/$ amounts to natural Ghanaian speech:
+        e.g. 'GH₵ 50.00' -> '50 Ghana Cedis', 'GH₵ 12.50' -> '12 Ghana Cedis and 50 Pesewas'.
+        """
+        if not text:
+            return ""
+
+        def _replace_currency(match: re.Match[str]) -> str:
+            amt_str = match.group(1).replace(",", "")
+            try:
+                if "." in amt_str:
+                    parts = amt_str.split(".", 1)
+                    cedis = int(parts[0])
+                    pesewas = int(parts[1][:2].ljust(2, "0"))
+                    if pesewas == 0:
+                        return f"{cedis} Ghana Cedis"
+                    return f"{cedis} Ghana Cedis and {pesewas} Pesewas"
+                else:
+                    return f"{amt_str} Ghana Cedis"
+            except Exception:
+                return f"{amt_str} Ghana Cedis"
+
+        pattern = r"(?:GH[₵¢]|GHS|[₵$])\s*([0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)"
+        normalized = re.sub(pattern, _replace_currency, text, flags=re.IGNORECASE)
+        normalized = re.sub(
+            r"\bGH[₵¢]\b|\bGHS\b|[₵]", "Ghana Cedis", normalized, flags=re.IGNORECASE
+        )
+        normalized = re.sub(r"\bdollars?\b", "Cedis", normalized, flags=re.IGNORECASE)
+        normalized = re.sub(r"\bcents?\b", "Pesewas", normalized, flags=re.IGNORECASE)
+        normalized = normalized.replace("$", " Cedis ")
+        return normalized
+
+    @staticmethod
     async def synthesize_neural_voice(
-        text: str, voice_name: str = "Kore"
+        text: str, voice_name: str = "Kore", voice_persona: str = "akosua"
     ) -> tuple[str | None, str | None]:
-        """Synthesize natural neural speech using Gemini Flash TTS models. Returns (base64_audio, mime_type)."""
+        """Synthesize natural neural speech using Gemini Flash TTS models with consistent persona mapping. Returns (base64_audio, mime_type)."""
         if not settings.GEMINI_API_KEY or not text or not text.strip():
             return None, None
 
         # Clean tags and markdown from text before audio synthesis
         clean_text = re.sub(r"\[ACTION:[^\]]+\]", "", text)
         clean_text = re.sub(r"\[VOICE_ACTION:[^\]]+\]", "", clean_text)
+        clean_text = re.sub(r"\[PROPOSED_[A-Z]+:\s*\{[^}]*\}\]", "", clean_text)
+        clean_text = re.sub(r"\[AUTONOMOUS_[A-Z]+:\s*\{[^}]*\}\]", "", clean_text)
         clean_text = re.sub(r"[*#_`]", "", clean_text).strip()
         if not clean_text:
             return None, None
+
+        # Phonetically normalize currency figures to guarantee Cedis pronunciation
+        clean_text = SupportService.normalize_currency_for_speech(clean_text)
+
+        voice_personas_map: dict[str, dict[str, str]] = {
+            "akosua": {
+                "gemini": "Kore",
+                "mistral": "en_carol_neutral",
+                "openai": "nova",
+            },
+            "kwame": {
+                "gemini": "Puck",
+                "mistral": "en_paul_neutral",
+                "openai": "onyx",
+            },
+            "esi": {
+                "gemini": "Aoede",
+                "mistral": "en_alice_neutral",
+                "openai": "alloy",
+            },
+        }
+
+        persona_key = (voice_persona or "akosua").lower()
+        persona_cfg = voice_personas_map.get(persona_key, voice_personas_map["akosua"])
+        effective_gemini_voice = persona_cfg["gemini"] if voice_persona else voice_name
+        effective_mistral_voice = persona_cfg["mistral"]
+        effective_openai_voice = persona_cfg["openai"]
 
         tts_models = ["gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview"]
         for model in tts_models:
@@ -1786,7 +2111,7 @@ class SupportService:
                     "speechConfig": {
                         "voiceConfig": {
                             "prebuiltVoiceConfig": {
-                                "voiceName": voice_name,
+                                "voiceName": effective_gemini_voice,
                             }
                         }
                     },
@@ -1844,13 +2169,17 @@ class SupportService:
 
         # 2. Secondary Engine: Mistral Voxtral 3 Realtime TTS Fallback
         if settings.MISTRAL_API_KEY:
-            mistral_audio, mistral_mime = await SupportService._synthesize_with_mistral(clean_text)
+            mistral_audio, mistral_mime = await SupportService._synthesize_with_mistral(
+                clean_text, voice=effective_mistral_voice
+            )
             if mistral_audio:
                 return mistral_audio, mistral_mime
 
         # 3. Tertiary Engine: OpenAI tts-1 Fallback
         if settings.OPENAI_API_KEY:
-            oa_audio, oa_mime = await SupportService._synthesize_with_openai(clean_text)
+            oa_audio, oa_mime = await SupportService._synthesize_with_openai(
+                clean_text, voice=effective_openai_voice
+            )
             if oa_audio:
                 return oa_audio, oa_mime
 

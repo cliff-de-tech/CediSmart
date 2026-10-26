@@ -134,6 +134,10 @@ class VoiceRequest(BaseModel):
         default="en",
         description="User dialect/language preference: 'en', 'pidgin', 'twi'",
     )
+    voice_persona: str = Field(
+        default="akosua",
+        description="User preferred voice persona: 'akosua', 'kwame', 'esi'",
+    )
     auto_pilot: bool = Field(
         default=False,
         description="Whether autonomous execution mode is active",
@@ -161,6 +165,10 @@ class VoiceResponse(BaseModel):
 class VoiceSynthesizeRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=1000)
     voice_name: str = Field(default="Kore")
+    voice_persona: str = Field(
+        default="akosua",
+        description="User preferred voice persona: 'akosua', 'kwame', 'esi'",
+    )
 
 
 class VoiceSynthesizeResponse(BaseModel):
