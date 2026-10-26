@@ -352,6 +352,13 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
       try {
         await microphoneStartingRef.current;
         stream.stop();
+        // Immediately disengage recording and lock audio session to main loudspeaker with doNotMix
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+          shouldRouteThroughEarpiece: false,
+          interruptionMode: 'doNotMix',
+        });
       } catch {}
       setAudioLevel(0);
     })();
@@ -398,7 +405,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
           playsInSilentMode: true,
           allowsRecording: true,
           shouldRouteThroughEarpiece: false,
-          interruptionMode: 'mixWithOthers',
+          interruptionMode: 'doNotMix',
         });
         if (!isCurrentTurn(turn) || !canListen()) return;
         captureRef.current = new VoiceCapture();

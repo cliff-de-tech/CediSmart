@@ -67,12 +67,12 @@ class VoiceService {
       else { feedback?.onProgress?.(1); onDone?.(); }
     };
     try {
-      // PCM capture uses iOS's record-only session. Restore speaker playback after it stops.
+      // Restore loudspeaker playback and ensure exclusive audio focus (doNotMix) at maximum gain
       await setAudioModeAsync({
         allowsRecording: false,
         playsInSilentMode: true,
         shouldRouteThroughEarpiece: false,
-        interruptionMode: 'mixWithOthers',
+        interruptionMode: 'doNotMix',
       });
       if (generation !== this.generation) return;
       const isMp3 = audioBase64.startsWith('SUQz') || audioBase64.startsWith('//');
@@ -85,6 +85,7 @@ class VoiceService {
         return;
       }
       const player = createAudioPlayer({ uri: tempUri }, { updateInterval: 100, keepAudioSessionActive: true });
+      player.volume = 1.0;
       this.activePlayer = player;
       let started = false;
       let lastPosition = 0;

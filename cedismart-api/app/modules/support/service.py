@@ -2160,14 +2160,24 @@ class SupportService:
                         raw_data = inline_data.get("data")
                         raw_mime = inline_data.get("mimeType", "audio/wav")
 
-                        # If raw L16 PCM without WAV header is returned, wrap into standard WAV so mobile players handle it seamlessly
+                        # If raw L16 PCM without WAV header is returned, wrap into standard WAV and normalize volume
                         if "audio/l16" in raw_mime.lower() or "codec=pcm" in raw_mime.lower():
                             try:
+                                import array
                                 import base64
                                 import io
                                 import wave
 
                                 pcm_bytes = base64.b64decode(raw_data)
+                                arr = array.array("h")
+                                arr.frombytes(pcm_bytes)
+                                max_amp = max((abs(s) for s in arr), default=0)
+                                if 0 < max_amp < 31500:
+                                    scale = 31500.0 / max_amp
+                                    for i in range(len(arr)):
+                                        arr[i] = int(arr[i] * scale)
+                                    pcm_bytes = arr.tobytes()
+
                                 wav_io = io.BytesIO()
                                 with wave.open(wav_io, "wb") as wf:
                                     wf.setnchannels(1)
@@ -2181,6 +2191,40 @@ class SupportService:
                                     "PCM to WAV packaging error: %s", type(wav_err).__name__
                                 )
                                 continue
+                        elif "audio/wav" in raw_mime.lower() or "audio/x-wav" in raw_mime.lower():
+                            try:
+                                import array
+                                import base64
+                                import io
+                                import wave
+
+                                wav_bytes = base64.b64decode(raw_data)
+                                in_io = io.BytesIO(wav_bytes)
+                                with wave.open(in_io, "rb") as wf_in:
+                                    nchannels = wf_in.getnchannels()
+                                    sampwidth = wf_in.getsampwidth()
+                                    framerate = wf_in.getframerate()
+                                    frames = wf_in.readframes(wf_in.getnframes())
+
+                                if sampwidth == 2 and frames:
+                                    arr = array.array("h")
+                                    arr.frombytes(frames)
+                                    max_amp = max((abs(s) for s in arr), default=0)
+                                    if 0 < max_amp < 31500:
+                                        scale = 31500.0 / max_amp
+                                        for i in range(len(arr)):
+                                            arr[i] = int(arr[i] * scale)
+                                        out_io = io.BytesIO()
+                                        with wave.open(out_io, "wb") as wf_out:
+                                            wf_out.setnchannels(nchannels)
+                                            wf_out.setsampwidth(sampwidth)
+                                            wf_out.setframerate(framerate)
+                                            wf_out.writeframes(arr.tobytes())
+                                        raw_data = base64.b64encode(out_io.getvalue()).decode(
+                                            "utf-8"
+                                        )
+                            except Exception:
+                                pass
 
                         return raw_data, raw_mime
                     logger.warning("Gemini TTS unavailable (%s status %d)", model, resp.status_code)
