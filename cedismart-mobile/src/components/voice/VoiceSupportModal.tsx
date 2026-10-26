@@ -36,6 +36,9 @@ import {
   Paperclip,
   MessageSquare,
   RefreshCw,
+  ChevronRight,
+  ChevronLeft,
+  Volume2,
 } from 'lucide-react-native';
 import {
   useAudioStream,
@@ -61,16 +64,15 @@ import { Message } from '../shared/SupportModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import uuid from 'react-native-uuid';
 import {
-  PRECACHED_BALANCE_BRIDGES,
-  PRECACHED_EXPENSE_BRIDGES,
-  PRECACHED_BUDGET_BRIDGES,
+  PRECACHED_BRIDGES,
+  VoiceBridgeType,
 } from '../../assets/audio/precachedBridges';
 
 let lastBridgeIndex = -1;
-const getPrecachedBridge = (type: 'balance' | 'expense' | 'budget') => {
-  const pool = type === 'balance' ? PRECACHED_BALANCE_BRIDGES
-             : type === 'expense' ? PRECACHED_EXPENSE_BRIDGES
-             : PRECACHED_BUDGET_BRIDGES;
+const getPrecachedBridge = (type: VoiceBridgeType, persona: VoicePersona) => {
+  const personaPool = PRECACHED_BRIDGES[persona] || PRECACHED_BRIDGES.akosua;
+  const pool = personaPool[type] || personaPool.balance;
+  if (!pool || pool.length === 0) return null;
   let nextIdx = Math.floor(Math.random() * pool.length);
   if (pool.length > 1 && nextIdx === lastBridgeIndex) {
     nextIdx = (nextIdx + 1) % pool.length;
@@ -151,6 +153,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     description: string;
   } | null>(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showVoiceSubmenu, setShowVoiceSubmenu] = useState(false);
   const [attachedImage, setAttachedImage] = useState<{
     uri: string;
     base64: string;
@@ -700,9 +703,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Recording expense…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : voicePersona === 'kwame'
-            ? null
-            : getPrecachedBridge('expense');
+          : getPrecachedBridge('expense', voicePersona);
         const bridgePromise = bridge
           ? playBridgePhrase(bridge.text, bridge.base64, turn)
           : Promise.resolve();
@@ -715,9 +716,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Checking your balances…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : voicePersona === 'kwame'
-            ? null
-            : getPrecachedBridge('balance');
+          : getPrecachedBridge('balance', voicePersona);
         const bridgePromise = bridge
           ? playBridgePhrase(bridge.text, bridge.base64, turn)
           : Promise.resolve();
@@ -767,9 +766,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Checking your budgets…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : voicePersona === 'kwame'
-            ? null
-            : getPrecachedBridge('budget');
+          : getPrecachedBridge('budget', voicePersona);
         const bridgePromise = bridge
           ? playBridgePhrase(bridge.text, bridge.base64, turn)
           : Promise.resolve();
@@ -814,6 +811,37 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         const [_, budgetText] = await Promise.all([bridgePromise, budgetPromise]);
         if (!isCurrentTurn(turn)) return;
         reply = budgetText;
+        neuralAudioB64 = null;
+      } else if (action && action.type === 'check_reports') {
+        setDynamicStatus('Checking your financial report…');
+        const bridge = neuralAudioB64
+          ? { text: reply, base64: neuralAudioB64 }
+          : getPrecachedBridge('report', voicePersona);
+        const bridgePromise = bridge
+          ? playBridgePhrase(bridge.text, bridge.base64, turn)
+          : Promise.resolve();
+        const reportPromise = (async () => {
+          setActionToast(null);
+          try {
+            const now = new Date();
+            const res = await apiClient.get('/reports/monthly', {
+              params: { year: now.getFullYear(), month: now.getMonth() + 1 },
+            });
+            const data = res.data;
+            if (!data) return "You don't have any recorded transactions for this month's report yet.";
+            const inc = Number(data.total_income || 0);
+            const exp = Number(data.total_expense || 0);
+            const topCat = data.top_expense_category?.name;
+            const topCatAmt = data.top_expense_category?.amount ? Number(data.top_expense_category.amount) : 0;
+            const topCatStr = topCat ? `, with ${topCat} being your top expense at ${topCatAmt.toFixed(0)} Cedis` : '';
+            return `This month, your total income is ${inc.toFixed(0)} Ghana Cedis and total spending is ${exp.toFixed(0)} Cedis${topCatStr}.`;
+          } catch {
+            return "I couldn't pull up your report right now. Please check your connection and try again.";
+          }
+        })();
+        const [_, reportText] = await Promise.all([bridgePromise, reportPromise]);
+        if (!isCurrentTurn(turn)) return;
+        reply = reportText;
         neuralAudioB64 = null;
       }
 
@@ -1056,6 +1084,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   };
 
   const handleClose = () => {
+    setShowAttachMenu(false);
+    setShowVoiceSubmenu(false);
     void cleanupVoiceSession();
     onClose();
   };
@@ -1104,27 +1134,9 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
               <Text style={[styles.voiceTitle, { color: theme === 'dark' ? '#e1e3e0' : '#1c1b1f' }]}>CediSmart Voice</Text>
               <Text accessibilityLiveRegion="polite" style={[styles.voiceStatus, { color: theme === 'dark' ? '#b2b6b1' : '#40493d' }]}>{statusLabel}</Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TouchableOpacity
-                onPress={handleCycleVoicePersona}
-                style={[
-                  styles.personaPill,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(74, 222, 128, 0.12)' : 'rgba(13, 99, 27, 0.08)',
-                    borderColor: theme === 'dark' ? 'rgba(74, 222, 128, 0.28)' : 'rgba(13, 99, 27, 0.2)',
-                  },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={`Voice: ${VOICE_PERSONAS[voicePersona].name}. Tap to switch voice`}
-              >
-                <Text style={[styles.personaPillText, { color: theme === 'dark' ? '#4ade80' : '#0d631b' }]}>
-                  {VOICE_PERSONAS[voicePersona].label}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setIsCompactView((value) => !value)} style={styles.transcriptToggle} accessibilityRole="button" accessibilityLabel={isCompactView ? 'Hide transcript' : 'Show transcript'} accessibilityState={{ selected: isCompactView }}>
-                <MessageSquare size={21} color={theme === 'dark' ? '#4ade80' : '#0d631b'} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={() => setIsCompactView((value) => !value)} style={styles.transcriptToggle} accessibilityRole="button" accessibilityLabel={isCompactView ? 'Hide transcript' : 'Show transcript'} accessibilityState={{ selected: isCompactView }}>
+              <MessageSquare size={21} color={theme === 'dark' ? '#4ade80' : '#0d631b'} />
+            </TouchableOpacity>
           </View>
           {voiceError && (
             <View style={styles.errorPanel}>
@@ -1202,10 +1214,15 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
             </View>
           )}
 
-          {/* OpenAI-Style '+' Attachment Popup Menu (Glassy BlurView) */}
+          {/* OpenAI-Style '+' Attachment & Voice Selection Popup Menu */}
           {showAttachMenu && (
             <>
-              <TouchableWithoutFeedback onPress={() => setShowAttachMenu(false)}>
+              <TouchableWithoutFeedback
+                onPress={() => {
+                  setShowAttachMenu(false);
+                  setShowVoiceSubmenu(false);
+                }}
+              >
                 <View style={StyleSheet.absoluteFill} />
               </TouchableWithoutFeedback>
 
@@ -1215,41 +1232,172 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                   tint="dark"
                   style={styles.attachMenuBlur}
                 >
-                  {/* Camera Option */}
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={handleLaunchCamera}
-                    style={styles.attachMenuItem}
-                  >
-                    <View style={styles.attachMenuIconBadge}>
-                      <Camera size={19} color="#F3F4F6" />
-                    </View>
-                    <Text style={styles.attachMenuText}>Camera</Text>
-                  </TouchableOpacity>
+                  {!showVoiceSubmenu ? (
+                    <>
+                      {/* Camera Option */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={handleLaunchCamera}
+                        style={styles.attachMenuItem}
+                      >
+                        <View style={styles.attachMenuIconBadge}>
+                          <Camera size={19} color="#F3F4F6" />
+                        </View>
+                        <Text style={styles.attachMenuText}>Camera</Text>
+                      </TouchableOpacity>
 
-                  {/* Photos Option */}
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={handlePickPhotos}
-                    style={styles.attachMenuItem}
-                  >
-                    <View style={styles.attachMenuIconBadge}>
-                      <ImageIcon size={19} color="#F3F4F6" />
-                    </View>
-                    <Text style={styles.attachMenuText}>Photos</Text>
-                  </TouchableOpacity>
+                      {/* Photos Option */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={handlePickPhotos}
+                        style={styles.attachMenuItem}
+                      >
+                        <View style={styles.attachMenuIconBadge}>
+                          <ImageIcon size={19} color="#F3F4F6" />
+                        </View>
+                        <Text style={styles.attachMenuText}>Photos</Text>
+                      </TouchableOpacity>
 
-                  {/* Files Option */}
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={handlePickDocument}
-                    style={styles.attachMenuItem}
-                  >
-                    <View style={styles.attachMenuIconBadge}>
-                      <Paperclip size={19} color="#F3F4F6" />
-                    </View>
-                    <Text style={styles.attachMenuText}>Files</Text>
-                  </TouchableOpacity>
+                      {/* Files Option */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={handlePickDocument}
+                        style={styles.attachMenuItem}
+                      >
+                        <View style={styles.attachMenuIconBadge}>
+                          <Paperclip size={19} color="#F3F4F6" />
+                        </View>
+                        <Text style={styles.attachMenuText}>Files</Text>
+                      </TouchableOpacity>
+
+                      <View
+                        style={{
+                          height: StyleSheet.hairlineWidth,
+                          backgroundColor: 'rgba(255, 255, 255, 0.18)',
+                          marginVertical: 4,
+                          marginHorizontal: 8,
+                        }}
+                      />
+
+                      {/* Select Voice > Option */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          Haptics.selectionAsync().catch(() => {});
+                          setShowVoiceSubmenu(true);
+                        }}
+                        style={styles.attachMenuItem}
+                      >
+                        <View style={styles.attachMenuIconBadge}>
+                          <Volume2 size={19} color="#F3F4F6" />
+                        </View>
+                        <View
+                          style={{
+                            flex: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingRight: 4,
+                          }}
+                        >
+                          <Text style={styles.attachMenuText}>Select Voice</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Text style={{ fontSize: 13, color: '#9CA3AF' }}>
+                              {VOICE_PERSONAS[voicePersona].name}
+                            </Text>
+                            <ChevronRight size={16} color="#9CA3AF" />
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      {/* Back Header to Main Menu */}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          Haptics.selectionAsync().catch(() => {});
+                          setShowVoiceSubmenu(false);
+                        }}
+                        style={[
+                          styles.attachMenuItem,
+                          {
+                            borderBottomWidth: StyleSheet.hairlineWidth,
+                            borderBottomColor: 'rgba(255, 255, 255, 0.18)',
+                            paddingBottom: 8,
+                            marginBottom: 4,
+                          },
+                        ]}
+                      >
+                        <ChevronLeft size={18} color="#9CA3AF" style={{ marginRight: 6 }} />
+                        <Text style={[styles.attachMenuText, { fontWeight: '700', flex: 1 }]}>
+                          Select Voice
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* 3 Voice Options with Radio Button Selectors */}
+                      {(['akosua', 'kwame', 'esi'] as VoicePersona[]).map((key) => {
+                        const p = VOICE_PERSONAS[key];
+                        const isSelected = voicePersona === key;
+                        return (
+                          <TouchableOpacity
+                            key={key}
+                            activeOpacity={0.7}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+                              setVoicePersona(key);
+                              AsyncStorage.setItem('cedismart_voice_persona', key).catch(() => {});
+                            }}
+                            style={[
+                              styles.attachMenuItem,
+                              isSelected && {
+                                backgroundColor: 'rgba(74, 222, 128, 0.14)',
+                                borderRadius: 12,
+                              },
+                            ]}
+                          >
+                            {/* Radio Button Circle */}
+                            <View
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 9,
+                                borderWidth: 2,
+                                borderColor: isSelected ? '#4ade80' : '#6B7280',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 10,
+                              }}
+                            >
+                              {isSelected && (
+                                <View
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: 4,
+                                    backgroundColor: '#4ade80',
+                                  }}
+                                />
+                              )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                style={[
+                                  styles.attachMenuText,
+                                  isSelected && { color: '#4ade80', fontWeight: '700' },
+                                ]}
+                              >
+                                {p.label}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>
+                                {p.desc}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </>
+                  )}
                 </BlurView>
               </View>
             </>
@@ -1506,7 +1654,7 @@ const styles = StyleSheet.create({
     bottom: 84,
     left: 20,
     zIndex: 999,
-    width: 216,
+    width: 232,
     borderRadius: 26,
     overflow: 'hidden',
     borderWidth: 1,

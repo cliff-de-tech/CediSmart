@@ -1,4 +1,5 @@
 from typing import Annotated, Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.core.exceptions import AppException
+from app.core.security import decode_token
 from app.modules.auth.router import limiter
 from app.modules.support.schemas import (
     ChatRequest,
@@ -65,8 +67,23 @@ async def chat_with_support(request: Request, body: ChatRequest, db: DBSession) 
     summary="Process spoken user audio with Gemini multimodal audio understanding",
 )
 @limiter.limit("60/15minutes")
-async def voice_chat_with_support(request: Request, body: VoiceRequest) -> VoiceResponse:
+async def voice_chat_with_support(
+    request: Request, body: VoiceRequest, db: DBSession
+) -> VoiceResponse:
     """Transcribes spoken user audio and returns a natural spoken response + detected action."""
+    user_id: UUID | None = None
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+        try:
+            payload = decode_token(token)
+            if payload.get("type") == "access":
+                sub = payload.get("sub")
+                if sub:
+                    user_id = UUID(str(sub))
+        except Exception:
+            pass
+
     result = await SupportService.process_voice(
         audio_base64=body.audio_base64,
         audio_mime_type=body.audio_mime_type,
@@ -79,6 +96,8 @@ async def voice_chat_with_support(request: Request, body: VoiceRequest) -> Voice
         voice_persona=body.voice_persona,
         auto_pilot=body.auto_pilot,
         deep_audit=body.deep_audit,
+        db=db,
+        user_id=user_id,
     )
     return VoiceResponse(**result)
 

@@ -584,12 +584,6 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     Haptics.selectionAsync().catch(() => {});
   };
 
-  const handleSetVoicePersona = (persona: VoicePersona) => {
-    setVoicePersona(persona);
-    AsyncStorage.setItem('cedismart_voice_persona', persona).catch(() => {});
-    Haptics.selectionAsync().catch(() => {});
-  };
-
   const handleToggleAutoPilot = (val: boolean) => {
     setAutoPilot(val);
     AsyncStorage.setItem('cedismart_ai_autopilot', String(val)).catch(() => {});
@@ -2566,35 +2560,6 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                       <TouchableOpacity
                         key={key}
                         onPress={() => handleSetLanguage(key as any)}
-                        style={[
-                          chatStyles.segmentedPillItem,
-                          isSelected && { backgroundColor: colors.accent, elevation: 1 },
-                        ]}
-                      >
-                        <Text style={[
-                          chatStyles.segmentedPillText,
-                          { color: isSelected ? '#ffffff' : colors.text, fontWeight: isSelected ? '700' : '500' }
-                        ]}>
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* 2b. Voice Persona Selector */}
-                <Text style={[chatStyles.sheetSectionLabel, { color: colors.muted, marginTop: 18 }]}>Voice Persona</Text>
-                <View style={[chatStyles.segmentedPillContainer, { backgroundColor: isDark ? '#141a16' : '#f0f3f0', borderColor: colors.border }]}>
-                  {[
-                    { key: 'akosua', label: '👩 Akosua (Female)' },
-                    { key: 'kwame', label: '👨 Kwame (Male)' },
-                    { key: 'esi', label: '👩 Esi (Female)' },
-                  ].map(({ key, label }) => {
-                    const isSelected = voicePersona === key;
-                    return (
-                      <TouchableOpacity
-                        key={key}
-                        onPress={() => handleSetVoicePersona(key as VoicePersona)}
                         style={[
                           chatStyles.segmentedPillItem,
                           isSelected && { backgroundColor: colors.accent, elevation: 1 },

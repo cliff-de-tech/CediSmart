@@ -5,6 +5,7 @@ import re
 from datetime import date
 from decimal import Decimal
 from typing import Any, cast
+from uuid import UUID
 
 import httpx
 from sqlalchemy import or_, select
@@ -206,6 +207,7 @@ class SupportService:
         db: AsyncSession | None,
         phone: str | None,
         device_diagnostics: dict[str, Any] | None,
+        user_id: UUID | None = None,
     ) -> tuple[str, Any]:
         """Build a live X-Ray diagnostic snapshot from Postgres + client telemetry."""
         lines: list[str] = []
@@ -223,23 +225,29 @@ class SupportService:
                 f"Pending Offline Queue={offline_q} tx(s), Local Auth Token Present={has_token}"
             )
 
-        if db is not None and phone and phone.lower() != "anonymous":
+        if db is not None:
             try:
                 from app.modules.accounts.models import FinancialAccount
                 from app.modules.accounts.service import _compute_balances
                 from app.modules.auth.models import User
                 from app.modules.transactions.models import Transaction
 
-                clean = phone.strip().replace(" ", "").replace("-", "")
-                candidates = {clean}
-                if clean.startswith("+233"):
-                    candidates.add("0" + clean[4:])
-                elif clean.startswith("0") and len(clean) == 10:
-                    candidates.add("+233" + clean[1:])
+                if user_id:
+                    stmt = select(User).where(User.id == user_id)
+                    res = await db.execute(stmt)
+                    user_obj = res.scalar_one_or_none()
 
-                stmt = select(User).where(User.phone.in_(list(candidates)))
-                res = await db.execute(stmt)
-                user_obj = res.scalar_one_or_none()
+                if not user_obj and phone and phone.lower() != "anonymous":
+                    clean = phone.strip().replace(" ", "").replace("-", "")
+                    candidates = {clean}
+                    if clean.startswith("+233"):
+                        candidates.add("0" + clean[4:])
+                    elif clean.startswith("0") and len(clean) == 10:
+                        candidates.add("+233" + clean[1:])
+
+                    stmt = select(User).where(User.phone.in_(list(candidates)))
+                    res = await db.execute(stmt)
+                    user_obj = res.scalar_one_or_none()
 
                 if user_obj:
                     tier = (
@@ -1834,19 +1842,24 @@ class SupportService:
         voice_persona: str = "akosua",
         auto_pilot: bool = False,
         deep_audit: bool = False,
+        db: AsyncSession | None = None,
+        user_id: UUID | None = None,
     ) -> dict[str, Any]:
         """Process spoken user audio with Gemini 2.5 / 1.5 multimodal audio understanding.
 
-        Transcribes speech, extracts financial actions (e.g. logging transactions, checking balances),
-        and returns a natural spoken response suitable for Text-to-Speech playback.
+        Transcribes speech, extracts financial actions (e.g. logging transactions, checking balances,
+        checking budgets, reading reports), and returns a natural spoken response suitable for TTS.
         """
-        # Resolve clean first name
-        first_name = "there"
-        if user_name:
-            clean_name = re.sub(
-                r"^(mr|mrs|ms|dr|rev|prof)\.?\s+", "", user_name, flags=re.IGNORECASE
-            ).strip()
-            first_name = clean_name.split()[0] if clean_name else "there"
+        # Fetch live telemetry (balances, wallets, budgets, and monthly reports)
+        xray_block, user_obj = await SupportService.build_xray_telemetry(
+            db=db,
+            phone=phone,
+            device_diagnostics=None,
+            user_id=user_id,
+        )
+
+        # Resolve clean first name and full display name
+        first_name, full_name = SupportService._extract_display_name(user_name, user_obj)
 
         # Clean audio base64
         clean_b64 = audio_base64
@@ -1873,19 +1886,22 @@ class SupportService:
             f"You are CediSmart AI Voice Assistant, talking directly to {first_name} in Ghana.\n"
             "The user spoke an audio message. Your tasks:\n"
             "1. Transcribe the user's speech accurately into English or Ghanaian Pidgin. If there is no speech, background silence, or non-speech noise, set transcript to '' (empty string). NEVER output timestamps such as '00:00' or tags like '<noise>'.\n"
-            "2. Detect user intent:\n"
+            "2. Detect user intent and use LIVE FINANCIAL DATA below to provide factual, accurate answers:\n"
             "   - 'create_transaction': If user says e.g. 'log 50 cedis for fuel on momo', 'spent 20 cedis on lunch', 'received 500 from kwame on bank'. Extract amount (number), type ('expense' or 'income'), category ('Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Income'), description (e.g. 'Fuel', 'Lunch'), and account_type ('mobile_money', 'cash', or 'bank').\n"
-            "   - 'check_balance': If user asks about their balance, wallets, or money.\n"
-            "   - 'check_budget': If user asks about their budget or spending limits.\n"
-            "   - 'navigate': If user asks to open/go to a screen ('Budgets', 'Transactions', 'Settings').\n"
+            "   - 'check_balance': If user asks about their balance, wallets, or money. Answer accurately using the live wallet balances in LIVE FINANCIAL DATA.\n"
+            "   - 'check_budget': If user asks about their budget, category limits, or remaining amounts. State the exact limit, spent amount, and remaining balance using the live budgets in LIVE FINANCIAL DATA.\n"
+            "   - 'check_reports': If user asks about reports, monthly spending, income, or financial breakdown. Summarize their total income, total expense, and net position or top category from LIVE FINANCIAL DATA.\n"
+            "   - 'navigate': If user asks to open/go to a screen ('Budgets', 'Transactions', 'Settings', 'Reports').\n"
             "   - 'general_reply': For any questions, support, or financial guidance.\n"
             "3. Spoken Response & Dynamic Verbal Bridges (CRITICAL):\n"
-            "   - Generate a warm, active, concise spoken response in 1-2 short sentences (maximum 18 words) that sounds friendly, authentic, and natural when spoken aloud via Text-To-Speech in Ghana.\n"
-            "   - For actionable intents ('check_balance', 'create_transaction', 'check_budget'), you MUST provide an immediate reassuring verbal bridge that tells the user what you are doing before fetching or logging data.\n"
+            "   - Generate a warm, active, concise spoken response in 1-2 short sentences (maximum 20 words) that sounds friendly, authentic, and natural when spoken aloud via Text-To-Speech in Ghana.\n"
+            "   - When answering questions about balances, budgets, or reports, answer directly with the real figures.\n"
+            "   - For actionable intents ('check_balance', 'create_transaction', 'check_budget', 'check_reports'), you MUST provide an immediate reassuring verbal bridge that tells the user what you are doing before fetching or logging data.\n"
             "   - DO NOT repeat the same bridging phrase consecutively. Dynamically rotate across a rich plethora of natural Ghanaian phrasing:\n"
-            "     * For 'check_balance': e.g., 'Checking your balance real quick...', 'Let me pull up your account balances for you...', 'Getting your current balance right now...', 'Let me look at your wallets real quick...', 'Checking how much you have across your accounts...', 'Pulling up your total balance right away...', 'Let me check your available funds real quick...'\n"
-            "     * For 'create_transaction': e.g., 'Logging that for you right away...', 'Recording that expense now...', 'Adding that to your records real quick...', 'Got it, saving that transaction for you...', 'Putting that into your ledger now...', 'Let me log that for you real quick...'\n"
-            "     * For 'check_budget': e.g., 'Pulling up your budget now...', 'Let me check how your monthly budget is looking...', 'Checking your budget limits real quick...', 'Looking up your budget status for you...', 'Let me inspect your spending limits right away...'\n"
+            "     * For 'check_balance': e.g., 'Checking your balance real quick...', 'Let me pull up your account balances for you...', 'Getting your current balance right now...', 'Let me look at your wallets real quick...'\n"
+            "     * For 'create_transaction': e.g., 'Logging that for you right away...', 'Recording that expense now...', 'Adding that to your records real quick...', 'Got it, saving that transaction for you...'\n"
+            "     * For 'check_budget': e.g., 'Pulling up your budget now...', 'Let me check how your monthly budget is looking...', 'Checking your budget limits real quick...', 'Looking up your budget status for you...'\n"
+            "     * For 'check_reports': e.g., 'Pulling up your financial report...', 'Let me check your monthly spending breakdown...', 'Checking your income and expenses for this month...', 'Looking up your spending report real quick...'\n"
             "   - Never use static or robotic wording. Keep it reassuring, varied, and lively.\n"
             + (
                 "4. Language / Dialect: Spoken response and transcript MUST be in authentic Ghanaian Pidgin ('Charley', 'No wahala', 'I dey check am').\n\n"
@@ -1901,7 +1917,7 @@ class SupportService:
             '  "transcript": "Transcribed user speech here",\n'
             '  "response": "Concise spoken reply here",\n'
             '  "action": {\n'
-            '    "type": "create_transaction" | "check_balance" | "check_budget" | "navigate" | "general_reply",\n'
+            '    "type": "create_transaction" | "check_balance" | "check_budget" | "check_reports" | "navigate" | "general_reply",\n'
             '    "payload": {\n'
             '      "amount": null or float,\n'
             '      "type": null or "expense" or "income",\n'
@@ -1911,7 +1927,8 @@ class SupportService:
             '      "screen": null or string\n'
             "    }\n"
             "  }\n"
-            "}"
+            "}\n\n"
+            f"=== LIVE USER FINANCIAL DATA (LEDGER, BUDGETS & REPORTS) ===\n{xray_block}\n"
         )
 
         # 1. Primary: Gemini Multimodal Audio Understanding (Ultra-Fast Flash-Lite Models)
@@ -2101,7 +2118,10 @@ class SupportService:
         effective_mistral_voice = persona_cfg["mistral"]
         effective_openai_voice = persona_cfg["openai"]
 
-        tts_models = ["gemini-2.5-flash-preview-tts", "gemini-3.1-flash-tts-preview"]
+        tts_models = [
+            "gemini-3.8-flash-tts",
+            "gemini-3.8-flash-lite-tts",
+        ]
         for model in tts_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
             payload = {
