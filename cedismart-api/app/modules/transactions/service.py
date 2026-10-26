@@ -1086,7 +1086,7 @@ async def parse_and_log_sms(
         target_bal = Decimal(str(parsed["new_balance"]))
         if curr_bal != target_bal:
             diff = target_bal - curr_bal
-            account.opening_balance = float(Decimal(str(account.opening_balance)) + diff)
+            account.opening_balance = Decimal(str(account.opening_balance)) + diff
             await db.flush()
 
     # Invalidate cache

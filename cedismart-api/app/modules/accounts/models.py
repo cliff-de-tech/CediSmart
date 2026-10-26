@@ -1,6 +1,7 @@
 """FinancialAccount model — bank, mobile money, and cash accounts."""
 
 import uuid
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, ForeignKey, Index, Numeric, String, text
@@ -37,7 +38,7 @@ class FinancialAccount(TimestampMixin, Base):
     )  # 'bank' | 'mobile_money' | 'cash'
     provider: Mapped[str | None] = mapped_column(String(50), nullable=True)
     account_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    opening_balance: Mapped[float] = mapped_column(
+    opening_balance: Mapped[Decimal] = mapped_column(
         Numeric(14, 2), nullable=False, server_default=text("0")
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
