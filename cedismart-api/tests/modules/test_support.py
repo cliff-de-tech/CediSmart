@@ -2,12 +2,14 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import make_auth_headers
 
 
 @pytest.mark.asyncio
-async def test_support_chat_mock(client: AsyncClient) -> None:
+@pytest.mark.parametrize("voice_persona", [None, "kwame", "esi"])
+async def test_support_chat_mock(client: AsyncClient, voice_persona: str | None) -> None:
     # Mock SupportService.generate_chat_response to avoid actual Gemini API calls
     with patch(
         "app.modules.support.router.SupportService.generate_chat_response", new_callable=AsyncMock
@@ -16,9 +18,10 @@ async def test_support_chat_mock(client: AsyncClient) -> None:
             "Hello! I am the CediSmart Support Assistant. How can I help you today?"
         )
 
-        resp = await client.post(
-            "/api/v1/support/chat", json={"messages": [{"role": "user", "content": "Hello"}]}
-        )
+        payload = {"messages": [{"role": "user", "content": "Hello"}]}
+        if voice_persona is not None:
+            payload["voice_persona"] = voice_persona
+        resp = await client.post("/api/v1/support/chat", json=payload)
         assert resp.status_code == 200
         body = resp.json()
         assert (
@@ -26,6 +29,7 @@ async def test_support_chat_mock(client: AsyncClient) -> None:
             == "Hello! I am the CediSmart Support Assistant. How can I help you today?"
         )
         mock_chat.assert_called_once()
+        assert mock_chat.call_args.kwargs["voice_persona"] == (voice_persona or "akosua")
 
 
 @pytest.mark.asyncio
@@ -175,7 +179,10 @@ async def test_ticket_status_user_facing_stages(client: AsyncClient) -> None:
             "latest_agent_comment": "Fix has been merged.",
             "user_status": "update_available",
             "status_label": "Update Available",
-            "status_description": "A verified fix has been merged into CediSmart and will be included in the next app update.",
+            "status_description": (
+                "A verified fix has been merged into CediSmart and will be included in the next "
+                "app update."
+            ),
             "stage_step": 4,
         }
 
@@ -192,9 +199,12 @@ async def test_multi_sms_rescue_parsing() -> None:
     from app.modules.support.service import SupportService
 
     sms_text = (
-        "Payment made for GHS 20.00 to BENYGLAD VENTURES 1. Current Balance: GHS 27.86. Available Balance: GHS 27.86. Reference: . Transaction ID: 34336043447. E-Levy: GHS 0.00.\n"
-        "==============================\n"
-        "Payment made for GHS 30.00 to SD SAMATECH ENTERPRISE. Current Balance: GHS 57.86. Available Balance: GHS 57.86. Reference: . Transaction ID: 34335805561. E-Levy: GHS 0.00."
+        "Payment made for GHS 20.00 to BENYGLAD VENTURES 1. Current Balance: GHS 27.86. "
+        "Available Balance: GHS 27.86. Reference: . Transaction ID: 34336043447. E-Levy: GHS "
+        "0.00.\n==============================\nPayment made for GHS 30.00 to SD SAMATECH "
+        "ENTERPRISE. Current Balance: GHS 57.86. Available Balance: GHS 57.86. Reference: . "
+        "Transaction ID: 34335805561. E-Levy: GHS "
+        "0.00."
     )
     banner = await SupportService._try_instant_sms_rescue(db=None, user_obj=None, raw_text=sms_text)
     assert banner is not None
@@ -206,7 +216,27 @@ async def test_multi_sms_rescue_parsing() -> None:
 
 
 @pytest.mark.asyncio
-async def test_support_voice_mock(client: AsyncClient) -> None:
+@pytest.mark.parametrize("defer_audio", [False, True])
+async def test_support_voice_mock(
+    client: AsyncClient, db_session: AsyncSession, defer_audio: bool
+) -> None:
+    audio = "UklGRi4AAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA="
+    history = [{"role": "assistant", "content": "Checking your balance real quick..."}]
+    request_body = {
+        "audio_base64": audio,
+        "audio_mime_type": "audio/m4a",
+        "user_name": "Mr. Clifford",
+        "phone": "+233241234567",
+    }
+    if defer_audio:
+        request_body.update(
+            synthesize_audio=False,
+            messages=history,
+            language="twi",
+            voice_persona="esi",
+            auto_pilot=True,
+            deep_audit=True,
+        )
     with patch(
         "app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock
     ) as mock_voice:
@@ -226,26 +256,55 @@ async def test_support_voice_mock(client: AsyncClient) -> None:
             },
         }
 
-        resp = await client.post(
-            "/api/v1/support/voice",
-            json={
-                "audio_base64": "UklGRi4AAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=",
-                "audio_mime_type": "audio/m4a",
-                "user_name": "Mr. Clifford",
-                "phone": "+233241234567",
-            },
-        )
+        resp = await client.post("/api/v1/support/voice", json=request_body)
         assert resp.status_code == 200
         body = resp.json()
         assert body["transcript"] == "log 50 cedis for lunch on momo"
         assert "Recorded 50 cedis" in body["response"]
         assert body["action"]["type"] == "create_transaction"
         assert body["action"]["payload"]["amount"] == 50.0
-        mock_voice.assert_called_once()
+        mock_voice.assert_awaited_once_with(
+            audio_base64=audio,
+            audio_mime_type="audio/m4a",
+            user_name="Mr. Clifford",
+            phone="+233241234567",
+            initial_context="dashboard",
+            synthesize_audio=not defer_audio,
+            messages=history if defer_audio else None,
+            language="twi" if defer_audio else "en",
+            voice_persona="esi" if defer_audio else "akosua",
+            auto_pilot=defer_audio,
+            deep_audit=defer_audio,
+            db=db_session,
+            user_id=None,
+        )
+
+
+@pytest.mark.parametrize("valid_token", [True, False])
+async def test_support_voice_forwards_authenticated_identity(
+    client: AsyncClient, db_session: AsyncSession, make_user, valid_token: bool
+) -> None:
+    user = await make_user()
+    headers = make_auth_headers(user.id) if valid_token else {"Authorization": "Bearer invalid"}
+    with patch(
+        "app.modules.support.router.SupportService.process_voice", new_callable=AsyncMock
+    ) as mock_voice:
+        mock_voice.return_value = {
+            "transcript": "My budget?",
+            "response": "Checking.",
+            "action": None,
+        }
+        response = await client.post(
+            "/api/v1/support/voice", json={"audio_base64": "YXVkaW8="}, headers=headers
+        )
+        assert response.status_code == 200
+        assert mock_voice.call_args.kwargs["db"] is db_session
+        assert mock_voice.call_args.kwargs["user_id"] == (user.id if valid_token else None)
 
 
 @pytest.mark.asyncio
-async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
+@pytest.mark.parametrize("voice_persona", ["akosua", "kwame"])
+async def test_support_voice_synthesize_mock(client: AsyncClient, voice_persona: str) -> None:
     with patch(
         "app.modules.support.router.SupportService.synthesize_neural_voice", new_callable=AsyncMock
     ) as mock_synth:
@@ -256,6 +315,7 @@ async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
             json={
                 "text": "Hi Clifford, I'm listening.",
                 "voice_name": "Kore",
+                "voice_persona": voice_persona,
             },
         )
         assert resp.status_code == 200
@@ -263,7 +323,7 @@ async def test_support_voice_synthesize_mock(client: AsyncClient) -> None:
         assert body["audio_base64"] == "dGVzdC1hdWRpby1ieXRlcw=="
         assert body["audio_mime_type"] == "audio/wav"
         mock_synth.assert_called_once_with(
-            text="Hi Clifford, I'm listening.", voice_name="Kore", voice_persona="akosua"
+            text="Hi Clifford, I'm listening.", voice_name="Kore", voice_persona=voice_persona
         )
 
 

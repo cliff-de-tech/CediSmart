@@ -34,7 +34,10 @@ class BillingService:
             raise AppException(
                 status_code=400,
                 error_code="INVALID_PLAN",
-                message="Invalid plan selection. Choose 'pro', 'pro_yearly', 'business', or 'business_yearly'.",
+                message=(
+                    "Invalid plan selection. Choose 'pro', 'pro_yearly', 'business', or "
+                    "'business_yearly'."
+                ),
             )
 
         reference = f"cedi_{uuid.uuid4().hex}"
@@ -49,10 +52,24 @@ class BillingService:
             or "test" not in settings.PAYSTACK_SECRET_KEY
         ):
             logger.info("Using mock payment initialization for CediSmart billing.")
-            mock_url = f"https://cedismart-api.onrender.com/api/v1/billing/mock-checkout?reference={reference}&user_id={user_id}&plan={plan}"
+            mock_url = (
+                "https://cedismart-api.onrender.com/api/v1/billing/mock-checkout?reference="
+                f"{reference}"
+                "&user_id="
+                f"{user_id}"
+                "&plan="
+                f"{plan}"
+            )
             # In local dev:
             if settings.ENVIRONMENT == "development":
-                mock_url = f"http://192.168.1.199:8000/api/v1/billing/mock-checkout?reference={reference}&user_id={user_id}&plan={plan}"
+                mock_url = (
+                    "http://192.168.1.199:8000/api/v1/billing/mock-checkout?reference="
+                    f"{reference}"
+                    "&user_id="
+                    f"{user_id}"
+                    "&plan="
+                    f"{plan}"
+                )
             return {"authorization_url": mock_url, "reference": reference}
 
         url = "https://api.paystack.co/transaction/initialize"

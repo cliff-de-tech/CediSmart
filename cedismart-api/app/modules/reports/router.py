@@ -106,11 +106,11 @@ async def get_trends_report(
     end_year: int | None = Query(None, ge=2000, le=2100),
     end_month: int | None = Query(None, ge=1, le=12),
 ) -> TrendsReportResponse:
-    """Return income/expense totals for the last N months (default 6, max 12) ending at target year/month.
-
-    All months are present in the response even if they have zero transactions
-    — frontend charts can render without gap-handling logic.
-    """
+    (
+        "Return income/expense totals for the last N months (default 6, max 12) ending at target "
+        "year/month.\n\n    All months are present in the response even if they have zero "
+        "transactions\n    — frontend charts can render without gap-handling logic.\n    "
+    )
     result = await service.get_trends_report(
         user_id=user_id,
         months=months,

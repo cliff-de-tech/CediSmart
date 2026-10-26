@@ -42,7 +42,7 @@ CediSmart helps users track spending, manage budgets, and take control of their 
 | **Auth**           | JWT (RS256) + bcrypt PIN hashing                |
 | **Rate Limiting**  | slowapi                                         |
 | **Auth Verification** | Clerk SDK/API                                  |
-| **Hosting**        | Railway.app                                     |
+| **Hosting**        | Render                                          |
 
 ---
 
@@ -184,6 +184,8 @@ uvicorn app.main:app --reload --port 8000
 | `TERMII_API_KEY`    | Termii SMS API key                       | `TL...`                                          |
 | `TERMII_SENDER_ID`  | Termii sender ID                         | `CediSmart`                                      |
 | `GEMINI_API_KEY`    | Gemini API Key (for SMS parsing & Chat)  | `AIzaSy...` or `AQ...` (AI Studio key)           |
+| `MISTRAL_API_KEY`   | Optional Mistral chat, SMS, and speech fallback | Configured on Render |
+| `OPENAI_API_KEY`    | Optional OpenAI chat, SMS, and speech fallback | Configured on Render |
 
 See [`.env.example`](.env.example) for the full template with inline comments.
 
@@ -201,7 +203,8 @@ docker build -t cedismart-api .
 docker run -p 8000:8000 --env-file .env cedismart-api
 ```
 
-**Health check:** `GET /health` → `{"status": "healthy"}`
+**Health check:** `GET /health` reports `status`, API `version`, and `has_gemini`
+(the configuration status). It does not return API keys or key prefixes.
 
 **API docs** (debug mode only): `http://localhost:8000/docs`
 
@@ -245,6 +248,16 @@ pytest tests/modules/test_auth.py -v
 ```
 
 **Coverage target:** ≥ 80% (enforced in CI).
+
+Run `ruff check .`, `black --check .`, `mypy app/ --strict`, and `bandit -r app/ -ll`
+before opening a pull request. Formatting and linting exclude immutable generated
+revisions in `alembic/versions/`; CI still validates the migration chain with
+`alembic upgrade head` against PostgreSQL. Coverage traces SQLAlchemy greenlet
+switches as well as threads so executed async service code is counted correctly.
+
+CI sets `TEST_DATABASE_URL` to PostgreSQL and `TEST_USE_REAL_REDIS=true`. Test
+database connections are unpooled, and Redis connections are closed before each
+test event loop ends, so clients are never reused across incompatible loops.
 
 ### 🧪 Testing & Verification
 All client-side verification SMS checks are offloaded to Clerk. The API only receives a verified Clerk User ID at `/auth/register/clerk` and validates it against the Clerk Backend API using the `CLERK_SECRET_KEY` environment variable.
@@ -317,6 +330,33 @@ Every error returns a consistent JSON structure:
 | **Support** | GET | `/api/v1/support/ticket-status/{issue_number}` | Real-time 4-stage ticket tracking |
 | **Support** | POST | `/api/v1/support/feedback` | In-app user feedback dispatch to Discord |
 
+Voice requests accept optional `messages` for recent conversation context and
+`synthesize_audio` (default `true`). Set `synthesize_audio=false` to receive the
+transcript, reply, and action without a TTS request. Clients can request speech
+separately through `/api/v1/support/voice/synthesize`.
+Standalone timestamp and noise-tag transcripts are returned as an empty string.
+Recognition provider failures return `error_code=recognition_unavailable`, an
+empty transcript, and no action or audio. Unavailable speech synthesis returns
+HTTP 503 with `synthesis_unavailable`.
+
+Chat and voice requests also accept `language` (`en`, `pidgin`, or `twi`),
+`auto_pilot`, and `deep_audit`. Auto-Pilot and Deep Audit default to `false`.
+Chat, voice, and speech synthesis requests accept `voice_persona` (`akosua`,
+`kwame`, or `esi`, default `akosua`). Chat and recognition prompts retain the
+selected persona's identity and English/Pidgin/Twi introduction. Speech normalizes
+currency to Ghana Cedis and Pesewas. Tests cover persona and voice option
+forwarding, current TTS retry order, Auto-Pilot's selection of the
+user's active wallet, compound English/Pidgin/Twi transactions, and monthly budget
+updates using Decimal amounts, with all provider HTTP responses mocked.
+Authenticated voice requests forward the access-token user ID and database
+session so live budget and report context uses the signed-in user's account.
+Audio tests verify PCM/WAV gain normalization, preserve stereo channels and
+sample rates, and leave loud, silent, or 8-bit WAV samples unchanged.
+
+Chat tries Gemini, then Mistral, then OpenAI (or GitHub Models). Provider chat
+content must be text; a missing or non-text Mistral reply continues to the next
+provider. Tests mock provider HTTP responses, including both speech fallbacks.
+
 ---
 
 ## Financial Data Rules
@@ -353,19 +393,27 @@ These rules are **non-negotiable** — they protect real users' money.
 
 ## Deployment
 
-CediSmart is deployed on **Railway.app** with:
+The backend runs on **Render** at `https://cedismart-api.onrender.com`. Supporting services include:
 
-- **PostgreSQL** — Railway managed instance
-- **Redis** — Railway managed instance
+- **PostgreSQL** — configured through `DATABASE_URL`
+- **Redis** — configured through `REDIS_URL`
 - **Cloudflare** — CDN/proxy in front of all traffic
 - **Expo EAS** — Mobile app builds (React Native)
 
-### Railway Setup
+### Render Setup
 
-1. Connect your GitHub repository
-2. Set all environment variables from `.env.example`
-3. Railway auto-detects the `Dockerfile` and builds
-4. Run `alembic upgrade head` via Railway's run command
+1. Connect `cliff-de-tech/CediSmart` to the Render web service.
+2. Set the service root directory to `cedismart-api` and use its Dockerfile.
+3. Set the environment variables listed in `.env.example` in Render.
+4. `start.sh` applies migrations and seeds categories before starting Uvicorn on `$PORT`.
+5. Use `/health` as the Render health check path.
+
+The GitHub `Backend Health Check` workflow checks `/health` after successful Backend CI
+on `main`, and also supports a manual run. It retries transient failures and cold starts.
+The default API origin can be overridden with the `PRODUCTION_API_URL` Actions variable.
+This checks availability, not whether a specific commit has finished deploying.
+Deployment configuration and logs remain in Render; Railway and Slack credentials
+are not required by this workflow.
 
 ---
 

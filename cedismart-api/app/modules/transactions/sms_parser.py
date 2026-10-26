@@ -23,10 +23,15 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
 
     # -------------------------------------------------------------------------
     # Format 1: Telecel / Vodafone / MoMo "Payment made for GHS <amount> to <recipient>"
-    # E.g. "Payment made for GHS 20.00 to BENYGLAD VENTURES 1. Current Balance: GHS 27.86. Available Balance: GHS 27.86. Reference: . Transaction ID: 34336043447. E-Levy: GHS 0.00."
+    # E.g. "Payment made for GHS 20.00 to BENYGLAD VENTURES 1. Current Balance: GHS 27.86. Available
+    # Balance: GHS 27.86. Reference: . Transaction ID: 34336043447. E-Levy: GHS 0.00."
     # -------------------------------------------------------------------------
     rx_payment_made = re.search(
-        r"payment\s+made\s+for\s+GHS\s*([\d\.,]+)\s+to\s+([^.]+?)(?:\.|\s+Current|\s+Available|\s+Reference).*?(?:current\s+balance|balance):\s*GHS\s*([\d\.,]+).*?(?:transaction\s+id|id):\s*(\w+)",
+        (
+            "payment\\s+made\\s+for\\s+GHS\\s*([\\d\\.,]+)\\s+to\\s+([^.]+?)(?:\\.|\\s+Current|\\"
+            "s+Available|\\s+Reference).*?(?:current\\s+balance|balance):\\s*GHS\\s*([\\d\\.,]+)."
+            "*?(?:transaction\\s+id|id):\\s*(\\w+)"
+        ),
         body_clean,
         re.IGNORECASE,
     )
@@ -50,10 +55,15 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
 
     # -------------------------------------------------------------------------
     # Format 2: Telecel / Vodafone / MoMo "Payment received for GHS <amount> from <sender>"
-    # E.g. "Payment received for GHS 150.00 from KWAME MENSAH. Current Balance: GHS 1,240.50. Financial Transaction ID: 29481920192."
+    # E.g. "Payment received for GHS 150.00 from KWAME MENSAH. Current Balance: GHS 1,240.50.
+    # Financial Transaction ID: 29481920192."
     # -------------------------------------------------------------------------
     rx_payment_rcvd = re.search(
-        r"payment\s+received\s+for\s+GHS\s*([\d\.,]+)\s+from\s+([^.]+?)(?:\.|\s+Current|\s+Available|\s+Reference).*?(?:current\s+balance|balance):\s*GHS\s*([\d\.,]+).*?(?:transaction\s+id|financial\s+transaction\s+id|id):\s*(\w+)",
+        (
+            "payment\\s+received\\s+for\\s+GHS\\s*([\\d\\.,]+)\\s+from\\s+([^.]+?)(?:\\.|\\s+Curr"
+            "ent|\\s+Available|\\s+Reference).*?(?:current\\s+balance|balance):\\s*GHS\\s*([\\d\\"
+            ".,]+).*?(?:transaction\\s+id|financial\\s+transaction\\s+id|id):\\s*(\\w+)"
+        ),
         body_clean,
         re.IGNORECASE,
     )
@@ -73,10 +83,16 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
 
     # -------------------------------------------------------------------------
     # Format 3: Cash Out / Agent Withdrawal
-    # E.g. "Cash Out made for GHS 50.00 at Agent 123... Current Balance: GHS 100.00. Transaction ID: 9918231."
+    # E.g. "Cash Out made for GHS 50.00 at Agent 123... Current Balance: GHS 100.00. Transaction ID:
+    # 9918231."
     # -------------------------------------------------------------------------
     rx_cash_out = re.search(
-        r"cash\s*out\s*(?:made\s+for)?\s*GHS\s*([\d\.,]+)\s+(?:at|to|from)\s+([^.]+?)(?:\.|\s+Current|\s+Available|\s+Reference).*?(?:current\s+balance|balance):\s*GHS\s*([\d\.,]+).*?(?:transaction\s+id|financial\s+transaction\s+id|id):\s*(\w+)",
+        (
+            "cash\\s*out\\s*(?:made\\s+for)?\\s*GHS\\s*([\\d\\.,]+)\\s+(?:at|to|from)\\s+([^.]+?)"
+            "(?:\\.|\\s+Current|\\s+Available|\\s+Reference).*?(?:current\\s+balance|balance):\\s"
+            "*GHS\\s*([\\d\\.,]+).*?(?:transaction\\s+id|financial\\s+transaction\\s+id|id):\\s*("
+            "\\w+)"
+        ),
         body_clean,
         re.IGNORECASE,
     )
@@ -98,9 +114,13 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
     # MTN MoMo Standard Senders & Generic Patterns
     # -------------------------------------------------------------------------
     # Case A: Cash In / Received
-    # E.g. "You have received GHS 50.00 from Kojo Mensah (0241234567). Your new balance is GHS 124.50. Transaction ID: 194827189."
+    # E.g. "You have received GHS 50.00 from Kojo Mensah (0241234567). Your new balance is GHS
+    # 124.50. Transaction ID: 194827189."
     rx_received = re.search(
-        r"received\s+GHS\s*([\d\.,]+)\s+from\s+(.*?)\s*\((.*?)\).*?new\s+balance\s+is\s+GHS\s*([\d\.,]+).*?ID:\s*(\d+)",
+        (
+            "received\\s+GHS\\s*([\\d\\.,]+)\\s+from\\s+(.*?)\\s*\\((.*?)\\).*?new\\s+balance\\s+"
+            "is\\s+GHS\\s*([\\d\\.,]+).*?ID:\\s*(\\d+)"
+        ),
         body_clean,
         re.IGNORECASE,
     )
@@ -115,9 +135,14 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
         }
 
     # Case B: Transfer Out / Sent / Payment
-    # E.g. "You have transferred GHS 20.00 to Kofi Owusu (0244112233). Fee charged: GHS 0.20. Your new balance is GHS 80.00. Transaction ID: 194827190."
+    # E.g. "You have transferred GHS 20.00 to Kofi Owusu (0244112233). Fee charged: GHS 0.20. Your
+    # new balance is GHS 80.00. Transaction ID: 194827190."
     rx_sent = re.search(
-        r"transferred\s+GHS\s*([\d\.,]+)\s+to\s+(.*?)\s*\((.*?)\).*?Fee\s*(?:charged)?:\s*GHS\s*([\d\.,]+).*?new\s+balance\s+is\s+GHS\s*([\d\.,]+).*?ID:\s*(\d+)",
+        (
+            "transferred\\s+GHS\\s*([\\d\\.,]+)\\s+to\\s+(.*?)\\s*\\((.*?)\\).*?Fee\\s*(?:charged"
+            ")?:\\s*GHS\\s*([\\d\\.,]+).*?new\\s+balance\\s+is\\s+GHS\\s*([\\d\\.,]+).*?ID:\\s*("
+            "\\d+)"
+        ),
         body_clean,
         re.IGNORECASE,
     )
@@ -132,9 +157,13 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
         }
 
     # Case C: General Cash Out / Payment
-    # E.g. "Payment of GHS 15.00 made to ECG. Transaction Fee: GHS 0.15. Your new balance is GHS 65.00. Transaction ID: 194827191."
+    # E.g. "Payment of GHS 15.00 made to ECG. Transaction Fee: GHS 0.15. Your new balance is GHS
+    # 65.00. Transaction ID: 194827191."
     rx_payment = re.search(
-        r"payment\s+of\s+GHS\s*([\d\.,]+)\s+made\s+to\s+(.*?)\..*?Fee:\s*GHS\s*([\d\.,]+).*?new\s+balance\s+is\s+GHS\s*([\d\.,]+).*?ID:\s*(\d+)",
+        (
+            "payment\\s+of\\s+GHS\\s*([\\d\\.,]+)\\s+made\\s+to\\s+(.*?)\\..*?Fee:\\s*GHS\\s*([\\"
+            "d\\.,]+).*?new\\s+balance\\s+is\\s+GHS\\s*([\\d\\.,]+).*?ID:\\s*(\\d+)"
+        ),
         body_clean,
         re.IGNORECASE,
     )
@@ -152,9 +181,13 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
     # Telecel / Vodafone Cash Senders
     # -------------------------------------------------------------------------
     # Case A: Cash In / Received
-    # E.g. "You have received GHS 100.00 from 0201234567. Current balance: GHS 150.00. Transaction ID: 123456"
+    # E.g. "You have received GHS 100.00 from 0201234567. Current balance: GHS 150.00. Transaction
+    # ID: 123456"
     rx_tc_received = re.search(
-        r"received\s+GHS\s*([\d\.,]+)\s+from\s+(\d+|[^.]+?).*?balance:\s*GHS\s*([\d\.,]+).*?ID:\s*(\d+)",
+        (
+            "received\\s+GHS\\s*([\\d\\.,]+)\\s+from\\s+(\\d+|[^.]+?).*?balance:\\s*GHS\\s*([\\d"
+            "\\.,]+).*?ID:\\s*(\\d+)"
+        ),
         body_clean,
         re.IGNORECASE,
     )
@@ -169,9 +202,13 @@ def parse_sms(sender: str, body: str) -> ParsedSMS | None:
         }
 
     # Case B: Sent / Transferred
-    # E.g. "You have transferred GHS 30.00 to 0207654321. Fee: GHS 0.30. Current balance: GHS 120.00. Transaction ID: 123457"
+    # E.g. "You have transferred GHS 30.00 to 0207654321. Fee: GHS 0.30. Current balance: GHS
+    # 120.00. Transaction ID: 123457"
     rx_tc_sent = re.search(
-        r"transferred\s+GHS\s*([\d\.,]+)\s+to\s+(\d+|[^.]+?).*?(?:Fee:\s*GHS\s*([\d\.,]+).*?)?balance:\s*GHS\s*([\d\.,]+).*?ID:\s*(\d+)",
+        (
+            "transferred\\s+GHS\\s*([\\d\\.,]+)\\s+to\\s+(\\d+|[^.]+?).*?(?:Fee:\\s*GHS\\s*([\\d"
+            "\\.,]+).*?)?balance:\\s*GHS\\s*([\\d\\.,]+).*?ID:\\s*(\\d+)"
+        ),
         body_clean,
         re.IGNORECASE,
     )

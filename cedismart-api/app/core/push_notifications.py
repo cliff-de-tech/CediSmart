@@ -33,7 +33,7 @@ async def send_push_notification(
     # Fetch active device tokens for the user
     result = await db.execute(
         select(UserDeviceToken).where(
-            UserDeviceToken.user_id == user_id, UserDeviceToken.is_active == True
+            UserDeviceToken.user_id == user_id, UserDeviceToken.is_active.is_(True)
         )
     )
     device_tokens = result.scalars().all()

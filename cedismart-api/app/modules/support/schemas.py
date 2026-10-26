@@ -32,11 +32,15 @@ class ChatRequest(BaseModel):
     )
     phone: str | None = Field(
         default=None,
-        description="Optional user phone number for live DB X-Ray telemetry and instant MoMo SMS rescue",
+        description=(
+            "Optional user phone number for live DB X-Ray telemetry and instant MoMo SMS " "rescue"
+        ),
     )
     image_base64: str | None = Field(
         default=None,
-        description="Optional base64-encoded screenshot or receipt image attached to the latest turn",
+        description=(
+            "Optional base64-encoded screenshot or receipt image attached to the latest " "turn"
+        ),
     )
     image_mime_type: str | None = Field(
         default="image/jpeg",
@@ -44,11 +48,18 @@ class ChatRequest(BaseModel):
     )
     language: str = Field(
         default="en",
-        description="User dialect/language preference: 'en' (English), 'pidgin' (Ghanaian Pidgin), 'twi' (Twi / Akan)",
+        description=(
+            "User dialect/language preference: 'en' (English), 'pidgin' (Ghanaian Pidgin), 'twi' "
+            "(Twi / Akan)"
+        ),
     )
     auto_pilot: bool = Field(
         default=False,
-        description="Whether autonomous execution mode is active (executes transactions directly instead of proposing confirmation cards)",
+        description=(
+            "Whether autonomous execution mode is active (executes transactions directly instead "
+            "of proposing confirmation "
+            "cards)"
+        ),
     )
     deep_audit: bool = Field(
         default=False,
@@ -159,7 +170,10 @@ class VoiceResponse(BaseModel):
     action: VoiceAction | None = None
     audio_base64: str | None = Field(
         default=None,
-        description="High-fidelity neural audio bytes (e.g. WAV) synthesized by Gemini for natural speech",
+        description=(
+            "High-fidelity neural audio bytes (e.g. WAV) synthesized by Gemini for natural "
+            "speech"
+        ),
     )
     audio_mime_type: str | None = Field(
         default="audio/wav", description="MIME type of synthesized audio"

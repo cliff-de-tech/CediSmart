@@ -143,111 +143,64 @@ async def paystack_webhook(
 )
 async def mock_checkout(reference: str, user_id: str, plan: str) -> str:
     """Return a styled checkout page for simulated local testing."""
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>CediSmart Simulated Checkout</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            body {{
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                background-color: #121212;
-                color: #ffffff;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                height: 100vh;
-                margin: 0;
-                padding: 20px;
-                box-sizing: border-box;
-            }}
-            .card {{
-                background-color: #1e1e1e;
-                border: 1px solid #0A6E4A;
-                border-radius: 16px;
-                padding: 30px;
-                max-width: 400px;
-                width: 100%;
-                text-align: center;
-                box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            }}
-            h2 {{
-                color: #0A6E4A;
-                margin-top: 0;
-            }}
-            p {{
-                color: #b0b0b0;
-                font-size: 14px;
-                line-height: 1.6;
-            }}
-            .btn {{
-                background-color: #0A6E4A;
-                color: white;
-                border: none;
-                padding: 14px 28px;
-                font-size: 16px;
-                font-weight: bold;
-                border-radius: 12px;
-                cursor: pointer;
-                width: 100%;
-                margin-top: 20px;
-                transition: background-color 0.2s;
-            }}
-            .btn:hover {{
-                background-color: #0d8a5c;
-            }}
-            .badge {{
-                display: inline-block;
-                background-color: rgba(10, 110, 74, 0.2);
-                color: #0A6E4A;
-                padding: 6px 12px;
-                border-radius: 20px;
-                font-weight: bold;
-                font-size: 12px;
-                margin-bottom: 15px;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="card">
-            <div class="badge">{plan.upper()} PLAN</div>
-            <h2>CediSmart Checkout</h2>
-            <p>This is a simulated Mobile Money payment gateway for testing CediSmart's subscription flow.</p>
-            <p><strong>Reference:</strong> <code>{reference}</code></p>
-            <button class="btn" onclick="submitSimulatedPayment()">Authorize Payment (MoMo)</button>
-        </div>
-        <script>
-            async function submitSimulatedPayment() {{
-                const payload = {{
-                    event: "charge.success",
-                    data: {{
-                        reference: "{reference}",
-                        metadata: {{
-                            user_id: "{user_id}",
-                            plan: "{plan}"
-                        }}
-                    }}
-                }};
-                try {{
-                    const res = await fetch('/api/v1/billing/paystack-webhook', {{
-                        method: 'POST',
-                        headers: {{
-                            'Content-Type': 'application/json'
-                        }},
-                        body: JSON.stringify(payload)
-                    }});
-                    if (res.ok) {{
-                        alert('✅ Payment Simulated Successfully! Your premium subscription is now active. Return to the CediSmart app.');
-                    }} else {{
-                        alert('❌ Error: Payment simulation failed.');
-                    }}
-                }} catch (e) {{
-                    alert('❌ Error: Could not connect to API.');
-                }}
-            }}
-        </script>
-    </body>
-    </html>
-    """
+    return (
+        "\n    <!DOCTYPE html>\n    <html>\n    <head>\n        <title>CediSmart Simulated "
+        'Checkout</title>\n        <meta name="viewport" content="width=device-width, '
+        'initial-scale=1.0">\n        <style>\n            body {\n                font-family: '
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, '
+        "sans-serif;\n                background-color: #121212;\n                color: "
+        "#ffffff;\n                display: flex;\n                flex-direction: column;\n     "
+        "           align-items: center;\n                justify-content: center;\n             "
+        "   height: 100vh;\n                margin: 0;\n                padding: 20px;\n         "
+        "       box-sizing: border-box;\n            }\n            .card {\n                "
+        "background-color: #1e1e1e;\n                border: 1px solid #0A6E4A;\n                "
+        "border-radius: 16px;\n                padding: 30px;\n                max-width: "
+        "400px;\n                width: 100%;\n                text-align: center;\n             "
+        "   box-shadow: 0 10px 25px rgba(0,0,0,0.5);\n            }\n            h2 {\n          "
+        "      color: #0A6E4A;\n                margin-top: 0;\n            }\n            p {\n "
+        "               color: #b0b0b0;\n                font-size: 14px;\n                "
+        "line-height: 1.6;\n            }\n            .btn {\n                background-color: "
+        "#0A6E4A;\n                color: white;\n                border: none;\n                "
+        "padding: 14px 28px;\n                font-size: 16px;\n                font-weight: "
+        "bold;\n                border-radius: 12px;\n                cursor: pointer;\n         "
+        "       width: 100%;\n                margin-top: 20px;\n                transition: "
+        "background-color 0.2s;\n            }\n            .btn:hover {\n                "
+        "background-color: #0d8a5c;\n            }\n            .badge {\n                "
+        "display: inline-block;\n                background-color: rgba(10, 110, 74, 0.2);\n     "
+        "           color: #0A6E4A;\n                padding: 6px 12px;\n                "
+        "border-radius: 20px;\n                font-weight: bold;\n                font-size: "
+        "12px;\n                margin-bottom: 15px;\n            }\n        </style>\n    "
+        '</head>\n    <body>\n        <div class="card">\n            <div '
+        'class="badge">'
+        f"{plan.upper()}"
+        " PLAN</div>\n            <h2>CediSmart Checkout</h2>\n            <p>This is a "
+        "simulated Mobile Money payment gateway for testing CediSmart's subscription flow.</p>\n "
+        "           <p><strong>Reference:</strong> "
+        "<code>"
+        f"{reference}"
+        '</code></p>\n            <button class="btn" '
+        'onclick="submitSimulatedPayment()">Authorize Payment (MoMo)</button>\n        '
+        "</div>\n        <script>\n            async function submitSimulatedPayment() {\n       "
+        '         const payload = {\n                    event: "charge.success",\n            '
+        "        data: {\n                        reference: "
+        '"'
+        f"{reference}"
+        '",\n                        metadata: {\n                            user_id: '
+        '"'
+        f"{user_id}"
+        '",\n                            plan: '
+        '"'
+        f"{plan}"
+        '"\n                        }\n                    }\n                };\n              '
+        "  try {\n                    const res = await "
+        "fetch('/api/v1/billing/paystack-webhook', {\n                        method: 'POST',\n  "
+        "                      headers: {\n                            'Content-Type': "
+        "'application/json'\n                        },\n                        body: "
+        "JSON.stringify(payload)\n                    });\n                    if (res.ok) {\n   "
+        "                     alert('✅ Payment Simulated Successfully! Your premium subscription "
+        "is now active. Return to the CediSmart app.');\n                    } else {\n          "
+        "              alert('❌ Error: Payment simulation failed.');\n                    }\n    "
+        "            } catch (e) {\n                    alert('❌ Error: Could not connect to "
+        "API.');\n                }\n            }\n        </script>\n    </body>\n    "
+        "</html>\n    "
+    )

@@ -1,90 +1,45 @@
-name: Backend Deploy
+name: Backend Health Check
 
-# Only deploy when code lands on main — never on feature branches
+# Render owns deployments. This workflow checks API availability after CI;
+# it does not trigger a deployment or assert which commit is currently live.
 on:
-  push:
+  workflow_run:
+    workflows: ["Backend CI"]
+    types: [completed]
     branches: [main]
-    paths:
-      - "cedismart-api/**"
-      - ".github/workflows/backend-deploy.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-defaults:
-  run:
-    working-directory: cedismart-api
+concurrency:
+  group: backend-health-check
+  cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Deploy to Railway
+  health-check:
+    name: Verify Render API health
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
+      - name: Check Render health endpoint
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          PRODUCTION_API_URL: ${{ vars.PRODUCTION_API_URL || 'https://cedismart-api.onrender.com' }}
         run: |
-          if [ -z "${RAILWAY_TOKEN:-}" ]; then
-            echo "::notice::RAILWAY_TOKEN secret is not configured. Skipping Railway deploy (Render is used for production)."
-            exit 0
-          fi
+          # Retry transient deploy restarts and Render cold starts for up to five minutes.
+          curl --fail --silent --show-error \
+            --retry 12 --retry-all-errors --retry-delay 10 --retry-max-time 300 \
+            --connect-timeout 10 --max-time 30 \
+            --output health.json "${PRODUCTION_API_URL%/}/health"
 
-          # Deploy the cedismart-api service; optionally pin project context when provided.
-          if [ -n "${RAILWAY_PROJECT_ID:-}" ]; then
-            railway up --service cedismart-api --project "${RAILWAY_PROJECT_ID}"
-          else
-            railway up --service cedismart-api
-          fi
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
 
-      - name: Health check — verify deployment is live
-        env:
-          PRODUCTION_API_URL: ${{ secrets.PRODUCTION_API_URL }}
-        # Wait for Railway to finish deploying before hitting the health endpoint
-        run: |
-          if [ -z "${PRODUCTION_API_URL:-}" ]; then
-            echo "::notice::PRODUCTION_API_URL secret is not configured; skipping health check."
-            exit 0
-          fi
-
-          echo "Waiting 30s for Railway deployment to stabilise..."
-          sleep 30
-
-          HTTP_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" \
-            --max-time 15 \
-            "${PRODUCTION_API_URL}/health")
-
-          echo "Health check responded with HTTP $HTTP_STATUS"
-
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "Health check FAILED (expected 200, got $HTTP_STATUS)"
-            exit 1
-          fi
-
-          echo "Health check passed."
-
-      - name: Notify Slack on deployment failure
-        if: failure() && env.SLACK_WEBHOOK_URL != ''
-        # Only runs if a previous step in this job failed
-        uses: slackapi/slack-github-action@v1.27.0
-        with:
-          payload: |
-            {
-              "text": ":red_circle: *CediSmart API deployment FAILED* on `main`.\nCommit: ${{ github.sha }}\nAuthor: ${{ github.actor }}\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
-            }
-        env:
-          # SLACK_WEBHOOK_URL is stored as a secret — never log it
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          response = json.loads(Path("health.json").read_text())
+          if response.get("status") != "healthy":
+              raise SystemExit("Render API health check did not report healthy.")
+          print("Render API is healthy.")
+          PY

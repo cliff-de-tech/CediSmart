@@ -76,7 +76,6 @@ def create_app() -> FastAPI:
             "status": "healthy",
             "version": "0.1.2",
             "has_gemini": bool(settings.GEMINI_API_KEY),
-            "gemini_prefix": settings.GEMINI_API_KEY[:6] if settings.GEMINI_API_KEY else "",
         }
 
     return app
