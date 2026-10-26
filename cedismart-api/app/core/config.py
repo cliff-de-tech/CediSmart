@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # --- JWT / Security (RS256) ---
-    RSA_PRIVATE_KEY: str
-    RSA_PUBLIC_KEY: str
+    RSA_PRIVATE_KEY: str = ""
+    RSA_PUBLIC_KEY: str = ""
     ALGORITHM: str = "RS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
