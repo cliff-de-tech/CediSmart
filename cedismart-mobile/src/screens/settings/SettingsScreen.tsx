@@ -3409,16 +3409,45 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   Edit Photo
                 </Text>
               </TouchableOpacity>
-              <Text
-                style={{
-                  color: isDark ? '#ffffff' : '#111827',
-                  fontSize: 22,
-                  fontWeight: '700',
-                  textAlign: 'center',
-                }}
-              >
-                {user?.full_name || 'Set Your Name'}
-              </Text>
+              {isEditingName ? (
+                <TextInput
+                  ref={nameInputRef}
+                  style={{
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 22,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                    paddingVertical: 2,
+                    minWidth: 200,
+                  }}
+                  selectionColor={isDark ? '#4ade80' : '#0d631b'}
+                  value={newName}
+                  onChangeText={setNewName}
+                  autoFocus
+                  onBlur={saveName}
+                  onSubmitEditing={saveName}
+                  returnKeyType="done"
+                />
+              ) : (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setIsEditingName(true);
+                    setTimeout(() => nameInputRef.current?.focus(), 60);
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: isDark ? '#ffffff' : '#111827',
+                      fontSize: 22,
+                      fontWeight: '700',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {user?.full_name || 'Set Your Name'}
+                  </Text>
+                </TouchableOpacity>
+              )}
               <Text
                 style={{
                   color: isDark ? '#98989F' : '#6B7280',
@@ -3432,39 +3461,6 @@ const SettingsScreen = ({ navigation, route }: any) => {
             </View>
 
             <SettingsGroup style={{ marginTop: 12 }}>
-              <SettingItem
-                icon={User}
-                title="Full Name"
-                onPress={() => {
-                  setIsEditingName(true);
-                  setTimeout(() => nameInputRef.current?.focus(), 60);
-                }}
-              >
-                {isEditingName ? (
-                  <TextInput
-                    ref={nameInputRef}
-                    style={{
-                      color: isDark ? '#ffffff' : '#111827',
-                      fontSize: 16,
-                      fontWeight: '700',
-                      paddingVertical: 4,
-                      width: '100%',
-                    }}
-                    selectionColor={isDark ? '#4ade80' : '#0d631b'}
-                    value={newName}
-                    onChangeText={setNewName}
-                    autoFocus
-                    onBlur={saveName}
-                    onSubmitEditing={saveName}
-                    returnKeyType="done"
-                  />
-                ) : (
-                  <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>
-                    {user?.full_name || 'Tap to set name'}
-                  </Text>
-                )}
-              </SettingItem>
-
               <SettingItem icon={Smartphone} title="Phone Number" value={user?.phone} />
 
               <SettingItem
