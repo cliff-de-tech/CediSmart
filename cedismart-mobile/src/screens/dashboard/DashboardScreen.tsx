@@ -3,7 +3,7 @@ import { GlassSheetBackground } from '../../components/glass/GlassSheetBackgroun
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
-import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image, Dimensions, Linking, Alert, TextInput, Modal, RefreshControl, Keyboard, TouchableWithoutFeedback, StyleSheet, AppState, Clipboard } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image, Dimensions, Linking, Alert, TextInput, Modal, RefreshControl, Keyboard, TouchableWithoutFeedback, StyleSheet, AppState, Clipboard, LayoutAnimation, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -542,6 +542,9 @@ const DashboardScreen = ({ navigation }: any) => {
 
   // Swipe-to-Delete with 5-Second Undo Toast
   const handleSwipeDelete = (tx: Transaction) => {
+    if (Platform.OS === 'ios' || Platform.OS === 'android') {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
     setHiddenTxIds((prev) => new Set(prev).add(tx.id));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
@@ -583,6 +586,9 @@ const DashboardScreen = ({ navigation }: any) => {
 
   const handleUndoDelete = () => {
     if (undoTx) {
+      if (Platform.OS === 'ios' || Platform.OS === 'android') {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      }
       clearInterval(undoTx.timeoutId);
       setHiddenTxIds((prev) => {
         const next = new Set(prev);
