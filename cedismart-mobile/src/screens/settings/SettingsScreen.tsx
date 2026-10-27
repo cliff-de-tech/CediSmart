@@ -1744,7 +1744,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
           </Animated.View>
 
           {/* PROFILE Section Title + Apple-Style Profile Card */}
-          {matchesSearch('profile', 'account', 'name', 'phone', 'ghana card', 'kyc', 'switch profile', 'avatar', user?.full_name || '', user?.phone || '') && (
+          {matchesSearch('profile', 'account', 'name', 'phone', 'ghana card', 'kyc', 'switch profile', 'avatar', 'membership', 'premium', 'pro', 'business', 'trial', 'subscription', 'upgrade', 'plan', 'billing', user?.full_name || '', user?.phone || '') && (
             <View>
               <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Profile</Text>
               <SettingsGroup style={{ borderRadius: 20, marginBottom: 20 }}>
@@ -1795,7 +1795,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                       }}
                       numberOfLines={2}
                     >
-                      {`CediSmart Account, ${user?.is_premium || effectiveTrialActive ? 'Pro+' : 'Wallet'},\nand more`}
+                      {`CediSmart Account, ${user?.is_premium || effectiveTrialActive ? 'Pro' : 'Wallet'},\nand more`}
                     </Text>
                   </View>
                   <View style={{ marginLeft: 10 }}>
@@ -1932,77 +1932,6 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 </Text>
               </SettingItem>
             </SettingsGroup>
-          </View>
-          )}
-
-          {/* Membership Section */}
-          {matchesSearch('membership', 'premium', 'pro', 'business', 'trial', 'subscription', 'upgrade', 'plan', 'billing') && (
-          <View className="mt-4">
-            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Membership</Text>
-            <SettingsGroup>
-              <SettingItem 
-                icon={Award} 
-                title="Premium Level" 
-                onPress={() => {
-                  if (user?.is_premium) {
-                    Alert.alert(
-                      'CediSmart Pro',
-                      'You are a Pro member! Enjoy unlimited vaults, CSV exports, and priority offline syncing.',
-                      [{ text: 'Great!' }]
-                    );
-                  } else if (effectiveTrialActive) {
-                    Alert.alert(
-                      'Free Trial Active',
-                      `You are currently enjoying CediSmart Pro for free! You have ${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left. Would you like to subscribe to a paid plan now to avoid interruption?`,
-                      [
-                        { text: 'Later', style: 'cancel' },
-                        { text: 'View Plans', onPress: () => pricingSheetRef.current?.snapToIndex(0) }
-                      ]
-                    );
-                  } else if (!user?.trial_started_at) {
-                    Alert.alert(
-                      'Start Free Trial',
-                      'Activate your 7-day free trial of CediSmart Pro now to enjoy automatic syncing and unlimited features.',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Start Trial Now', onPress: handleStartTrial }
-                      ]
-                    );
-                  } else {
-                    pricingSheetRef.current?.snapToIndex(0);
-                  }
-                }}
-                color={user?.is_premium || effectiveTrialActive ? "#4c56af" : undefined}
-                isLast
-              >
-                <Text className={`font-bold text-base ${(user?.is_premium || effectiveTrialActive) ? (isDark ? 'text-indigo-400' : 'text-secondary') : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-                  {user?.is_premium 
-                    ? 'CediSmart Pro' 
-                    : effectiveTrialActive 
-                    ? `Free Trial (${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left)`
-                    : !user?.trial_started_at
-                    ? 'Free Tier (Redeem Trial)'
-                    : 'Free Tier (Tap to upgrade)'}
-                </Text>
-              </SettingItem>
-            </SettingsGroup>
-            
-            {/* Conditional Cancel Option */}
-            {(user?.is_premium || effectiveTrialActive) && (
-              <TouchableOpacity
-                onPress={handleCancelPlan}
-                disabled={isCancellingPlan}
-                className="mt-3 py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/5 items-center justify-center flex-row active:scale-95"
-              >
-                {isCancellingPlan ? (
-                  <ActivityIndicator size="small" color="#ef4444" />
-                ) : (
-                  <Text className="text-red-500 font-bold text-sm">
-                    {user?.is_premium ? 'Cancel Paid Subscription' : 'Opt-out of Free Trial'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
           </View>
           )}
 
@@ -3452,13 +3381,82 @@ const SettingsScreen = ({ navigation, route }: any) => {
                   }
                 }}
                 color={isKycVerified ? '#16a34a' : undefined}
-                isLast
               >
                 <Text className={`font-bold text-base ${isKycVerified ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
                   {isKycVerified ? 'Verified (Tier 1)' : 'Unverified (Tap to verify)'}
                 </Text>
               </SettingItem>
+
+              <SettingItem
+                icon={Award}
+                title="Membership & Plan"
+                onPress={() => {
+                  if (user?.is_premium) {
+                    Alert.alert(
+                      'CediSmart Pro',
+                      'You are a Pro member! Enjoy unlimited vaults, CSV exports, and priority offline syncing.',
+                      [{ text: 'Great!' }]
+                    );
+                  } else if (effectiveTrialActive) {
+                    Alert.alert(
+                      'Free Trial Active',
+                      `You are currently enjoying CediSmart Pro for free! You have ${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left. Would you like to subscribe to a paid plan now to avoid interruption?`,
+                      [
+                        { text: 'Later', style: 'cancel' },
+                        {
+                          text: 'View Plans',
+                          onPress: () => {
+                            profileDetailSheetRef.current?.close();
+                            setTimeout(() => pricingSheetRef.current?.snapToIndex(0), 220);
+                          },
+                        },
+                      ]
+                    );
+                  } else if (!user?.trial_started_at) {
+                    Alert.alert(
+                      'Start Free Trial',
+                      'Activate your 7-day free trial of CediSmart Pro now to enjoy automatic syncing and unlimited features.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Start Trial Now', onPress: handleStartTrial },
+                      ]
+                    );
+                  } else {
+                    profileDetailSheetRef.current?.close();
+                    setTimeout(() => pricingSheetRef.current?.snapToIndex(0), 220);
+                  }
+                }}
+                color={user?.is_premium || effectiveTrialActive ? '#4c56af' : undefined}
+                isLast
+              >
+                <Text className={`font-bold text-base ${(user?.is_premium || effectiveTrialActive) ? (isDark ? 'text-indigo-400' : 'text-secondary') : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                  {user?.is_premium
+                    ? 'CediSmart Pro'
+                    : effectiveTrialActive
+                    ? `Free Trial (${effectiveTrialDays} ${effectiveTrialDays === 1 ? 'day' : 'days'} left)`
+                    : !user?.trial_started_at
+                    ? 'Free Tier (Redeem Trial)'
+                    : 'Free Tier (Tap to upgrade)'}
+                </Text>
+              </SettingItem>
             </SettingsGroup>
+
+            {/* Conditional Cancel Option inside Profile Details */}
+            {(user?.is_premium || effectiveTrialActive) && (
+              <TouchableOpacity
+                onPress={handleCancelPlan}
+                disabled={isCancellingPlan}
+                className="mt-1 py-3 px-4 rounded-xl border border-red-500/20 bg-red-500/5 items-center justify-center flex-row active:scale-95"
+              >
+                {isCancellingPlan ? (
+                  <ActivityIndicator size="small" color="#ef4444" />
+                ) : (
+                  <Text className="text-red-500 font-bold text-sm">
+                    {user?.is_premium ? 'Cancel Paid Subscription' : 'Opt-out of Free Trial'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </BottomSheetScrollView>
       </BottomSheet>
