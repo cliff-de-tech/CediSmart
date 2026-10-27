@@ -914,8 +914,8 @@ const DashboardScreen = ({ navigation }: any) => {
           style={[
             styles.transactionItemCard,
             {
-              backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
-              borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+              backgroundColor: isDark ? '#141e18' : '#ffffff',
+              borderColor: isDark ? 'rgba(164, 243, 185, 0.14)' : 'rgba(0, 0, 0, 0.06)',
             },
           ]}
         >
@@ -941,7 +941,6 @@ const DashboardScreen = ({ navigation }: any) => {
               }`}>
                 {item.transaction_type === 'income' ? '+' : '-'}{hideBalances ? "₵ ••••" : formatGHS(item.amount)}
               </Text>
-              <Text className={`text-[9px] mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Swipe for actions</Text>
             </View>
           </View>
         </View>
@@ -2516,13 +2515,12 @@ const DashboardScreen = ({ navigation }: any) => {
 
 const styles = StyleSheet.create({
   transactionItemCard: {
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
-    marginBottom: 12,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
     elevation: 2,
     overflow: 'hidden',
   },

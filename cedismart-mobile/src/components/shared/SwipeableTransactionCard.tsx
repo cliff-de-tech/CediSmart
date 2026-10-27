@@ -1,11 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Animated,
   PanResponder,
   TouchableOpacity,
-  Text,
   StyleSheet,
+  Dimensions,
 } from 'react-native';
 import { Trash2, Tag } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
@@ -18,7 +18,10 @@ interface SwipeableTransactionCardProps {
   isDark?: boolean;
 }
 
-const SWIPE_THRESHOLD = 75;
+const ACTION_WIDTH = 84;
+const SWIPE_THRESHOLD = 45;
+const FULL_SWIPE_THRESHOLD = 160;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const SwipeableTransactionCard: React.FC<SwipeableTransactionCardProps> = ({
   onDelete,
@@ -28,94 +31,189 @@ export const SwipeableTransactionCard: React.FC<SwipeableTransactionCardProps> =
   isDark = true,
 }) => {
   const pan = useRef(new Animated.Value(0)).current;
+  const currentOffset = useRef(0);
+  const [isOpen, setIsOpen] = useState<'left' | 'right' | null>(null);
+
+  const resetPosition = (animated = true) => {
+    currentOffset.current = 0;
+    setIsOpen(null);
+    if (animated) {
+      Animated.spring(pan, {
+        toValue: 0,
+        tension: 45,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      pan.setValue(0);
+    }
+  };
+
+  const snapTo = (toValue: number, state: 'left' | 'right' | null) => {
+    currentOffset.current = toValue;
+    setIsOpen(state);
+    Animated.spring(pan, {
+      toValue,
+      tension: 45,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 15 && Math.abs(gestureState.dy) < 12;
+        return Math.abs(gestureState.dx) > 12 && Math.abs(gestureState.dy) < 10;
+      },
+      onPanResponderGrant: () => {
+        pan.stopAnimation((value) => {
+          currentOffset.current = value;
+        });
       },
       onPanResponderMove: (_, gestureState) => {
-        // Allow resistance when swiping further
-        let dx = gestureState.dx;
-        if (dx > 100) dx = 100 + (dx - 100) * 0.2;
-        if (dx < -100) dx = -100 + (dx + 100) * 0.2;
-        pan.setValue(dx);
+        let newX = currentOffset.current + gestureState.dx;
+
+        // Block swiping right if no categorize action
+        if (!onCategorize && newX > 0) {
+          newX = 0;
+        }
+
+        // Apple-style drag resistance beyond ACTION_WIDTH
+        if (newX < -ACTION_WIDTH) {
+          const excess = Math.abs(newX) - ACTION_WIDTH;
+          newX = -(ACTION_WIDTH + Math.pow(excess, 0.85));
+        } else if (newX > ACTION_WIDTH) {
+          const excess = newX - ACTION_WIDTH;
+          newX = ACTION_WIDTH + Math.pow(excess, 0.85);
+        }
+
+        pan.setValue(newX);
       },
       onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -SWIPE_THRESHOLD) {
-          // Swiped Left -> Delete
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        const netDx = currentOffset.current + gestureState.dx;
+
+        if (netDx < -FULL_SWIPE_THRESHOLD) {
+          // Full swipe Left -> Instant Delete
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
           Animated.timing(pan, {
-            toValue: -120,
-            duration: 150,
+            toValue: -SCREEN_WIDTH,
+            duration: 200,
             useNativeDriver: true,
           }).start(() => {
             onDelete();
-            // Reset position after action
-            Animated.spring(pan, {
-              toValue: 0,
-              bounciness: 4,
-              useNativeDriver: true,
-            }).start();
+            resetPosition(false);
           });
-        } else if (gestureState.dx > SWIPE_THRESHOLD && onCategorize) {
-          // Swiped Right -> Categorize
+        } else if (netDx < -SWIPE_THRESHOLD) {
+          // Snap Open to Delete
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          snapTo(-ACTION_WIDTH, 'right');
+        } else if (onCategorize && netDx > FULL_SWIPE_THRESHOLD) {
+          // Full swipe Right -> Instant Categorize
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
           Animated.timing(pan, {
-            toValue: 120,
-            duration: 150,
+            toValue: SCREEN_WIDTH,
+            duration: 200,
             useNativeDriver: true,
           }).start(() => {
             onCategorize();
-            Animated.spring(pan, {
-              toValue: 0,
-              bounciness: 4,
-              useNativeDriver: true,
-            }).start();
+            resetPosition(false);
           });
+        } else if (onCategorize && netDx > SWIPE_THRESHOLD) {
+          // Snap Open to Categorize
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          snapTo(ACTION_WIDTH, 'left');
         } else {
           // Return to origin
-          Animated.spring(pan, {
-            toValue: 0,
-            bounciness: 8,
-            useNativeDriver: true,
-          }).start();
+          resetPosition(true);
         }
       },
     })
   ).current;
 
+  // Opacities interpolate strictly from 0 to 1 so nothing is visible when pan == 0
+  const rightOpacity = pan.interpolate({
+    inputRange: [-ACTION_WIDTH, -15, 0],
+    outputRange: [1, 0.4, 0],
+    extrapolate: 'clamp',
+  });
+
+  const leftOpacity = pan.interpolate({
+    inputRange: [0, 15, ACTION_WIDTH],
+    outputRange: [0, 0.4, 1],
+    extrapolate: 'clamp',
+  });
+
+  const rightIconScale = pan.interpolate({
+    inputRange: [-FULL_SWIPE_THRESHOLD, -ACTION_WIDTH, 0],
+    outputRange: [1.2, 1, 0.8],
+    extrapolate: 'clamp',
+  });
+
+  const leftIconScale = pan.interpolate({
+    inputRange: [0, ACTION_WIDTH, FULL_SWIPE_THRESHOLD],
+    outputRange: [0.8, 1, 1.2],
+    extrapolate: 'clamp',
+  });
+
+  const handleCardPress = () => {
+    if (isOpen) {
+      resetPosition(true);
+    } else {
+      onPress();
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* Background Actions */}
-      <View style={styles.actionsContainer}>
-        {/* Right Swipe Action (Categorize) */}
+      {/* Background Actions Layer - 100% invisible when idle */}
+      <View style={styles.actionsContainer} pointerEvents={isOpen ? 'auto' : 'box-none'}>
+        {/* Left Swipe Action (Categorize) */}
         {onCategorize && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
-              onCategorize();
-            }}
-            style={[styles.leftAction, { backgroundColor: '#059669' }]}
+          <Animated.View
+            style={[
+              styles.actionButton,
+              styles.categoryAction,
+              { opacity: leftOpacity },
+            ]}
           >
-            <Tag size={18} color="#ffffff" />
-            <Text style={styles.actionText}>Category</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                resetPosition(true);
+                onCategorize();
+              }}
+              style={styles.actionTouchable}
+            >
+              <Animated.View style={{ transform: [{ scale: leftIconScale }] }}>
+                <Tag size={22} color="#ffffff" strokeWidth={2.4} />
+              </Animated.View>
+            </TouchableOpacity>
+          </Animated.View>
         )}
 
-        {/* Left Swipe Action (Delete) */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-            onDelete();
-          }}
-          style={[styles.rightAction, { backgroundColor: '#dc2626' }]}
+        {/* Right Swipe Action (Delete) */}
+        <Animated.View
+          style={[
+            styles.actionButton,
+            styles.deleteAction,
+            { opacity: rightOpacity },
+          ]}
         >
-          <Trash2 size={18} color="#ffffff" />
-          <Text style={styles.actionText}>Delete</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+              resetPosition(true);
+              onDelete();
+            }}
+            style={styles.actionTouchable}
+          >
+            <Animated.View style={{ transform: [{ scale: rightIconScale }] }}>
+              <Trash2 size={22} color="#ffffff" strokeWidth={2.4} />
+            </Animated.View>
+          </TouchableOpacity>
+        </Animated.View>
       </View>
 
       {/* Swiping Foreground Card */}
@@ -125,7 +223,7 @@ export const SwipeableTransactionCard: React.FC<SwipeableTransactionCardProps> =
           transform: [{ translateX: pan }],
         }}
       >
-        <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
+        <TouchableOpacity activeOpacity={0.85} onPress={handleCardPress}>
           {children}
         </TouchableOpacity>
       </Animated.View>
@@ -136,9 +234,10 @@ export const SwipeableTransactionCard: React.FC<SwipeableTransactionCardProps> =
 const styles = StyleSheet.create({
   container: {
     position: 'relative',
-    marginBottom: 8,
-    borderRadius: 16,
+    marginBottom: 10,
+    borderRadius: 20,
     overflow: 'hidden',
+    backgroundColor: 'transparent',
   },
   actionsContainer: {
     position: 'absolute',
@@ -148,34 +247,30 @@ const styles = StyleSheet.create({
     bottom: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
-  leftAction: {
-    width: 80,
+  actionButton: {
+    width: ACTION_WIDTH,
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    borderTopLeftRadius: 16,
-    borderBottomLeftRadius: 16,
   },
-  rightAction: {
-    width: 80,
+  actionTouchable: {
+    width: '100%',
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
+  },
+  categoryAction: {
+    backgroundColor: '#10B981',
+    borderTopLeftRadius: 20,
+    borderBottomLeftRadius: 20,
+  },
+  deleteAction: {
+    backgroundColor: '#FF3B30',
     marginLeft: 'auto',
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-  },
-  actionText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 3,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
   },
 });
