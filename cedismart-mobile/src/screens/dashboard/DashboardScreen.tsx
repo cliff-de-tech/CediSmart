@@ -75,6 +75,10 @@ const DashboardScreen = ({ navigation }: any) => {
   const profileSheetRef = useRef<BottomSheet>(null);
   const ledgerSheetRef = useRef<BottomSheet>(null);
   const editTxSheetRef = useRef<BottomSheet>(null);
+  const searchInputRef = useRef<any>(null);
+  const editAmountInputRef = useRef<any>(null);
+  const editDescInputRef = useRef<any>(null);
+  const editDateInputRef = useRef<any>(null);
 
   const [avatarUri, setAvatarUri] = useState<string>(DEFAULT_AVATAR_URL);
   const [isViewingPhoto, setIsViewingPhoto] = useState(false);
@@ -1956,12 +1960,24 @@ const DashboardScreen = ({ navigation }: any) => {
 
             {/* Search Input Row with Filter Toggle */}
             <View className="flex-row items-center mb-4">
-              <View className={`flex-1 flex-row items-center ${isDark ? 'bg-black/25 border-white/15' : 'bg-white/70 border-gray-200'} rounded-2xl border px-4 py-3 mr-3 shadow-sm`}>
-                <Search size={20} color={isDark ? '#e1e3e0' : '#6B7280'} className="mr-3" />
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => searchInputRef.current?.focus()}
+                className={`flex-1 flex-row items-center ${isDark ? 'bg-black/25 border-white/15' : 'bg-white/70 border-gray-200'} rounded-2xl border px-4 py-3 mr-3 shadow-sm`}
+              >
+                <Search size={20} color={isDark ? '#e1e3e0' : '#6B7280'} style={{ marginRight: 10 }} />
                 <BottomSheetTextInput
-                  className={`flex-1 font-body text-base ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} p-0`}
+                  ref={searchInputRef}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 15,
+                    paddingVertical: 2,
+                  }}
+                  selectionColor={isDark ? '#4ade80' : '#0d631b'}
                   placeholder="Search note, category, amount..."
-                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+                  placeholderTextColor="#9CA3AF"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                   autoCorrect={false}
@@ -1973,7 +1989,7 @@ const DashboardScreen = ({ navigation }: any) => {
                     <X size={16} color={isDark ? '#9CA3AF' : '#6B7280'} />
                   </TouchableOpacity>
                 )}
-              </View>
+              </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 className={`p-3.5 rounded-2xl border ${
@@ -2265,33 +2281,59 @@ const DashboardScreen = ({ navigation }: any) => {
               <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1.5`}>
                 Amount (GH₵)
               </Text>
-              <View className={`flex-row items-center px-4 py-3 rounded-2xl border mb-4 ${isDark ? 'bg-black/30 border-white/15' : 'bg-white border-gray-200'}`}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => editAmountInputRef.current?.focus()}
+                className={`flex-row items-center px-4 py-3.5 rounded-2xl border mb-4 ${isDark ? 'bg-black/30 border-white/15' : 'bg-white border-gray-200'}`}
+              >
                 <Text className="text-lg font-bold text-primary mr-2">₵</Text>
                 <BottomSheetTextInput
+                  ref={editAmountInputRef}
                   value={editAmount}
                   onChangeText={setEditAmount}
                   keyboardType="decimal-pad"
                   returnKeyType="done"
                   onSubmitEditing={Keyboard.dismiss}
-                  className={`flex-1 text-xl font-headline font-bold ${isDark ? 'text-white' : 'text-charcoal'} p-0`}
+                  selectionColor={isDark ? '#4ade80' : '#0d631b'}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 20,
+                    fontWeight: '700',
+                    paddingVertical: 2,
+                  }}
                 />
-              </View>
+              </TouchableOpacity>
 
               {/* Note / Description */}
               <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1.5`}>
                 Note / Description
               </Text>
-              <View className={`flex-row items-center px-4 py-3 rounded-2xl border mb-4 ${isDark ? 'bg-black/30 border-white/15' : 'bg-white border-gray-200'}`}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => editDescInputRef.current?.focus()}
+                className={`flex-row items-center px-4 py-3.5 rounded-2xl border mb-4 ${isDark ? 'bg-black/30 border-white/15' : 'bg-white border-gray-200'}`}
+              >
                 <BottomSheetTextInput
+                  ref={editDescInputRef}
                   value={editDescription}
                   onChangeText={setEditDescription}
                   placeholder="What was this for?"
                   placeholderTextColor="#9ca3af"
                   returnKeyType="done"
                   onSubmitEditing={Keyboard.dismiss}
-                  className={`flex-1 font-body text-sm ${isDark ? 'text-white' : 'text-charcoal'} p-0`}
+                  selectionColor={isDark ? '#4ade80' : '#0d631b'}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 15,
+                    fontWeight: '500',
+                    paddingVertical: 2,
+                  }}
                 />
-              </View>
+              </TouchableOpacity>
 
               {/* Date */}
               <View className="flex-row justify-between items-center mb-1.5">
@@ -2321,18 +2363,31 @@ const DashboardScreen = ({ navigation }: any) => {
                   </TouchableOpacity>
                 </View>
               </View>
-              <View className={`flex-row items-center px-4 py-3 rounded-2xl border mb-4 ${isDark ? 'bg-black/30 border-white/15' : 'bg-white border-gray-200'}`}>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => editDateInputRef.current?.focus()}
+                className={`flex-row items-center px-4 py-3.5 rounded-2xl border mb-4 ${isDark ? 'bg-black/30 border-white/15' : 'bg-white border-gray-200'}`}
+              >
                 <Calendar size={16} color={isDark ? '#9ca3af' : '#6b7280'} style={{ marginRight: 8 }} />
                 <BottomSheetTextInput
+                  ref={editDateInputRef}
                   value={editDate}
                   onChangeText={setEditDate}
                   placeholder="YYYY-MM-DD"
                   placeholderTextColor="#9ca3af"
                   returnKeyType="done"
                   onSubmitEditing={Keyboard.dismiss}
-                  className={`flex-1 font-body text-sm ${isDark ? 'text-white' : 'text-charcoal'} p-0`}
+                  selectionColor={isDark ? '#4ade80' : '#0d631b'}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 15,
+                    fontWeight: '500',
+                    paddingVertical: 2,
+                  }}
                 />
-              </View>
+              </TouchableOpacity>
 
               {/* Category Selector Chips */}
               {categories && categories.length > 0 && (
