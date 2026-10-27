@@ -1994,7 +1994,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
               <SettingItem 
                 icon={Sun} 
                 title="Light Theme" 
-                value="Always use light appearance (Default)"
+                value="Use light appearance"
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
                   setThemeMode('none');
@@ -2029,7 +2029,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
               <SettingItem 
                 icon={Moon} 
                 title="Dark Theme" 
-                value="Always use dark appearance"
+                value="Use dark appearance"
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
                   setThemeMode('dark');
