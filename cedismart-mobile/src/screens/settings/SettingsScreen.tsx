@@ -1635,27 +1635,20 @@ const SettingsScreen = ({ navigation, route }: any) => {
           pointerEvents="none"
           style={[
             {
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 44,
-              zIndex: 30,
+              height: 30,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: isDark ? 'rgba(8, 10, 8, 0.94)' : 'rgba(245, 248, 245, 0.94)',
-              borderBottomWidth: StyleSheet.hairlineWidth || 1,
-              borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.08)',
+              backgroundColor: 'transparent',
             },
             stickyHeaderAnimatedStyle,
           ]}
         >
           <Text
             style={{
-              color: isDark ? '#ffffff' : '#111827',
-              fontSize: 17,
+              color: isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(17, 24, 39, 0.85)',
+              fontSize: 15,
               fontWeight: '600',
-              letterSpacing: -0.3,
+              letterSpacing: -0.2,
             }}
           >
             Settings
@@ -1665,7 +1658,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
         <Animated.ScrollView
           ref={settingsScrollRef}
           className="flex-1 px-6"
-          contentContainerStyle={{ paddingTop: 28, paddingBottom: tabBarClearance + 24 }}
+          contentContainerStyle={{ paddingTop: 2, paddingBottom: tabBarClearance + 24 }}
           showsVerticalScrollIndicator={false}
           onScroll={scrollHandler}
           scrollEventThrottle={16}
