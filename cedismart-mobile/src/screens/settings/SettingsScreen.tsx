@@ -14,7 +14,14 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, FileText, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, FileText, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones, Search, Mic } from 'lucide-react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -151,6 +158,94 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [userAvatarUri, setUserAvatarUri] = useState<string>(DEFAULT_AVATAR_URL);
   const profileDetailSheetRef = useRef<BottomSheet>(null);
   const nameInputRef = useRef<any>(null);
+
+  // Apple-Style Search & 2-Stage Dynamic Scroll Choreography
+  const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
+  const settingsSearchInputRef = useRef<any>(null);
+  const settingsScrollRef = useRef<any>(null);
+  const scrollY = useSharedValue(0);
+  const SEARCH_COLLAPSE_DISTANCE = 50;
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const stickyHeaderAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [SEARCH_COLLAPSE_DISTANCE + 4, SEARCH_COLLAPSE_DISTANCE + 32],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+    return { opacity };
+  });
+
+  const largeTitleAnimatedStyle = useAnimatedStyle(() => {
+    const translateY = interpolate(
+      scrollY.value,
+      [0, SEARCH_COLLAPSE_DISTANCE],
+      [0, SEARCH_COLLAPSE_DISTANCE],
+      Extrapolation.CLAMP
+    );
+    const opacity = interpolate(
+      scrollY.value,
+      [SEARCH_COLLAPSE_DISTANCE + 2, SEARCH_COLLAPSE_DISTANCE + 28],
+      [1, 0],
+      Extrapolation.CLAMP
+    );
+    return {
+      transform: [{ translateY }],
+      opacity,
+      zIndex: 10,
+    };
+  });
+
+  const searchBarAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [0, 28],
+      [1, 0],
+      Extrapolation.CLAMP
+    );
+    const scaleY = interpolate(
+      scrollY.value,
+      [0, SEARCH_COLLAPSE_DISTANCE],
+      [1, 0.85],
+      Extrapolation.CLAMP
+    );
+    return {
+      opacity,
+      transform: [{ scaleY }],
+    };
+  });
+
+  const handleScrollEndDrag = useCallback((event: any) => {
+    const y = event?.nativeEvent?.contentOffset?.y ?? 0;
+    const vy = Math.abs(event?.nativeEvent?.velocity?.y ?? 0);
+    if (vy < 0.15 && y > 0 && y < SEARCH_COLLAPSE_DISTANCE) {
+      const targetY = y < SEARCH_COLLAPSE_DISTANCE / 2 ? 0 : SEARCH_COLLAPSE_DISTANCE;
+      settingsScrollRef.current?.scrollTo?.({ y: targetY, animated: true });
+    }
+  }, []);
+
+  const handleMomentumScrollEnd = useCallback((event: any) => {
+    const y = event?.nativeEvent?.contentOffset?.y ?? 0;
+    if (y > 0 && y < SEARCH_COLLAPSE_DISTANCE) {
+      const targetY = y < SEARCH_COLLAPSE_DISTANCE / 2 ? 0 : SEARCH_COLLAPSE_DISTANCE;
+      settingsScrollRef.current?.scrollTo?.({ y: targetY, animated: true });
+    }
+  }, []);
+
+  const normalizedSearch = settingsSearchQuery.trim().toLowerCase();
+  const matchesSearch = useCallback(
+    (...keywords: string[]) => {
+      if (!normalizedSearch) return true;
+      return keywords.some((kw) => kw.toLowerCase().includes(normalizedSearch));
+    },
+    [normalizedSearch]
+  );
 
   // KYC States
   const kycSheetRef = useRef<BottomSheet>(null);
@@ -1535,178 +1630,301 @@ const SettingsScreen = ({ navigation, route }: any) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         className="flex-1"
       >
-        <ScrollView className="flex-1 px-6 py-8" contentContainerStyle={{ paddingBottom: tabBarClearance + 24 }} showsVerticalScrollIndicator={false}>
-          <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-5`}>Settings</Text>
+        {/* Stage 2 Sticky Compact Top Navigation Bar */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 44,
+              zIndex: 30,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isDark ? 'rgba(8, 10, 8, 0.94)' : 'rgba(245, 248, 245, 0.94)',
+              borderBottomWidth: StyleSheet.hairlineWidth || 1,
+              borderBottomColor: isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.08)',
+            },
+            stickyHeaderAnimatedStyle,
+          ]}
+        >
+          <Text
+            style={{
+              color: isDark ? '#ffffff' : '#111827',
+              fontSize: 17,
+              fontWeight: '600',
+              letterSpacing: -0.3,
+            }}
+          >
+            Settings
+          </Text>
+        </Animated.View>
 
-          {/* Apple-Style Profile Card */}
-          <SettingsGroup style={{ borderRadius: 20, marginBottom: 20 }}>
-            {/* Top Row: Main CediSmart Account / Profile Row */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                setNewName(user?.full_name || '');
-                setIsEditingName(false);
-                profileDetailSheetRef.current?.snapToIndex(0);
-              }}
+        <Animated.ScrollView
+          ref={settingsScrollRef}
+          className="flex-1 px-6"
+          contentContainerStyle={{ paddingTop: 28, paddingBottom: tabBarClearance + 24 }}
+          showsVerticalScrollIndicator={false}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          onScrollEndDrag={handleScrollEndDrag}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Stage 1 & 2 Dynamic Large "Settings" Title */}
+          <Animated.View style={largeTitleAnimatedStyle}>
+            <Text
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 16,
-                paddingVertical: 14,
+                color: isDark ? '#ffffff' : '#1c221e',
+                fontSize: 34,
+                fontWeight: '700',
+                letterSpacing: -0.6,
+                lineHeight: 40,
+                marginBottom: 10,
               }}
             >
-              <Image
-                source={{ uri: userAvatarUri }}
+              Settings
+            </Text>
+          </Animated.View>
+
+          {/* Stage 1 Collapsible Apple-Style Search Bar */}
+          <Animated.View style={[{ marginBottom: 12 }, searchBarAnimatedStyle]}>
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => settingsSearchInputRef.current?.focus()}
+              style={{
+                height: 38,
+                borderRadius: 11,
+                backgroundColor: isDark ? 'rgba(118, 118, 128, 0.24)' : 'rgba(118, 118, 128, 0.12)',
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 11,
+              }}
+            >
+              <Search size={17} color={isDark ? '#8E8E93' : '#6B7280'} style={{ marginRight: 7 }} />
+              <TextInput
+                ref={settingsSearchInputRef}
+                value={settingsSearchQuery}
+                onChangeText={setSettingsSearchQuery}
+                placeholder="Search"
+                placeholderTextColor={isDark ? '#8E8E93' : '#6B7280'}
+                returnKeyType="search"
                 style={{
-                  width: 62,
-                  height: 62,
-                  borderRadius: 31,
-                  backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                  flex: 1,
+                  width: '100%',
+                  color: isDark ? '#ffffff' : '#111827',
+                  fontSize: 16,
+                  paddingVertical: 0,
                 }}
               />
-              <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
-                <Text
+              {settingsSearchQuery.length > 0 ? (
+                <TouchableOpacity
+                  onPress={() => setSettingsSearchQuery('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   style={{
-                    color: isDark ? '#ffffff' : '#111827',
-                    fontSize: 20,
-                    fontWeight: '700',
-                    lineHeight: 25,
-                    letterSpacing: -0.3,
+                    width: 18,
+                    height: 18,
+                    borderRadius: 9,
+                    backgroundColor: isDark ? '#636366' : '#9CA3AF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginLeft: 6,
                   }}
-                  numberOfLines={2}
                 >
-                  {user?.full_name || 'Set Your Name'}
-                </Text>
-                <Text
-                  style={{
-                    color: isDark ? '#98989F' : '#6B7280',
-                    fontSize: 13,
-                    lineHeight: 18,
-                    marginTop: 3,
+                  <X size={11} color={isDark ? '#1C1C1E' : '#ffffff'} strokeWidth={3} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setIsSupportModalVisible(true);
                   }}
-                  numberOfLines={2}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ marginLeft: 6 }}
                 >
-                  {`CediSmart Account, ${user?.is_premium || effectiveTrialActive ? 'Pro+' : 'Wallet'},\nand more`}
-                </Text>
-              </View>
-              <View style={{ marginLeft: 10 }}>
-                <ChevronRight size={18} color={isDark ? '#636366' : '#9CA3AF'} />
-              </View>
+                  <Mic size={17} color={isDark ? '#8E8E93' : '#6B7280'} />
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
+          </Animated.View>
 
-            {/* Apple Inset Hairline Separator */}
-            <View
-              style={{
-                height: StyleSheet.hairlineWidth || 1,
-                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.08)',
-                marginLeft: 92,
-              }}
-            />
-
-            {/* Bottom Row: Overlapping Avatars + Switch Profile (Apple Family Style) */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
-                switchSheetRef.current?.snapToIndex(0);
-              }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: 16,
-                paddingVertical: 11,
-              }}
-            >
-              <View
-                style={{
-                  width: 62,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Image
-                  source={{ uri: userAvatarUri }}
+          {/* PROFILE Section Title + Apple-Style Profile Card */}
+          {matchesSearch('profile', 'account', 'name', 'phone', 'ghana card', 'kyc', 'switch profile', 'avatar', user?.full_name || '', user?.phone || '') && (
+            <View>
+              <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Profile</Text>
+              <SettingsGroup style={{ borderRadius: 20, marginBottom: 20 }}>
+                {/* Top Row: Main CediSmart Account / Profile Row */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setNewName(user?.full_name || '');
+                    setIsEditingName(false);
+                    profileDetailSheetRef.current?.snapToIndex(0);
+                  }}
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    borderWidth: 2,
-                    borderColor: isDark ? '#141e18' : '#ffffff',
-                    backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
-                    zIndex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                  }}
+                >
+                  <Image
+                    source={{ uri: userAvatarUri }}
+                    style={{
+                      width: 62,
+                      height: 62,
+                      borderRadius: 31,
+                      backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                    }}
+                  />
+                  <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
+                    <Text
+                      style={{
+                        color: isDark ? '#ffffff' : '#111827',
+                        fontSize: 20,
+                        fontWeight: '700',
+                        lineHeight: 25,
+                        letterSpacing: -0.3,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {user?.full_name || 'Set Your Name'}
+                    </Text>
+                    <Text
+                      style={{
+                        color: isDark ? '#98989F' : '#6B7280',
+                        fontSize: 13,
+                        lineHeight: 18,
+                        marginTop: 3,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {`CediSmart Account, ${user?.is_premium || effectiveTrialActive ? 'Pro+' : 'Wallet'},\nand more`}
+                    </Text>
+                  </View>
+                  <View style={{ marginLeft: 10 }}>
+                    <ChevronRight size={18} color={isDark ? '#636366' : '#9CA3AF'} />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Apple Inset Hairline Separator */}
+                <View
+                  style={{
+                    height: StyleSheet.hairlineWidth || 1,
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.08)',
+                    marginLeft: 92,
                   }}
                 />
-                {(() => {
-                  const secondaryAcc = savedAccounts.find((a) => a.phone !== user?.phone);
-                  const secondaryUri = secondaryAcc ? accountAvatars[secondaryAcc.phone] : null;
-                  if (secondaryUri) {
-                    return (
-                      <Image
-                        source={{ uri: secondaryUri }}
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 16,
-                          marginLeft: -10,
-                          borderWidth: 2,
-                          borderColor: isDark ? '#141e18' : '#ffffff',
-                          backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
-                          zIndex: 2,
-                        }}
-                      />
-                    );
-                  }
-                  return (
-                    <View
+
+                {/* Bottom Row: Overlapping Avatars + Switch Profile (Apple Family Style) */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    switchSheetRef.current?.snapToIndex(0);
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 11,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 62,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Image
+                      source={{ uri: userAvatarUri }}
                       style={{
                         width: 32,
                         height: 32,
                         borderRadius: 16,
-                        marginLeft: -10,
                         borderWidth: 2,
                         borderColor: isDark ? '#141e18' : '#ffffff',
-                        backgroundColor: isDark ? '#1e3a29' : '#dcfce7',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 2,
+                        backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                        zIndex: 1,
+                      }}
+                    />
+                    {(() => {
+                      const secondaryAcc = savedAccounts.find((a) => a.phone !== user?.phone);
+                      const secondaryUri = secondaryAcc ? accountAvatars[secondaryAcc.phone] : null;
+                      if (secondaryUri) {
+                        return (
+                          <Image
+                            source={{ uri: secondaryUri }}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 16,
+                              marginLeft: -10,
+                              borderWidth: 2,
+                              borderColor: isDark ? '#141e18' : '#ffffff',
+                              backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                              zIndex: 2,
+                            }}
+                          />
+                        );
+                      }
+                      return (
+                        <View
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 16,
+                            marginLeft: -10,
+                            borderWidth: 2,
+                            borderColor: isDark ? '#141e18' : '#ffffff',
+                            backgroundColor: isDark ? '#1e3a29' : '#dcfce7',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 2,
+                          }}
+                        >
+                          <Users size={14} color={isDark ? '#4ade80' : '#0d631b'} />
+                        </View>
+                      );
+                    })()}
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
+                    <Text
+                      style={{
+                        color: isDark ? '#ffffff' : '#111827',
+                        fontSize: 16,
+                        fontWeight: '500',
                       }}
                     >
-                      <Users size={14} color={isDark ? '#4ade80' : '#0d631b'} />
-                    </View>
-                  );
-                })()}
-              </View>
-              <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
-                <Text
-                  style={{
-                    color: isDark ? '#ffffff' : '#111827',
-                    fontSize: 16,
-                    fontWeight: '500',
-                  }}
-                >
-                  Switch Profile
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {savedAccounts.length > 1 && (
-                  <Text
-                    style={{
-                      color: isDark ? '#8E8E93' : '#6B7280',
-                      fontSize: 15,
-                      marginRight: 6,
-                    }}
-                  >
-                    {savedAccounts.length}
-                  </Text>
-                )}
-                <ChevronRight size={18} color={isDark ? '#636366' : '#9CA3AF'} />
-              </View>
-            </TouchableOpacity>
-          </SettingsGroup>
+                      Switch Profile
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {savedAccounts.length > 1 && (
+                      <Text
+                        style={{
+                          color: isDark ? '#8E8E93' : '#6B7280',
+                          fontSize: 15,
+                          marginRight: 6,
+                        }}
+                      >
+                        {savedAccounts.length}
+                      </Text>
+                    )}
+                    <ChevronRight size={18} color={isDark ? '#636366' : '#9CA3AF'} />
+                  </View>
+                </TouchableOpacity>
+              </SettingsGroup>
+            </View>
+          )}
 
           {/* Tracked Financial Accounts Section */}
+          {matchesSearch('tracked accounts', 'momo', 'mobile money', 'bank', 'cash', 'wallet', 'add account', 'manage') && (
           <View className="mt-4">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Tracked Accounts & MoMo</Text>
             <SettingsGroup>
@@ -1722,8 +1940,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
               </SettingItem>
             </SettingsGroup>
           </View>
+          )}
 
           {/* Membership Section */}
+          {matchesSearch('membership', 'premium', 'pro', 'business', 'trial', 'subscription', 'upgrade', 'plan', 'billing') && (
           <View className="mt-4">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Membership</Text>
             <SettingsGroup>
@@ -1791,8 +2011,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
               </TouchableOpacity>
             )}
           </View>
+          )}
 
           {/* Appearance Section */}
+          {matchesSearch('appearance', 'dark', 'light', 'theme', 'device', 'system', 'mode') && (
           <View className="mt-4">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Appearance</Text>
             <SettingsGroup>
@@ -1869,8 +2091,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
               />
             </SettingsGroup>
           </View>
+          )}
 
           {/* Security Section */}
+          {matchesSearch('security', 'biometric', 'faceid', 'fingerprint', 'pin', 'password', 'auto-lock', 'lock') && (
           <View className="mt-4">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Security</Text>
             <SettingsGroup>
@@ -1905,8 +2129,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
               />
             </SettingsGroup>
           </View>
+          )}
 
           {/* Notifications Section */}
+          {matchesSearch('notifications', 'sms', 'alerts', 'reminders', 'budget', 'warning', 'threshold') && (
           <View className="mt-4">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Notifications</Text>
             <SettingsGroup>
@@ -1951,8 +2177,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
               )}
             </SettingsGroup>
           </View>
+          )}
 
           {/* Data Section */}
+          {matchesSearch('data', 'storage', 'offline', 'queue', 'sync', 'export', 'csv', 'history', 'monthly', 'statement', 'pdf', 'app icon', 'icon', currentAppIcon) && (
           <View className="mt-4">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Data & Storage</Text>
             <SettingsGroup>
@@ -1997,8 +2225,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
               />
             </SettingsGroup>
           </View>
+          )}
 
           {/* Support Section */}
+          {matchesSearch('support', 'bug', 'report', 'ai', 'assistant', 'help', 'chat', 'feedback', 'review', 'suggest') && (
           <View className="mt-4">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Support</Text>
             <SettingsGroup>
@@ -2024,8 +2254,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
               />
             </SettingsGroup>
           </View>
+          )}
 
           {/* Danger Zone */}
+          {matchesSearch('account actions', 'logout', 'sign out', 'delete account', 'remove', 'danger') && (
           <View className="mt-8 mb-6">
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Account Actions</Text>
             <SettingsGroup>
@@ -2078,7 +2310,8 @@ const SettingsScreen = ({ navigation, route }: any) => {
               </TouchableOpacity>
             </SettingsGroup>
           </View>
-        </ScrollView>
+          )}
+        </Animated.ScrollView>
       </KeyboardAvoidingView>
 
       {/* Report Bug Modal */}
