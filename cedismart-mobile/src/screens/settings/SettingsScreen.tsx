@@ -34,6 +34,8 @@ try {
   // Gracefully catch import error if native module is not compiled in (e.g. in Expo Go sandbox)
 }
 
+const DEFAULT_AVATAR_URL = 'https://lh3.googleusercontent.com/aida-public/AB6AXuCPbtwyh4Eo_96C5zd6dFJFY9kbHP067jJpa7Aayw3aUk1co9x1_rJZOkN1473J1n10wGOmZyH_imPk56BMFUhtqh97n0NlHcDadkkvYPKlykD_wgKQ0fNUrBK4Iu1lJLUicP3eclDQXCGAAWUx5hODGPkFmHdt7ak3QMG9zCIQ1woeQWjZ7lpo8WpbJ3fIQepJ_Q7ZT7r1xyJBsDS0TdhOmQJP54CdoizSC8UpE8ln59Y5-6_lJNv8GhvkiAlc4Ddi9D8xyhpQ_YM';
+
 const normalizePhoneNumber = (phone: string): string => {
   if (!phone) return '';
   const clean = phone.replace(/[^\d+]/g, '');
@@ -146,6 +148,9 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [isBiometricEnabled, setIsBiometricEnabled] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(user?.full_name || '');
+  const [userAvatarUri, setUserAvatarUri] = useState<string>(DEFAULT_AVATAR_URL);
+  const profileDetailSheetRef = useRef<BottomSheet>(null);
+  const nameInputRef = useRef<any>(null);
 
   // KYC States
   const kycSheetRef = useRef<BottomSheet>(null);
@@ -250,10 +255,19 @@ const SettingsScreen = ({ navigation, route }: any) => {
     return accounts.some(acc => acc.account_type === 'bank' || acc.account_type === 'mobile_money');
   }, [accounts]);
 
-  // Sync latest user profile on screen focus to keep trial days & subscription fresh
+  // Sync latest user profile & avatar on screen focus to keep trial days, subscription & photo fresh
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
+      if (user?.id) {
+        AsyncStorage.getItem(`user_avatar_${user.id}`)
+          .then((uri) => {
+            if (isMounted) {
+              setUserAvatarUri(uri || DEFAULT_AVATAR_URL);
+            }
+          })
+          .catch(() => {});
+      }
       apiClient.get('/users/me')
         .then((res) => {
           if (isMounted && res.data) {
@@ -266,7 +280,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
       return () => {
         isMounted = false;
       };
-    }, [updateUser])
+    }, [updateUser, user?.id])
   );
 
   // Load KYC state and saved accounts on mount
@@ -1522,60 +1536,174 @@ const SettingsScreen = ({ navigation, route }: any) => {
         className="flex-1"
       >
         <ScrollView className="flex-1 px-6 py-8" contentContainerStyle={{ paddingBottom: tabBarClearance + 24 }} showsVerticalScrollIndicator={false}>
-          <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-8`}>Settings</Text>
+          <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-5`}>Settings</Text>
 
-          {/* Profile Section */}
-          <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Profile</Text>
-          <SettingsGroup>
-            <SettingItem 
-              icon={User} 
-              title="Full Name" 
-              onPress={() => setIsEditingName(true)}
-            >
-              {isEditingName ? (
-                <TextInput 
-                  className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base py-1 border-b border-primary/20`}
-                  value={newName}
-                  onChangeText={setNewName}
-                  autoFocus
-                  onBlur={saveName}
-                  onSubmitEditing={saveName}
-                  returnKeyType="done"
-                />
-              ) : (
-                <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>{user?.full_name || 'Set Name'}</Text>
-              )}
-            </SettingItem>
-            <SettingItem icon={Smartphone} title="Phone Number" value={user?.phone} />
-            <SettingItem 
-              icon={ShieldCheck} 
-              title="Identity Verification" 
+          {/* Apple-Style Profile Card */}
+          <SettingsGroup style={{ borderRadius: 20, marginBottom: 20 }}>
+            {/* Top Row: Main CediSmart Account / Profile Row */}
+            <TouchableOpacity
+              activeOpacity={0.7}
               onPress={() => {
-                if (isKycVerified) {
-                  Alert.alert(
-                    'Identity Verified',
-                    `Your account is linked to your Ghana Card (${ghanaCardNumber}) and verified for Tier 1 transaction limits.`
-                  );
-                } else {
-                  kycSheetRef.current?.snapToIndex(0);
-                }
+                Haptics.selectionAsync().catch(() => {});
+                setNewName(user?.full_name || '');
+                setIsEditingName(false);
+                profileDetailSheetRef.current?.snapToIndex(0);
               }}
-              color={isKycVerified ? "#16a34a" : undefined}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+              }}
             >
-              <Text className={`font-bold text-base ${isKycVerified ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-                {isKycVerified ? `Verified (Tier 1)` : 'Unverified (Tap to verify)'}
-              </Text>
-            </SettingItem>
-            <SettingItem 
-              icon={Users} 
-              title="Switch Profile" 
-              onPress={() => switchSheetRef.current?.snapToIndex(0)} 
-              isLast
+              <Image
+                source={{ uri: userAvatarUri }}
+                style={{
+                  width: 62,
+                  height: 62,
+                  borderRadius: 31,
+                  backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                }}
+              />
+              <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
+                <Text
+                  style={{
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 20,
+                    fontWeight: '700',
+                    lineHeight: 25,
+                    letterSpacing: -0.3,
+                  }}
+                  numberOfLines={2}
+                >
+                  {user?.full_name || 'Set Your Name'}
+                </Text>
+                <Text
+                  style={{
+                    color: isDark ? '#98989F' : '#6B7280',
+                    fontSize: 13,
+                    lineHeight: 18,
+                    marginTop: 3,
+                  }}
+                  numberOfLines={2}
+                >
+                  {`CediSmart Account, ${user?.is_premium || effectiveTrialActive ? 'Pro+' : 'Wallet'},\nand more`}
+                </Text>
+              </View>
+              <View style={{ marginLeft: 10 }}>
+                <ChevronRight size={18} color={isDark ? '#636366' : '#9CA3AF'} />
+              </View>
+            </TouchableOpacity>
+
+            {/* Apple Inset Hairline Separator */}
+            <View
+              style={{
+                height: StyleSheet.hairlineWidth || 1,
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(0, 0, 0, 0.08)',
+                marginLeft: 92,
+              }}
+            />
+
+            {/* Bottom Row: Overlapping Avatars + Switch Profile (Apple Family Style) */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                Haptics.selectionAsync().catch(() => {});
+                switchSheetRef.current?.snapToIndex(0);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 11,
+              }}
             >
-              <Text className={`font-bold text-base ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
-                {savedAccounts.length > 1 ? `${savedAccounts.length} Profiles` : 'Manage'}
-              </Text>
-            </SettingItem>
+              <View
+                style={{
+                  width: 62,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Image
+                  source={{ uri: userAvatarUri }}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    borderWidth: 2,
+                    borderColor: isDark ? '#141e18' : '#ffffff',
+                    backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                    zIndex: 1,
+                  }}
+                />
+                {(() => {
+                  const secondaryAcc = savedAccounts.find((a) => a.phone !== user?.phone);
+                  const secondaryUri = secondaryAcc ? accountAvatars[secondaryAcc.phone] : null;
+                  if (secondaryUri) {
+                    return (
+                      <Image
+                        source={{ uri: secondaryUri }}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 16,
+                          marginLeft: -10,
+                          borderWidth: 2,
+                          borderColor: isDark ? '#141e18' : '#ffffff',
+                          backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                          zIndex: 2,
+                        }}
+                      />
+                    );
+                  }
+                  return (
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        marginLeft: -10,
+                        borderWidth: 2,
+                        borderColor: isDark ? '#141e18' : '#ffffff',
+                        backgroundColor: isDark ? '#1e3a29' : '#dcfce7',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 2,
+                      }}
+                    >
+                      <Users size={14} color={isDark ? '#4ade80' : '#0d631b'} />
+                    </View>
+                  );
+                })()}
+              </View>
+              <View style={{ flex: 1, marginLeft: 14, justifyContent: 'center' }}>
+                <Text
+                  style={{
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 16,
+                    fontWeight: '500',
+                  }}
+                >
+                  Switch Profile
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {savedAccounts.length > 1 && (
+                  <Text
+                    style={{
+                      color: isDark ? '#8E8E93' : '#6B7280',
+                      fontSize: 15,
+                      marginRight: 6,
+                    }}
+                  >
+                    {savedAccounts.length}
+                  </Text>
+                )}
+                <ChevronRight size={18} color={isDark ? '#636366' : '#9CA3AF'} />
+              </View>
+            </TouchableOpacity>
           </SettingsGroup>
 
           {/* Tracked Financial Accounts Section */}
@@ -2984,6 +3112,127 @@ const SettingsScreen = ({ navigation, route }: any) => {
               })}
             </View>
 
+          </View>
+        </BottomSheetScrollView>
+      </BottomSheet>
+
+      {/* Apple-Style CediSmart Account Detail Bottom Sheet */}
+      <BottomSheet
+        ref={profileDetailSheetRef}
+        index={-1}
+        snapPoints={['72%', '90%']}
+        backdropComponent={renderBackdrop}
+        enablePanDownToClose
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        backgroundComponent={GlassSheetBackground}
+      >
+        <BottomSheetScrollView
+          contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="px-6 py-4">
+            <View className="w-full flex-row justify-between items-center mb-4">
+              <Text className={`text-xl font-headline font-bold ${isDark ? 'text-white' : 'text-charcoal'}`}>
+                CediSmart Account
+              </Text>
+              <TouchableOpacity onPress={() => profileDetailSheetRef.current?.close()}>
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-base`}>Done</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Centered Apple Account Hero Header */}
+            <View className="items-center my-4">
+              <Image
+                source={{ uri: userAvatarUri }}
+                style={{
+                  width: 88,
+                  height: 88,
+                  borderRadius: 44,
+                  marginBottom: 12,
+                  backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                }}
+              />
+              <Text
+                style={{
+                  color: isDark ? '#ffffff' : '#111827',
+                  fontSize: 22,
+                  fontWeight: '700',
+                  textAlign: 'center',
+                }}
+              >
+                {user?.full_name || 'Set Your Name'}
+              </Text>
+              <Text
+                style={{
+                  color: isDark ? '#98989F' : '#6B7280',
+                  fontSize: 14,
+                  marginTop: 4,
+                  textAlign: 'center',
+                }}
+              >
+                {user?.phone || 'CediSmart Member'}
+              </Text>
+            </View>
+
+            <SettingsGroup style={{ marginTop: 12 }}>
+              <SettingItem
+                icon={User}
+                title="Full Name"
+                onPress={() => {
+                  setIsEditingName(true);
+                  setTimeout(() => nameInputRef.current?.focus(), 60);
+                }}
+              >
+                {isEditingName ? (
+                  <TextInput
+                    ref={nameInputRef}
+                    style={{
+                      color: isDark ? '#ffffff' : '#111827',
+                      fontSize: 16,
+                      fontWeight: '700',
+                      paddingVertical: 4,
+                      width: '100%',
+                    }}
+                    selectionColor={isDark ? '#4ade80' : '#0d631b'}
+                    value={newName}
+                    onChangeText={setNewName}
+                    autoFocus
+                    onBlur={saveName}
+                    onSubmitEditing={saveName}
+                    returnKeyType="done"
+                  />
+                ) : (
+                  <Text className={`${isDark ? 'text-dark-charcoal' : 'text-charcoal'} font-bold text-base`}>
+                    {user?.full_name || 'Tap to set name'}
+                  </Text>
+                )}
+              </SettingItem>
+
+              <SettingItem icon={Smartphone} title="Phone Number" value={user?.phone} />
+
+              <SettingItem
+                icon={ShieldCheck}
+                title="Identity Verification"
+                onPress={() => {
+                  if (isKycVerified) {
+                    Alert.alert(
+                      'Identity Verified',
+                      `Your account is linked to your Ghana Card (${ghanaCardNumber}) and verified for Tier 1 transaction limits.`
+                    );
+                  } else {
+                    profileDetailSheetRef.current?.close();
+                    setTimeout(() => kycSheetRef.current?.snapToIndex(0), 220);
+                  }
+                }}
+                color={isKycVerified ? '#16a34a' : undefined}
+                isLast
+              >
+                <Text className={`font-bold text-base ${isKycVerified ? 'text-success' : isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>
+                  {isKycVerified ? 'Verified (Tier 1)' : 'Unverified (Tap to verify)'}
+                </Text>
+              </SettingItem>
+            </SettingsGroup>
           </View>
         </BottomSheetScrollView>
       </BottomSheet>
