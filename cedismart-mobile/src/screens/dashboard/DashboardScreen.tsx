@@ -993,22 +993,9 @@ const DashboardScreen = ({ navigation }: any) => {
           )}
         </View>
         <View className="flex-row items-center">
-          <GlassButton accessibilityLabel="Open accounts" onPress={() => navigation.navigate('Accounts')} style={{ marginRight: 10 }}>
-            <Landmark size={20} color={isDark ? '#a4f3b9' : '#0d631b'} />
-          </GlassButton>
-          <GlassButton accessibilityLabel="AI Support" onPress={() => { setStartFreshSupport(false); setIsSupportModalVisible(true); }} style={{ marginRight: 10 }}>
+          <GlassButton accessibilityLabel="AI Support" onPress={() => { setStartFreshSupport(false); setIsSupportModalVisible(true); }}>
             <Headphones size={19} color={isDark ? '#4ade80' : '#0d631b'} />
           </GlassButton>
-          <TouchableOpacity 
-            onPress={() => profileSheetRef.current?.snapToIndex(0)}
-            className="w-10 h-10 rounded-full bg-primary-container overflow-hidden border border-primary/20 active:scale-95 transition-all"
-          >
-            <Image 
-              source={{ uri: avatarUri }} 
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -2561,7 +2548,7 @@ const DashboardScreen = ({ navigation }: any) => {
       <TopBarSupportTooltip
         userName={user?.full_name}
         screenContext="dashboard"
-        arrowRightOffset={74}
+        arrowRightOffset={26}
         topOffset={74}
         onOpenSupport={(opts) => {
           setStartFreshSupport(!!opts?.startNewChat);

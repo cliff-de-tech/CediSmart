@@ -25,6 +25,7 @@ import Animated, {
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import PINPad from '../../components/shared/PINPad';
@@ -156,8 +157,58 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState(user?.full_name || '');
   const [userAvatarUri, setUserAvatarUri] = useState<string>(DEFAULT_AVATAR_URL);
+  const [isViewingProfilePhoto, setIsViewingProfilePhoto] = useState(false);
   const profileDetailSheetRef = useRef<BottomSheet>(null);
   const nameInputRef = useRef<any>(null);
+
+  const pickProfileImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera roll permissions are required to pick a profile image.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedUri = result.assets[0].uri;
+        setUserAvatarUri(selectedUri);
+        if (user?.id) {
+          await AsyncStorage.setItem(`user_avatar_${user.id}`, selectedUri);
+        }
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred while picking the image.');
+    }
+  };
+
+  const handleProfileAvatarPress = () => {
+    Alert.alert(
+      'Profile Photo',
+      'Choose an action for your profile picture.',
+      [
+        { text: 'View Photo', onPress: () => setIsViewingProfilePhoto(true) },
+        { text: 'Change Photo', onPress: pickProfileImage },
+        {
+          text: 'Remove Photo',
+          style: 'destructive',
+          onPress: async () => {
+            setUserAvatarUri(DEFAULT_AVATAR_URL);
+            if (user?.id) {
+              await AsyncStorage.removeItem(`user_avatar_${user.id}`);
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
 
   // Apple-Style Search & 2-Stage Dynamic Scroll Choreography
   const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
@@ -3298,16 +3349,31 @@ const SettingsScreen = ({ navigation, route }: any) => {
 
             {/* Centered Apple Account Hero Header */}
             <View className="items-center my-4">
-              <Image
-                source={{ uri: userAvatarUri }}
-                style={{
-                  width: 88,
-                  height: 88,
-                  borderRadius: 44,
-                  marginBottom: 12,
-                  backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
-                }}
-              />
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={handleProfileAvatarPress}
+                className="relative mb-2"
+              >
+                <Image
+                  source={{ uri: userAvatarUri }}
+                  style={{
+                    width: 88,
+                    height: 88,
+                    borderRadius: 44,
+                    backgroundColor: isDark ? '#1f2937' : '#e5e7eb',
+                  }}
+                />
+                <View
+                  className={`absolute bottom-0 right-0 w-7 h-7 bg-primary rounded-full items-center justify-center border-2 ${isDark ? 'border-dark-surface-container-lowest' : 'border-white'} shadow-lg`}
+                >
+                  <Plus size={16} color="white" />
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleProfileAvatarPress} className="mb-2">
+                <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} text-xs font-bold`}>
+                  Edit Photo
+                </Text>
+              </TouchableOpacity>
               <Text
                 style={{
                   color: isDark ? '#ffffff' : '#111827',
@@ -3460,6 +3526,28 @@ const SettingsScreen = ({ navigation, route }: any) => {
           </View>
         </BottomSheetScrollView>
       </BottomSheet>
+
+      {/* Full-screen Profile Photo Viewer */}
+      <Modal
+        visible={isViewingProfilePhoto}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsViewingProfilePhoto(false)}
+      >
+        <View className="flex-1 bg-black justify-center items-center relative">
+          <TouchableOpacity
+            onPress={() => setIsViewingProfilePhoto(false)}
+            className="absolute top-14 right-6 p-3 bg-white/10 rounded-full active:scale-90"
+          >
+            <Text className="text-white font-headline font-bold text-sm">Close</Text>
+          </TouchableOpacity>
+          <Image
+            source={{ uri: userAvatarUri }}
+            className="w-[90%] aspect-square rounded-2xl"
+            resizeMode="contain"
+          />
+        </View>
+      </Modal>
 
       <SupportModal
         visible={isSupportModalVisible}
