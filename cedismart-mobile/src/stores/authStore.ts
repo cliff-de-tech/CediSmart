@@ -54,6 +54,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: (user) => {
     set({ user, isAuthenticated: true, isLoading: false });
+    AsyncStorage.setItem('cached_user_profile', JSON.stringify(user)).catch(() => {});
     
     // Auto-save the account to the device list (and update existing entries)
     const saveAcc = async () => {
@@ -79,9 +80,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: () => set({ user: null, isAuthenticated: false, isLoading: false }),
   
   updateUser: (updatedFields) => 
-    set((state) => ({
-      user: state.user ? { ...state.user, ...updatedFields } : null
-    })),
+    set((state) => {
+      const nextUser = state.user ? { ...state.user, ...updatedFields } : null;
+      if (nextUser) {
+        AsyncStorage.setItem('cached_user_profile', JSON.stringify(nextUser)).catch(() => {});
+      }
+      return { user: nextUser };
+    }),
     
   setLoading: (isLoading) => set({ isLoading }),
 

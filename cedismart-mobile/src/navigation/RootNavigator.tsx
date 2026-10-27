@@ -1,19 +1,87 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
-import { View, ActivityIndicator, AppState, AppStateStatus, Text, Platform } from 'react-native';
+import { View, ActivityIndicator, AppState, AppStateStatus, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthNavigator from './AuthNavigator';
 import AppNavigator from './AppNavigator';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore, User, SavedAccount } from '../stores/authStore';
+import { useThemeStore } from '../stores/themeStore';
 import apiClient from '../api/client';
 import { AppLockOverlay } from '../components/shared/AppLockOverlay';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 
+function decodeJwtSub(token: string): string | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    if (typeof globalThis.atob === 'function') {
+      const payload = JSON.parse(globalThis.atob(padded));
+      return typeof payload?.sub === 'string' ? payload.sub : null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function resolveInstantUser(
+  accessToken: string,
+  cachedUserStr: string | null,
+  savedAccountsStr: string | null
+): User | null {
+  if (cachedUserStr) {
+    try {
+      const parsed = JSON.parse(cachedUserStr);
+      if (parsed && parsed.id) {
+        return parsed as User;
+      }
+    } catch {}
+  }
+
+  const jwtUserId = decodeJwtSub(accessToken);
+
+  if (savedAccountsStr) {
+    try {
+      const list: SavedAccount[] = JSON.parse(savedAccountsStr);
+      if (Array.isArray(list) && list.length > 0) {
+        const matched =
+          (jwtUserId ? list.find((a) => a.id === jwtUserId) : null) ||
+          list[list.length - 1];
+        if (matched && matched.id) {
+          return {
+            id: matched.id,
+            phone: matched.phone || '',
+            full_name: matched.full_name,
+            currency: 'GHS',
+            is_premium: true,
+            has_premium_access: true,
+          };
+        }
+      }
+    } catch {}
+  }
+
+  if (jwtUserId) {
+    return {
+      id: jwtUserId,
+      phone: '',
+      currency: 'GHS',
+      is_premium: true,
+      has_premium_access: true,
+    };
+  }
+
+  return null;
+}
+
 const RootNavigator = () => {
   const { isAuthenticated, isLoading, login, setLoading, logout, user } = useAuthStore();
+  const theme = useThemeStore((state) => state.theme);
+  const isDark = theme === 'dark';
   const [isLocked, setIsLocked] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
   const backgroundTimeRef = useRef<number | null>(null);
   const isInitialSessionHydrationRef = useRef(true);
   const wentToBackgroundRef = useRef(false);
@@ -75,9 +143,6 @@ const RootNavigator = () => {
     }
 
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      // Completely ignore ALL state transitions while a biometric/passcode
-      // system dialog is on screen — the OS fires spurious background↔active
-      // cycles that don't represent actual user navigation.
       if (biometricInProgressRef.current) {
         return;
       }
@@ -100,9 +165,6 @@ const RootNavigator = () => {
         wentToBackgroundRef.current = false;
         backgroundTimeRef.current = null;
       } else if (nextAppState === 'background') {
-        // Also honour the post-unlock cooldown to catch any delayed
-        // OS dialog-dismissal transitions that arrive after the
-        // biometricInProgress flag has already been cleared.
         const msSinceUnlock = Date.now() - justUnlockedAtRef.current;
         if (msSinceUnlock > 2000) {
           wentToBackgroundRef.current = true;
@@ -112,8 +174,7 @@ const RootNavigator = () => {
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
-    // Also check on mount if we need to lock on initial load (only for cold start session hydration)
+
     if (isInitialSessionHydrationRef.current) {
       AsyncStorage.getItem(`app_lock_setting_${user.id}`).then((lockSetting) => {
         if (lockSetting && lockSetting !== 'never') {
@@ -128,75 +189,64 @@ const RootNavigator = () => {
   }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
+    const revalidateInBackground = async () => {
+      const attempts = [10000, 25000];
+      for (let i = 0; i < attempts.length; i++) {
+        try {
+          const response = await apiClient.get('/users/me', {
+            timeout: attempts[i],
+          });
+          await AsyncStorage.setItem('cached_user_profile', JSON.stringify(response.data)).catch(() => {});
+          login(response.data);
+          return;
+        } catch (err: any) {
+          const status = err?.response?.status;
+          if (status === 401 || status === 403) {
+            await SecureStore.deleteItemAsync('access_token').catch(() => {});
+            await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+            await AsyncStorage.removeItem('cached_user_profile').catch(() => {});
+            logout();
+            return;
+          }
+          // Network or cold-start timeout — continue silently in background
+        }
+      }
+    };
+
     const hydrateSession = async () => {
       try {
-        const accessToken = await SecureStore.getItemAsync('access_token');
+        const [accessToken, cachedUserStr, savedAccountsStr] = await Promise.all([
+          SecureStore.getItemAsync('access_token'),
+          AsyncStorage.getItem('cached_user_profile').catch(() => null),
+          AsyncStorage.getItem('saved_accounts_list').catch(() => null),
+        ]);
+
         if (!accessToken) {
           logout();
           return;
         }
 
-        // Retry with escalating timeouts to handle Render cold starts.
-        // Attempt 1: 8s (warm server), Attempt 2: 20s, Attempt 3: 45s (cold start).
-        const attempts = [8000, 20000, 45000];
-        let lastError: any = null;
-
-        for (let i = 0; i < attempts.length; i++) {
-          try {
-            if (i > 0) {
-              setLoadingMessage('Waking up server, hang tight…');
-            }
-            const response = await apiClient.get('/users/me', {
-              timeout: attempts[i],
-            });
-            await AsyncStorage.setItem('cached_user_profile', JSON.stringify(response.data)).catch(() => {});
-            login(response.data);
-            return; // Success — exit early
-          } catch (err: any) {
-            lastError = err;
-            const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
-            const isNetworkError = err.message === 'Network Error' || !err.response;
-
-            if (isTimeout || isNetworkError) {
-              // Retriable — server is likely cold-starting or device is offline
-              console.warn(`Session hydration attempt ${i + 1}/${attempts.length} timed out (${attempts[i]}ms)`);
-              if (i < attempts.length - 1) {
-                setLoadingMessage(`Connecting… retrying (${i + 2}/${attempts.length})`);
-              }
-              continue;
-            }
-
-            // Non-retriable error (401, 403, etc.) — break immediately
-            break;
-          }
-        }
-
-        const status = lastError?.response?.status;
-        if (status === 401 || status === 403) {
-          console.warn('Session token rejected (401/403), clearing credentials.');
-          await SecureStore.deleteItemAsync('access_token').catch(() => {});
-          await SecureStore.deleteItemAsync('refresh_token').catch(() => {});
-          await AsyncStorage.removeItem('cached_user_profile').catch(() => {});
-          logout();
+        // Instant Local-First Hydration (<20ms): Enter the app interface immediately
+        // without blocking on server cold starts.
+        const instantUser = resolveInstantUser(accessToken, cachedUserStr, savedAccountsStr);
+        if (instantUser) {
+          login(instantUser);
+          setLoading(false);
+          setTimeout(() => {
+            isInitialSessionHydrationRef.current = false;
+          }, 1000);
+          // Silently sync latest profile in the background
+          void revalidateInBackground();
           return;
         }
 
-        // Transient network/timeout error — keep tokens and use cached profile if available for offline mode
-        const cachedUserStr = await AsyncStorage.getItem('cached_user_profile').catch(() => null);
-        if (cachedUserStr) {
-          try {
-            const cachedUser = JSON.parse(cachedUserStr);
-            login(cachedUser);
-            return;
-          } catch {}
-        }
-        logout();
+        // Fallback only if no local user identity could be resolved at all
+        await revalidateInBackground();
       } catch (error: any) {
         console.error('Session hydration failed:', error?.message || error);
         logout();
       } finally {
         setLoading(false);
-        setLoadingMessage('');
         setTimeout(() => {
           isInitialSessionHydrationRef.current = false;
         }, 1000);
@@ -208,13 +258,15 @@ const RootNavigator = () => {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-background" style={{ gap: 16 }}>
-        <ActivityIndicator size="large" color="#0A6E4A" />
-        {loadingMessage ? (
-          <Text style={{ color: '#9ca3af', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 }}>
-            {loadingMessage}
-          </Text>
-        ) : null}
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: isDark ? '#0b120e' : '#f8faf8',
+        }}
+      >
+        <ActivityIndicator size="large" color={isDark ? '#4ade80' : '#0A6E4A'} />
       </View>
     );
   }
