@@ -3461,8 +3461,6 @@ const SettingsScreen = ({ navigation, route }: any) => {
             </View>
 
             <SettingsGroup style={{ marginTop: 12 }}>
-              <SettingItem icon={Smartphone} title="Phone Number" value={user?.phone} />
-
               <SettingItem
                 icon={ShieldCheck}
                 title="Identity Verification"
