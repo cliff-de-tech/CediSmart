@@ -14,7 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, FileText, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones, Search, Mic } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, Sun, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, FileText, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones, Search, Mic } from 'lucide-react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -1992,12 +1992,47 @@ const SettingsScreen = ({ navigation, route }: any) => {
             <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Appearance</Text>
             <SettingsGroup>
               <SettingItem 
+                icon={Sun} 
+                title="Light Theme" 
+                value="Always use light appearance (Default)"
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  setThemeMode('none');
+                }}
+                hideChevron
+                rightElement={
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      borderWidth: 2,
+                      borderColor: themeMode === 'none' ? (isDark ? '#4ade80' : '#0d631b') : (isDark ? '#4B5563' : '#9CA3AF'),
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: 'transparent',
+                    }}
+                  >
+                    {themeMode === 'none' && (
+                      <View
+                        style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: isDark ? '#4ade80' : '#0d631b',
+                        }}
+                      />
+                    )}
+                  </View>
+                }
+              />
+              <SettingItem 
                 icon={Moon} 
                 title="Dark Theme" 
                 value="Always use dark appearance"
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
-                  setThemeMode(themeMode === 'dark' ? 'none' : 'dark');
+                  setThemeMode('dark');
                 }}
                 hideChevron
                 rightElement={
@@ -2032,7 +2067,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 value="Match system appearance"
                 onPress={() => {
                   Haptics.selectionAsync().catch(() => {});
-                  setThemeMode(themeMode === 'system' ? 'none' : 'system');
+                  setThemeMode('system');
                 }}
                 hideChevron
                 rightElement={
