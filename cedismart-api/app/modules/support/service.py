@@ -201,6 +201,61 @@ def get_execution_mode_prompt(auto_pilot: bool) -> str:
         )
 
 
+PERSONA_PROFILES: dict[str, dict[str, str]] = {
+    "akosua": {
+        "name": "Akosua",
+        "gender": "female",
+        "role": "CediSmart Financial Companion",
+        "style": "Warm, respectful, welcoming, encouraging, and financially knowledgeable Ghanaian sister/companion.",
+        "intro_en": "I am Akosua, your personal CediSmart financial companion.",
+        "intro_twi": "Me din de Akosua, wo CediSmart sika afotufoɔ ne wo yɔnkoɔ pa.",
+        "intro_pidgin": "My name na Akosua, your personal CediSmart financial paddy.",
+    },
+    "kwame": {
+        "name": "Kwame",
+        "gender": "male",
+        "role": "CediSmart Personal CFO",
+        "style": "Confident, grounded, sharp, analytical, reassuring, and wealth-building Ghanaian personal CFO.",
+        "intro_en": "I am Kwame, your CediSmart personal CFO and wealth strategist.",
+        "intro_twi": "Me din de Kwame, wo CediSmart sika hwɛfoɔ ne wo sika akwankyerɛfoɔ.",
+        "intro_pidgin": "My name na Kwame, your CediSmart personal CFO wey dey watch your money.",
+    },
+    "esi": {
+        "name": "Esi",
+        "gender": "female",
+        "role": "CediSmart Money Navigator",
+        "style": "Vibrant, modern, upbeat, quick-witted, and proactive Ghanaian financial companion.",
+        "intro_en": "I am Esi, your vibrant CediSmart money companion!",
+        "intro_twi": "Me din de Esi, wo CediSmart sika yɔnkoɔ a me ho yɛ hare!",
+        "intro_pidgin": "I be Esi, your sharp and energetic CediSmart money navigator!",
+    },
+}
+
+
+def get_persona_identity_prompt(persona_key: str = "akosua", language: str = "en") -> str:
+    key = (persona_key or "akosua").lower()
+    profile = PERSONA_PROFILES.get(key, PERSONA_PROFILES["akosua"])
+    p_name = profile["name"]
+    p_role = profile["role"]
+    p_style = profile["style"]
+    p_intro = profile["intro_en"]
+    if language == "twi":
+        p_intro = profile["intro_twi"]
+    elif language == "pidgin":
+        p_intro = profile["intro_pidgin"]
+
+    return (
+        f"\n\n=== YOUR IDENTITY & NAME (MANDATORY) ===\n"
+        f"Your name is {p_name}. You are the {p_role} for CediSmart in Ghana.\n"
+        f"Gender: {profile['gender']}. Personality & Tone: {p_style}\n"
+        f"- When the user asks what your name is ('What is your name?', 'Who are you?', 'Who am I speaking with?'), "
+        f"or in Twi ('Wo din de sɛn?'), or in Pidgin ('Wetin be your name?'), ALWAYS state your name '{p_name}' clearly and proudly: e.g. \"{p_intro}\".\n"
+        f"- When the user greets you by your name '{p_name}' (e.g. 'Hello {p_name}', '{p_name}, check my balance', 'Kwame, how much did I spend?'), "
+        f"acknowledge your name warmly and naturally.\n"
+        f"- Under NO circumstances claim you are a generic faceless bot or anonymous machine. You are {p_name} of CediSmart.\n"
+    )
+
+
 class SupportService:
     @staticmethod
     async def build_xray_telemetry(
@@ -1084,6 +1139,7 @@ class SupportService:
         image_base64: str | None = None,
         image_mime_type: str | None = "image/jpeg",
         language: str = "en",
+        voice_persona: str = "akosua",
         auto_pilot: bool = False,
         deep_audit: bool = False,
     ) -> str:
@@ -1126,11 +1182,12 @@ class SupportService:
             )
 
         base_prompt = AUTH_SYSTEM_PROMPT if support_type == "auth" else GENERAL_SYSTEM_PROMPT
+        persona_prompt = get_persona_identity_prompt(voice_persona, language)
         lang_prompt = LANGUAGE_PROMPTS.get(language, LANGUAGE_PROMPTS["en"])
         audit_prompt = DEEP_AUDIT_PROMPT if deep_audit else ""
         exec_mode_prompt = get_execution_mode_prompt(auto_pilot)
 
-        system_prompt = f"{base_prompt}\n\n{personalization}{lang_prompt}{audit_prompt}{exec_mode_prompt}{xray_block}"
+        system_prompt = f"{base_prompt}\n\n{personalization}{persona_prompt}{lang_prompt}{audit_prompt}{exec_mode_prompt}{xray_block}"
         if sms_rescue_banner:
             system_prompt += (
                 f"\n\n=== INSTANT SMS RESCUE EXECUTED ===\n"
@@ -1882,8 +1939,11 @@ class SupportService:
         else:
             effective_mime = "audio/mp4"
 
+        persona_prompt = get_persona_identity_prompt(voice_persona, language)
+
         prompt = (
-            f"You are CediSmart AI Voice Assistant, talking directly to {first_name} in Ghana.\n"
+            f"{persona_prompt}\n"
+            f"You are talking directly to {first_name} in Ghana.\n"
             "The user spoke an audio message. Your tasks:\n"
             "1. Transcribe the user's speech accurately into English or Ghanaian Pidgin. If there is no speech, background silence, or non-speech noise, set transcript to '' (empty string). NEVER output timestamps such as '00:00' or tags like '<noise>'.\n"
             "2. Detect user intent and use LIVE FINANCIAL DATA below to provide factual, accurate answers:\n"
@@ -2097,7 +2157,7 @@ class SupportService:
         voice_personas_map: dict[str, dict[str, str]] = {
             "akosua": {
                 "gemini": "Kore",
-                "mistral": "en_carol_neutral",
+                "mistral": "en_paul_happy",
                 "openai": "nova",
             },
             "kwame": {
@@ -2107,7 +2167,7 @@ class SupportService:
             },
             "esi": {
                 "gemini": "Aoede",
-                "mistral": "en_alice_neutral",
+                "mistral": "en_paul_confident",
                 "openai": "alloy",
             },
         }
@@ -2119,7 +2179,7 @@ class SupportService:
         effective_openai_voice = persona_cfg["openai"]
 
         tts_models = [
-            "gemini-3.8-flash-tts",
+            "gemini-3.1-flash-tts-preview",
             "gemini-3.8-flash-lite-tts",
         ]
         for model in tts_models:

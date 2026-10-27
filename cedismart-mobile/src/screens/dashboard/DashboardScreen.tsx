@@ -3,7 +3,7 @@ import { GlassSheetBackground } from '../../components/glass/GlassSheetBackgroun
 import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
-import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image, Dimensions, Linking, Alert, TextInput, Modal, RefreshControl, Keyboard, TouchableWithoutFeedback, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, FlatList, ScrollView, Image, Dimensions, Linking, Alert, TextInput, Modal, RefreshControl, Keyboard, TouchableWithoutFeedback, StyleSheet, AppState, Clipboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,7 +12,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { formatGHS } from '../../utils/currency';
-import { Plus, Tag, Landmark, Smartphone, ShieldCheck, Award, Search, Sparkles, Trash2, Users, SlidersHorizontal, Eye, EyeOff, Clock, RefreshCw, Edit3, X, Headphones, ArrowUpRight, ArrowDownRight } from 'lucide-react-native';
+import { Plus, Tag, Landmark, Smartphone, ShieldCheck, Award, Search, Sparkles, Trash2, Users, SlidersHorizontal, Eye, EyeOff, Clock, RefreshCw, Edit3, X, Headphones, ArrowUpRight, ArrowDownRight, Calendar, Zap, RotateCcw, Check } from 'lucide-react-native';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
@@ -24,6 +24,8 @@ import { CoinBackground } from '../../components/shared/CoinBackground';
 import { ConfettiEffect } from '../../components/shared/ConfettiEffect';
 import { SupportModal } from '../../components/shared/SupportModal';
 import { TopBarSupportTooltip } from '../../components/shared/TopBarSupportTooltip';
+import { SwipeableTransactionCard } from '../../components/shared/SwipeableTransactionCard';
+import uuid from 'react-native-uuid';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
@@ -97,6 +99,21 @@ const DashboardScreen = ({ navigation }: any) => {
   const [biometricType, setBiometricType] = useState<'face' | 'fingerprint' | null>(null);
   const [accountAvatars, setAccountAvatars] = useState<Record<string, string>>({});
   const [hideBalances, setHideBalances] = useState(false);
+
+  // Smart Clipboard MoMo SMS Sniffer state
+  const [sniffedSms, setSniffedSms] = useState<{
+    rawSms: string;
+    amount: string;
+    type: 'income' | 'expense';
+    description: string;
+    categoryName: string;
+    categoryId?: string;
+  } | null>(null);
+  const [isLoggingSniffedSms, setIsLoggingSniffedSms] = useState(false);
+
+  // Undo Toast & Swipe Delete state
+  const [hiddenTxIds, setHiddenTxIds] = useState<Set<string>>(new Set());
+  const [undoTx, setUndoTx] = useState<{ tx: Transaction; timeoutId: any; secondsLeft: number } | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -196,6 +213,27 @@ const DashboardScreen = ({ navigation }: any) => {
     },
     enabled: !!user?.id
   });
+
+  // Safe-to-Spend Today Dynamic Budget Metric (Allowance = Remaining / Days Left)
+  const safeToSpendToday = useMemo(() => {
+    if (!budgets || budgets.length === 0) return null;
+    const totalBudgeted = budgets.reduce((acc, b) => acc + (parseFloat(b.budgeted_amount) || 0), 0);
+    const totalSpent = budgets.reduce((acc, b) => acc + (parseFloat(b.spent_amount) || 0), 0);
+    if (totalBudgeted <= 0) return null;
+    const remaining = Math.max(0, totalBudgeted - totalSpent);
+    const now = new Date();
+    const totalDaysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysLeft = Math.max(1, totalDaysInMonth - now.getDate() + 1);
+    const dailyAllowance = remaining / daysLeft;
+    const status: 'healthy' | 'moderate' | 'tight' =
+      dailyAllowance > 50 ? 'healthy' : dailyAllowance > 15 ? 'moderate' : 'tight';
+    return {
+      dailyAllowance,
+      remaining,
+      daysLeft,
+      status,
+    };
+  }, [budgets]);
 
   // Reset pagination when server-side filters change
   useEffect(() => {
@@ -402,6 +440,158 @@ const DashboardScreen = ({ navigation }: any) => {
         },
       ]
     );
+  };
+
+  // Smart Clipboard MoMo SMS Sniffer Logic
+  const isMoMoSms = (text: string) => {
+    if (!text || text.length < 15) return false;
+    const lower = text.toLowerCase();
+    const hasProvider =
+      lower.includes('payment received') ||
+      lower.includes('payment made') ||
+      lower.includes('you have sent') ||
+      lower.includes('cash out') ||
+      lower.includes('cash in') ||
+      lower.includes('telecel cash') ||
+      lower.includes('at money') ||
+      lower.includes('momo') ||
+      lower.includes('trans id:') ||
+      lower.includes('transaction id:') ||
+      lower.includes('financial transaction id:');
+    const hasCurrency =
+      lower.includes('ghs') ||
+      lower.includes('gh₵') ||
+      lower.includes('gh¢') ||
+      lower.includes('cedis');
+    return hasProvider && hasCurrency;
+  };
+
+  const checkClipboardForMoMo = useCallback(async () => {
+    try {
+      const text = await Clipboard.getString();
+      if (!text || !isMoMoSms(text)) return;
+      const sig = text.trim();
+      const lastSniffed = await AsyncStorage.getItem('last_sniffed_momo_sig');
+      if (lastSniffed === sig) return;
+
+      const res = await apiClient.post('/transactions/parse-sms', { sms: sig });
+      if (res.data && res.data.amount) {
+        setSniffedSms({
+          rawSms: sig,
+          amount: String(res.data.amount),
+          type: res.data.transaction_type === 'income' ? 'income' : 'expense',
+          description: res.data.description || 'Mobile Money Transaction',
+          categoryName: res.data.category_name || 'General',
+          categoryId: res.data.category_id,
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+    } catch {
+      // Ignore background clipboard parse failure
+    }
+  }, []);
+
+  useEffect(() => {
+    checkClipboardForMoMo();
+    const sub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkClipboardForMoMo();
+      }
+    });
+    return () => sub.remove();
+  }, [checkClipboardForMoMo]);
+
+  const handleConfirmSniffedSms = async () => {
+    if (!sniffedSms) return;
+    setIsLoggingSniffedSms(true);
+    try {
+      const targetAccount = accounts?.find((a: any) => a.account_type === 'momo') || accounts?.[0];
+      const today = new Date().toISOString().split('T')[0];
+      await apiClient.post('/transactions/', {
+        amount: sniffedSms.amount,
+        transaction_type: sniffedSms.type,
+        description: sniffedSms.description,
+        transaction_date: today,
+        account_id: targetAccount?.id,
+        category_id: sniffedSms.categoryId,
+        client_id: uuid.v4(),
+      });
+      await AsyncStorage.setItem('last_sniffed_momo_sig', sniffedSms.rawSms);
+      setSniffedSms(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['reports'] });
+      Alert.alert('MoMo Logged!', `Successfully recorded ${formatGHS(sniffedSms.amount)} to your ledger.`);
+    } catch (err: any) {
+      Alert.alert('Could Not Log', err?.response?.data?.detail || 'Failed to record transaction.');
+    } finally {
+      setIsLoggingSniffedSms(false);
+    }
+  };
+
+  const handleDismissSniffedSms = async () => {
+    if (sniffedSms) {
+      await AsyncStorage.setItem('last_sniffed_momo_sig', sniffedSms.rawSms);
+      setSniffedSms(null);
+      Haptics.selectionAsync().catch(() => {});
+    }
+  };
+
+  // Swipe-to-Delete with 5-Second Undo Toast
+  const handleSwipeDelete = (tx: Transaction) => {
+    setHiddenTxIds((prev) => new Set(prev).add(tx.id));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+
+    if (undoTx?.timeoutId) {
+      clearTimeout(undoTx.timeoutId);
+    }
+
+    let remainingSeconds = 5;
+    const intervalId = setInterval(() => {
+      remainingSeconds -= 1;
+      if (remainingSeconds <= 0) {
+        clearInterval(intervalId);
+        apiClient
+          .delete(`/transactions/${tx.id}`)
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
+            queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['budgets'] });
+            queryClient.invalidateQueries({ queryKey: ['reports'] });
+          })
+          .catch((e) => console.error('Deletion error:', e));
+        setUndoTx(null);
+        setHiddenTxIds((prev) => {
+          const next = new Set(prev);
+          next.delete(tx.id);
+          return next;
+        });
+      } else {
+        setUndoTx((curr) => (curr ? { ...curr, secondsLeft: remainingSeconds } : null));
+      }
+    }, 1000);
+
+    setUndoTx({
+      tx,
+      timeoutId: intervalId,
+      secondsLeft: 5,
+    });
+  };
+
+  const handleUndoDelete = () => {
+    if (undoTx) {
+      clearInterval(undoTx.timeoutId);
+      setHiddenTxIds((prev) => {
+        const next = new Set(prev);
+        next.delete(undoTx.tx.id);
+        return next;
+      });
+      setUndoTx(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    }
   };
 
   // Sync data, avatar, KYC status, and saved accounts when screen comes into focus
@@ -707,46 +897,57 @@ const DashboardScreen = ({ navigation }: any) => {
   const expense = summary?.current_month?.expense ? parseFloat(summary.current_month.expense) : 0;
   const transactions = transactionsData?.data || [];
 
-  const renderTransactionItem = ({ item }: { item: Transaction }) => (
-    <View
-      style={[
-        styles.transactionItemCard,
-        {
-          backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
-          borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
-        },
-      ]}
-    >
-      <TouchableOpacity
+  const renderTransactionItem = ({ item }: { item: Transaction }) => {
+    if (hiddenTxIds.has(item.id)) return null;
+
+    return (
+      <SwipeableTransactionCard
+        isDark={isDark}
+        onDelete={() => handleSwipeDelete(item)}
+        onCategorize={() => {
+          setSelectedTx(item);
+          editTxSheetRef.current?.snapToIndex(0);
+        }}
         onPress={() => openTransactionDetail(item)}
-        className="flex-row items-center justify-between p-4 active:opacity-80"
       >
-        <View className="flex-row items-center flex-1 mr-3">
-          <View 
-            className={`w-12 h-12 rounded-full items-center justify-center mr-4 ${isDark ? 'bg-white/10' : 'bg-black/5'}`}
-          >
-            <Tag size={20} color={item.category?.color || (theme === 'dark' ? '#b2b6b1' : '#707a6c')} />
-          </View>
-          <View className="flex-1">
-            <Text className={`font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} text-base`} numberOfLines={1}>
-              {item.description || item.category?.name || 'Transaction'}
-            </Text>
-            <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} text-[10px] uppercase tracking-widest font-bold`}>
-              {item.category?.name || 'General'} • {item.transaction_date}
-            </Text>
+        <View
+          style={[
+            styles.transactionItemCard,
+            {
+              backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : 'rgba(255, 255, 255, 0.96)',
+              borderColor: isDark ? 'rgba(164, 243, 185, 0.16)' : 'rgba(0, 0, 0, 0.08)',
+            },
+          ]}
+        >
+          <View className="flex-row items-center justify-between p-4">
+            <View className="flex-row items-center flex-1 mr-3">
+              <View 
+                className={`w-12 h-12 rounded-full items-center justify-center mr-4 ${isDark ? 'bg-white/10' : 'bg-black/5'}`}
+              >
+                <Tag size={20} color={item.category?.color || (theme === 'dark' ? '#b2b6b1' : '#707a6c')} />
+              </View>
+              <View className="flex-1">
+                <Text className={`font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} text-base`} numberOfLines={1}>
+                  {item.description || item.category?.name || 'Transaction'}
+                </Text>
+                <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} text-[10px] uppercase tracking-widest font-bold`}>
+                  {item.category?.name || 'General'} • {item.transaction_date}
+                </Text>
+              </View>
+            </View>
+            <View className="items-end">
+              <Text className={`font-headline font-bold text-sm ${
+                item.transaction_type === 'income' ? 'text-success' : 'text-error'
+              }`}>
+                {item.transaction_type === 'income' ? '+' : '-'}{hideBalances ? "₵ ••••" : formatGHS(item.amount)}
+              </Text>
+              <Text className={`text-[9px] mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Swipe for actions</Text>
+            </View>
           </View>
         </View>
-        <View className="items-end">
-          <Text className={`font-headline font-bold text-sm ${
-            item.transaction_type === 'income' ? 'text-success' : 'text-error'
-          }`}>
-            {item.transaction_type === 'income' ? '+' : '-'}{hideBalances ? "₵ ••••" : formatGHS(item.amount)}
-          </Text>
-          <Text className={`text-[9px] mt-0.5 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>Tap to edit</Text>
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
+      </SwipeableTransactionCard>
+    );
+  };
 
   const BudgetCard = ({ item }: { item: Budget }) => (
     <GlassSurface radius={32} elevated style={{ minWidth: 280, marginRight: 16 }}>
@@ -826,6 +1027,106 @@ const DashboardScreen = ({ navigation }: any) => {
               {getGreetingPrefix()} {personalizedGreeting}
             </Text>
           </View>
+
+          {/* Sniffed MoMo SMS Detection Card */}
+          {sniffedSms && (
+            <View
+              style={{
+                marginBottom: 20,
+                borderRadius: 22,
+                backgroundColor: isDark ? 'rgba(6, 78, 59, 0.94)' : 'rgba(236, 253, 245, 0.98)',
+                borderColor: isDark ? 'rgba(16, 185, 129, 0.5)' : '#10b981',
+                borderWidth: 1.5,
+                padding: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.2,
+                shadowRadius: 10,
+                elevation: 6,
+              }}
+            >
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center">
+                  <View className="w-8 h-8 rounded-full bg-emerald-500/20 items-center justify-center mr-2.5">
+                    <Smartphone size={16} color="#10b981" />
+                  </View>
+                  <View>
+                    <Text className={`font-headline font-bold text-xs uppercase tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-800'}`}>
+                      MoMo SMS Copied
+                    </Text>
+                    <Text className={`text-[10px] ${isDark ? 'text-white/60' : 'text-gray-500'}`}>
+                      Tap to record directly to your ledger
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={handleDismissSniffedSms}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  className="p-1 rounded-full bg-black/10"
+                >
+                  <X size={14} color={isDark ? '#fff' : '#374151'} />
+                </TouchableOpacity>
+              </View>
+
+              <View className="flex-row items-center justify-between my-2 py-2 px-3 rounded-xl bg-black/15">
+                <View className="flex-1 mr-2">
+                  <Text className={`font-bold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`} numberOfLines={1}>
+                    {sniffedSms.description}
+                  </Text>
+                  <Text className={`text-[11px] ${isDark ? 'text-white/70' : 'text-gray-600'}`}>
+                    Category: {sniffedSms.categoryName}
+                  </Text>
+                </View>
+                <Text className={`text-base font-extrabold ${sniffedSms.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                  {sniffedSms.type === 'income' ? '+' : '-'}{formatGHS(sniffedSms.amount)}
+                </Text>
+              </View>
+
+              <View className="flex-row space-x-2 mt-2" style={{ gap: 8 }}>
+                <TouchableOpacity
+                  onPress={handleConfirmSniffedSms}
+                  disabled={isLoggingSniffedSms}
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#10b981',
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                  }}
+                >
+                  {isLoggingSniffedSms ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Check size={16} color="#fff" strokeWidth={2.5} />
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, marginLeft: 6 }}>
+                        Confirm & Log
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleDismissSniffedSms}
+                  disabled={isLoggingSniffedSms}
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: isDark ? '#fff' : '#374151', fontWeight: '600', fontSize: 13 }}>
+                    Dismiss
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           <GlassSurface
             tint="emerald"
@@ -961,6 +1262,86 @@ const DashboardScreen = ({ navigation }: any) => {
                     </Text>
                   </View>
                 </View>
+
+                {/* Safe to Spend Today Dynamic Budget Metric */}
+                {safeToSpendToday && (
+                  <View
+                    style={{
+                      marginTop: 14,
+                      backgroundColor:
+                        safeToSpendToday.status === 'healthy'
+                          ? 'rgba(74, 222, 128, 0.12)'
+                          : safeToSpendToday.status === 'moderate'
+                            ? 'rgba(251, 191, 36, 0.12)'
+                            : 'rgba(244, 63, 94, 0.12)',
+                      borderColor:
+                        safeToSpendToday.status === 'healthy'
+                          ? 'rgba(74, 222, 128, 0.3)'
+                          : safeToSpendToday.status === 'moderate'
+                            ? 'rgba(251, 191, 36, 0.3)'
+                            : 'rgba(244, 63, 94, 0.3)',
+                      borderWidth: 1,
+                      borderRadius: 18,
+                      paddingVertical: 10,
+                      paddingHorizontal: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <View className="flex-row items-center flex-1 mr-2">
+                      <View
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor:
+                            safeToSpendToday.status === 'healthy'
+                              ? 'rgba(74, 222, 128, 0.25)'
+                              : safeToSpendToday.status === 'moderate'
+                                ? 'rgba(251, 191, 36, 0.25)'
+                                : 'rgba(244, 63, 94, 0.25)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 10,
+                        }}
+                      >
+                        <Zap
+                          size={14}
+                          color={
+                            safeToSpendToday.status === 'healthy'
+                              ? '#4ade80'
+                              : safeToSpendToday.status === 'moderate'
+                                ? '#fbbf24'
+                                : '#f43f5e'
+                          }
+                        />
+                      </View>
+                      <View>
+                        <Text style={{ color: 'rgba(255, 255, 255, 0.8)' }} className="text-[10px] font-bold font-label uppercase tracking-wider">
+                          Safe to Spend Today
+                        </Text>
+                        <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }} className="text-[10px]">
+                          {safeToSpendToday.daysLeft} days left • {hideBalances ? "₵ ••••" : formatGHS(safeToSpendToday.remaining)} remaining
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
+                      style={{
+                        color:
+                          safeToSpendToday.status === 'healthy'
+                            ? '#4ade80'
+                            : safeToSpendToday.status === 'moderate'
+                              ? '#fbbf24'
+                              : '#f43f5e',
+                        fontSize: 15,
+                        fontWeight: '800',
+                      }}
+                    >
+                      {hideBalances ? "₵ ••••" : `${formatGHS(safeToSpendToday.dailyAllowance)}/day`}
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
           </GlassSurface>
@@ -1138,6 +1519,54 @@ const DashboardScreen = ({ navigation }: any) => {
       >
         <Plus color={isDark ? '#a4f3b9' : '#0d631b'} size={30} />
       </GlassButton>
+
+      {/* 5-Second Swipe Delete Undo Toast */}
+      {undoTx && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: tabBarClearance + 20,
+            left: 16,
+            right: 16,
+            backgroundColor: isDark ? 'rgba(31, 41, 55, 0.96)' : 'rgba(17, 24, 39, 0.96)',
+            borderRadius: 18,
+            padding: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.35,
+            shadowRadius: 10,
+            elevation: 10,
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.15)',
+            zIndex: 40,
+          }}
+        >
+          <View className="flex-row items-center flex-1 mr-3">
+            <View className="w-8 h-8 rounded-full bg-rose-500/20 items-center justify-center mr-2.5">
+              <Trash2 size={16} color="#f43f5e" />
+            </View>
+            <View>
+              <Text className="text-white font-bold text-xs" numberOfLines={1}>
+                Deleted {undoTx.tx.description || 'Transaction'} ({formatGHS(undoTx.tx.amount)})
+              </Text>
+              <Text className="text-white/60 text-[10px]">
+                Undo available for {undoTx.secondsLeft}s
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            onPress={handleUndoDelete}
+            className="bg-emerald-500 px-3.5 py-2 rounded-xl flex-row items-center active:bg-emerald-600"
+          >
+            <RotateCcw size={14} color="#fff" />
+            <Text className="text-white font-bold text-xs ml-1.5">Undo</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* USSD Helper Sheet */}
       <BottomSheet
@@ -1830,15 +2259,17 @@ const DashboardScreen = ({ navigation }: any) => {
               <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-gray-400' : 'text-gray-500'} mb-1.5`}>
                 Note / Description
               </Text>
-              <BottomSheetTextInput
-                value={editDescription}
-                onChangeText={setEditDescription}
-                placeholder="What was this for?"
-                placeholderTextColor="#9ca3af"
-                returnKeyType="done"
-                onSubmitEditing={Keyboard.dismiss}
-                className={`px-4 py-3 rounded-2xl border mb-4 font-body text-sm ${isDark ? 'bg-black/30 border-white/15 text-white' : 'bg-white border-gray-200 text-charcoal'}`}
-              />
+              <View className={`flex-row items-center px-4 py-3 rounded-2xl border mb-4 ${isDark ? 'bg-black/30 border-white/15' : 'bg-white border-gray-200'}`}>
+                <BottomSheetTextInput
+                  value={editDescription}
+                  onChangeText={setEditDescription}
+                  placeholder="What was this for?"
+                  placeholderTextColor="#9ca3af"
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                  className={`flex-1 font-body text-sm ${isDark ? 'text-white' : 'text-charcoal'} p-0`}
+                />
+              </View>
 
               {/* Date */}
               <View className="flex-row justify-between items-center mb-1.5">
@@ -1868,15 +2299,18 @@ const DashboardScreen = ({ navigation }: any) => {
                   </TouchableOpacity>
                 </View>
               </View>
-              <BottomSheetTextInput
-                value={editDate}
-                onChangeText={setEditDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#9ca3af"
-                returnKeyType="done"
-                onSubmitEditing={Keyboard.dismiss}
-                className={`px-4 py-3 rounded-2xl border mb-4 font-body text-sm ${isDark ? 'bg-black/30 border-white/15 text-white' : 'bg-white border-gray-200 text-charcoal'}`}
-              />
+              <View className={`flex-row items-center px-4 py-3 rounded-2xl border mb-4 ${isDark ? 'bg-black/30 border-white/15' : 'bg-white border-gray-200'}`}>
+                <Calendar size={16} color={isDark ? '#9ca3af' : '#6b7280'} style={{ marginRight: 8 }} />
+                <BottomSheetTextInput
+                  value={editDate}
+                  onChangeText={setEditDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#9ca3af"
+                  returnKeyType="done"
+                  onSubmitEditing={Keyboard.dismiss}
+                  className={`flex-1 font-body text-sm ${isDark ? 'text-white' : 'text-charcoal'} p-0`}
+                />
+              </View>
 
               {/* Category Selector Chips */}
               {categories && categories.length > 0 && (

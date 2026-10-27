@@ -18,12 +18,14 @@ interface VoiceOrbProps {
   state: VoiceState;
   audioLevel?: number; // 0.0 to 1.0 for live mic/speech amplitude
   size?: number;
+  interruptedTrigger?: number; // Increments on tap-to-interrupt to trigger shockwave
 }
 
 export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   state,
   audioLevel = 0,
   size = 180,
+  interruptedTrigger = 0,
 }) => {
   // Shared animation values
   const scale = useSharedValue(1);
@@ -35,6 +37,23 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
   const ring3Opacity = useSharedValue(0.1);
   const rotation = useSharedValue(0);
   const glowIntensity = useSharedValue(0.8);
+
+  // Shockwave ripple animation on tap-to-interrupt
+  const rippleScale = useSharedValue(1);
+  const rippleOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    if (interruptedTrigger > 0) {
+      rippleScale.value = 1;
+      rippleOpacity.value = 0.85;
+      rippleScale.value = withTiming(2.4, { duration: 420, easing: Easing.out(Easing.cubic) });
+      rippleOpacity.value = withTiming(0, { duration: 420 });
+      scale.value = withSequence(
+        withTiming(0.86, { duration: 80, easing: Easing.inOut(Easing.ease) }),
+        withSpring(1.0, { damping: 10, stiffness: 220 })
+      );
+    }
+  }, [interruptedTrigger]);
 
   useEffect(() => {
     switch (state) {
@@ -301,6 +320,25 @@ export const VoiceOrb: React.FC<VoiceOrbProps> = ({
             backgroundColor: `${colors[0]}35`,
           },
           ring1AnimatedStyle,
+        ]}
+      />
+
+      {/* Tap-to-Interrupt Ripple Shockwave */}
+      <Animated.View
+        style={[
+          styles.ring,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            borderWidth: 2.5,
+            borderColor: '#34d399',
+            backgroundColor: 'rgba(52, 211, 153, 0.25)',
+          },
+          useAnimatedStyle(() => ({
+            transform: [{ scale: rippleScale.value }],
+            opacity: rippleOpacity.value,
+          })),
         ]}
       />
 

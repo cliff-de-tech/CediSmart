@@ -14,7 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, FileText, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones } from 'lucide-react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -26,6 +26,7 @@ import apiClient, { setActiveTokens, clearActiveSession } from '../../api/client
 import { requestNotificationPermissions, triggerLocalNotification } from '../../utils/notifications';
 import { SupportModal } from '../../components/shared/SupportModal';
 import { CoinBackground } from '../../components/shared/CoinBackground';
+import { generateAndSharePdfStatement } from '../../utils/statementGenerator';
 let setAppIcon: any = null;
 try {
   setAppIcon = require('@howincodes/expo-dynamic-app-icon').setAppIcon;
@@ -176,6 +177,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const appIconSheetRef = useRef<BottomSheet>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [currentAppIcon, setCurrentAppIcon] = useState('Luminous Emerald');
   const [isOnline, setIsOnline] = useState(true);
   const [appLockSetting, setAppLockSetting] = useState('never');
@@ -1341,6 +1343,82 @@ const SettingsScreen = ({ navigation, route }: any) => {
     }
   };
 
+  const handleExportPdfStatement = async () => {
+    if (!user?.has_premium_access) {
+      Alert.alert(
+        'CediSmart Pro Feature',
+        'Official Branded PDF Monthly Statements are only available for Pro members. Upgrade now to get access!',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade to Pro', onPress: () => pricingSheetRef.current?.snapToIndex(0) },
+        ]
+      );
+      return;
+    }
+
+    setIsExportingPdf(true);
+    try {
+      const netState = await NetInfo.fetch();
+      if (!netState.isConnected) {
+        Alert.alert('Offline', 'Please connect to the internet to export your monthly statement.');
+        setIsExportingPdf(false);
+        return;
+      }
+
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1;
+      const monthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      const [sumRes, catRes, txRes] = await Promise.all([
+        apiClient.get(`/reports/monthly?year=${currentYear}&month=${currentMonth}`),
+        apiClient.get(
+          `/reports/categories?start_date=${currentYear}-${String(currentMonth).padStart(2, '0')}-01&end_date=${new Date(currentYear, currentMonth, 0).toISOString().split('T')[0]}&transaction_type=expense`
+        ),
+        apiClient.get('/transactions/?per_page=100'),
+      ]);
+
+      const totalIncome = parseFloat(sumRes.data?.total_income || 0);
+      const totalExpense = parseFloat(sumRes.data?.total_expense || 0);
+      const netSavings = parseFloat(sumRes.data?.net_savings || 0);
+      const savingsRate = parseFloat(sumRes.data?.savings_rate || 0);
+
+      const categoryBreakdown = (catRes.data?.categories || []).map((c: any) => ({
+        name: c.name,
+        amount: parseFloat(c.amount || 0),
+        percentage: parseFloat(c.percentage || 0),
+      }));
+
+      const transactions = (txRes.data?.data || []).map((t: any) => ({
+        date: t.transaction_date,
+        description: t.description || t.category?.name || 'Transaction',
+        category: t.category?.name || 'General',
+        account: t.account?.name || 'Wallet',
+        type: t.transaction_type,
+        amount: parseFloat(t.amount || 0),
+      }));
+
+      await generateAndSharePdfStatement({
+        userName: user?.full_name || 'CediSmart Member',
+        userPhone: user?.phone || '',
+        monthName,
+        totalIncome,
+        totalExpense,
+        netSavings,
+        savingsRate,
+        categoryBreakdown,
+        transactions,
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (err: any) {
+      console.error('PDF export error:', err);
+      Alert.alert('Statement Error', 'An error occurred while generating your branded statement.');
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handleSelectAppIcon = async (iconName: string) => {
     if (!user?.has_premium_access) {
       Alert.alert(
@@ -1761,6 +1839,12 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 title="Export History" 
                 value={isExporting ? "Exporting data..." : "Export to CSV"} 
                 onPress={isExporting ? undefined : handleExportHistory}
+              />
+              <SettingItem 
+                icon={isExportingPdf ? ActivityIndicator : FileText} 
+                title="Monthly Statement" 
+                value={isExportingPdf ? "Generating PDF..." : "Export Official PDF"} 
+                onPress={isExportingPdf ? undefined : handleExportPdfStatement}
               />
               <SettingItem 
                 icon={Smartphone} 

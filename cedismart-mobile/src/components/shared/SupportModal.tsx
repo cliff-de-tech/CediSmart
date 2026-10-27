@@ -1518,6 +1518,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         image_base64: payload.imageBase64,
         image_mime_type: payload.imageMimeType,
         language: language,
+        voice_persona: voicePersona,
         auto_pilot: autoPilot,
         deep_audit: deepAudit,
       });

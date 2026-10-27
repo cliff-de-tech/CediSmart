@@ -5,12 +5,14 @@ import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetr
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { BarChart, LineChart } from "react-native-gifted-charts";
-import { ChevronLeft, ChevronRight, PieChart as PieIcon, TrendingUp, ArrowDownCircle, ArrowUpCircle } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, PieChart as PieIcon, TrendingUp, ArrowDownCircle, ArrowUpCircle, FileText } from 'lucide-react-native';
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
 import apiClient from '../../api/client';
 import { formatGHS } from '../../utils/currency';
 import { CoinBackground } from '../../components/shared/CoinBackground';
+import { generateAndSharePdfStatement } from '../../utils/statementGenerator';
+import * as Haptics from 'expo-haptics';
 
 const ReportsScreen = () => {
   const { width: screenWidth } = useWindowDimensions();
@@ -79,6 +81,59 @@ const ReportsScreen = () => {
   };
 
   const monthName = currentDate.toLocaleString('default', { month: 'long' });
+
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  const handleDownloadPdfStatement = async () => {
+    setIsDownloadingPdf(true);
+    try {
+      const monthStr = `${year}-${month.toString().padStart(2, '0')}`;
+      const start = `${monthStr}-01`;
+      const end = new Date(year, month, 0).toISOString().split('T')[0];
+
+      const txRes = await apiClient.get(
+        `/transactions/?start_date=${start}&end_date=${end}&per_page=100`
+      );
+
+      const totalIncome = parseFloat(summary?.total_income || 0);
+      const totalExpense = parseFloat(summary?.total_expense || 0);
+      const netSavings = parseFloat(summary?.net_savings || 0);
+      const savingsRate = parseFloat(summary?.savings_rate || 0);
+
+      const categoryBreakdown = (categoryData?.categories || []).map((c: any) => ({
+        name: c.name,
+        amount: parseFloat(c.amount || 0),
+        percentage: parseFloat(c.percentage || 0),
+      }));
+
+      const transactions = (txRes.data?.data || []).map((t: any) => ({
+        date: t.transaction_date,
+        description: t.description || t.category?.name || 'Transaction',
+        category: t.category?.name || 'General',
+        account: t.account?.name || 'Wallet',
+        type: t.transaction_type,
+        amount: parseFloat(t.amount || 0),
+      }));
+
+      await generateAndSharePdfStatement({
+        userName: user?.full_name || 'CediSmart Member',
+        userPhone: user?.phone || '',
+        monthName: `${monthName} ${year}`,
+        totalIncome,
+        totalExpense,
+        netSavings,
+        savingsRate,
+        categoryBreakdown,
+        transactions,
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch (e) {
+      console.error('Error generating PDF statement:', e);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   // Prepare Bar Chart Data (Categories)
   const barData = useMemo(() => {
@@ -152,12 +207,29 @@ const ReportsScreen = () => {
   return (
     <SafeAreaView edges={['top', 'left', 'right']} className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-background'}`}>
       <CoinBackground />
-      {/* Header with Month Selector */}
+      {/* Header with Month Selector & PDF Export */}
       <View
         className="px-6 pt-4 pb-4 flex-row flex-wrap justify-between items-center"
         style={{ gap: 12 }}
       >
-        <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Reports</Text>
+        <View className="flex-row items-center gap-2.5">
+          <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}>Reports</Text>
+          <TouchableOpacity
+            onPress={handleDownloadPdfStatement}
+            disabled={isDownloadingPdf}
+            className={`px-3 py-1.5 rounded-full border flex-row items-center ${isDark ? 'bg-emerald-950/60 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'}`}
+          >
+            {isDownloadingPdf ? (
+              <ActivityIndicator size="small" color="#10b981" />
+            ) : (
+              <>
+                <FileText size={13} color="#10b981" />
+                <Text className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 ml-1">PDF</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
         <GlassSurface radius={24} style={{ flexDirection: 'row', alignItems: 'center' }}>
           <TouchableOpacity
             accessibilityRole="button"

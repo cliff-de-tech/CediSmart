@@ -66,20 +66,8 @@ import uuid from 'react-native-uuid';
 import {
   PRECACHED_BRIDGES,
   VoiceBridgeType,
+  getPrecachedBridge,
 } from '../../assets/audio/precachedBridges';
-
-let lastBridgeIndex = -1;
-const getPrecachedBridge = (type: VoiceBridgeType, persona: VoicePersona) => {
-  const personaPool = PRECACHED_BRIDGES[persona] || PRECACHED_BRIDGES.akosua;
-  const pool = personaPool[type] || personaPool.balance;
-  if (!pool || pool.length === 0) return null;
-  let nextIdx = Math.floor(Math.random() * pool.length);
-  if (pool.length > 1 && nextIdx === lastBridgeIndex) {
-    nextIdx = (nextIdx + 1) % pool.length;
-  }
-  lastBridgeIndex = nextIdx;
-  return pool[nextIdx];
-};
 
 // Helper to filter out silence artifacts, background noise, or model timestamp hallucinations (e.g. "00:00")
 const isInvalidTranscript = (text: string) => {
@@ -142,6 +130,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
 
   // Voice Interaction States
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [interruptedTrigger, setInterruptedTrigger] = useState(0);
   const [isCompactView, setIsCompactView] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -710,7 +699,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Recording expense…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : getPrecachedBridge('expense', voicePersona);
+          : getPrecachedBridge('expense', voicePersona, language);
         const bridgePromise = bridge
           ? playBridgePhrase(bridge.text, bridge.base64, turn)
           : Promise.resolve();
@@ -723,7 +712,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Checking your balances…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : getPrecachedBridge('balance', voicePersona);
+          : getPrecachedBridge('balance', voicePersona, language);
         const bridgePromise = bridge
           ? playBridgePhrase(bridge.text, bridge.base64, turn)
           : Promise.resolve();
@@ -773,7 +762,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Checking your budgets…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : getPrecachedBridge('budget', voicePersona);
+          : getPrecachedBridge('budget', voicePersona, language);
         const bridgePromise = bridge
           ? playBridgePhrase(bridge.text, bridge.base64, turn)
           : Promise.resolve();
@@ -823,7 +812,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
         setDynamicStatus('Checking your financial report…');
         const bridge = neuralAudioB64
           ? { text: reply, base64: neuralAudioB64 }
-          : getPrecachedBridge('report', voicePersona);
+          : getPrecachedBridge('report', voicePersona, language);
         const bridgePromise = bridge
           ? playBridgePhrase(bridge.text, bridge.base64, turn)
           : Promise.resolve();
@@ -1075,6 +1064,8 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     requestRef.current = null;
     isProcessingRef.current = false;
     setDynamicStatus(null);
+    setInterruptedTrigger((prev) => prev + 1);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     await voiceService.stop();
     setAudioLevel(0);
     setVoiceState('idle');
@@ -1082,11 +1073,14 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   };
 
   const handleOrbPress = () => {
-    Haptics.selectionAsync().catch(() => {});
     if (voiceState === 'speaking' || voiceState === 'thinking') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
       void interruptResponse();
     } else if (voiceState === 'idle' && !isMuted) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
       void startListeningLoop();
+    } else {
+      Haptics.selectionAsync().catch(() => {});
     }
   };
 
@@ -1173,7 +1167,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel={voiceState === 'speaking' ? 'Interrupt response' : voiceState === 'thinking' ? 'Cancel response' : 'Listening automatically'}
               >
-                <VoiceOrb state={voiceState} audioLevel={audioLevel} size={210} />
+                <VoiceOrb state={voiceState} audioLevel={audioLevel} size={210} interruptedTrigger={interruptedTrigger} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -1215,7 +1209,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
                   accessibilityRole="button"
                   accessibilityLabel={voiceState === 'speaking' ? 'Interrupt response' : voiceState === 'thinking' ? 'Cancel response' : 'Listening automatically'}
                 >
-                  <VoiceOrb state={voiceState} audioLevel={audioLevel} size={64} />
+                  <VoiceOrb state={voiceState} audioLevel={audioLevel} size={64} interruptedTrigger={interruptedTrigger} />
                 </TouchableOpacity>
               </View>
             </View>

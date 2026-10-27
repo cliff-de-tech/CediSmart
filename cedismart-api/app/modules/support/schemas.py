@@ -54,6 +54,10 @@ class ChatRequest(BaseModel):
         default=False,
         description="Whether deep financial audit analysis is requested",
     )
+    voice_persona: str = Field(
+        default="akosua",
+        description="User preferred voice persona identity: 'akosua', 'kwame', 'esi'",
+    )
 
 
 class ChatResponse(BaseModel):

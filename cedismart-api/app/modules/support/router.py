@@ -53,6 +53,7 @@ async def chat_with_support(request: Request, body: ChatRequest, db: DBSession) 
         support_type=body.support_type,
         user_name=body.user_name,
         language=body.language,
+        voice_persona=body.voice_persona,
         auto_pilot=body.auto_pilot,
         deep_audit=body.deep_audit,
         **extra_kwargs,
