@@ -542,11 +542,7 @@ const DashboardScreen = ({ navigation }: any) => {
 
   // Swipe-to-Delete with 5-Second Undo Toast
   const handleSwipeDelete = (tx: Transaction) => {
-    if (Platform.OS === 'ios' || Platform.OS === 'android') {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    }
     setHiddenTxIds((prev) => new Set(prev).add(tx.id));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
 
     if (undoTx?.timeoutId) {
       clearTimeout(undoTx.timeoutId);
