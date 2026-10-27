@@ -1283,19 +1283,19 @@ const DashboardScreen = ({ navigation }: any) => {
                             : 'rgba(244, 63, 94, 0.3)',
                       borderWidth: 1,
                       borderRadius: 18,
-                      paddingVertical: 10,
+                      paddingVertical: 11,
                       paddingHorizontal: 14,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                     }}
                   >
-                    <View className="flex-row items-center flex-1 mr-2">
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 10 }}>
                       <View
                         style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 14,
+                          width: 30,
+                          height: 30,
+                          borderRadius: 15,
                           backgroundColor:
                             safeToSpendToday.status === 'healthy'
                               ? 'rgba(74, 222, 128, 0.25)'
@@ -1305,6 +1305,7 @@ const DashboardScreen = ({ navigation }: any) => {
                           alignItems: 'center',
                           justifyContent: 'center',
                           marginRight: 10,
+                          flexShrink: 0,
                         }}
                       >
                         <Zap
@@ -1318,29 +1319,49 @@ const DashboardScreen = ({ navigation }: any) => {
                           }
                         />
                       </View>
-                      <View>
-                        <Text style={{ color: 'rgba(255, 255, 255, 0.8)' }} className="text-[10px] font-bold font-label uppercase tracking-wider">
+                      <View style={{ flex: 1, justifyContent: 'center' }}>
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.85}
+                          style={{ color: 'rgba(255, 255, 255, 0.88)', letterSpacing: 0.6 }}
+                          className="text-[10px] font-bold font-label uppercase"
+                        >
                           Safe to Spend Today
                         </Text>
-                        <Text style={{ color: 'rgba(255, 255, 255, 0.6)' }} className="text-[10px]">
-                          {safeToSpendToday.daysLeft} days left • {hideBalances ? "₵ ••••" : formatGHS(safeToSpendToday.remaining)} remaining
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.8}
+                          style={{ color: 'rgba(255, 255, 255, 0.65)', marginTop: 2 }}
+                          className="text-[11px] font-medium"
+                        >
+                          {safeToSpendToday.daysLeft} {safeToSpendToday.daysLeft === 1 ? 'day' : 'days'} left • {hideBalances ? "₵ ••••" : formatGHS(safeToSpendToday.remaining)} left
                         </Text>
                       </View>
                     </View>
-                    <Text
-                      style={{
-                        color:
-                          safeToSpendToday.status === 'healthy'
-                            ? '#4ade80'
-                            : safeToSpendToday.status === 'moderate'
-                              ? '#fbbf24'
-                              : '#f43f5e',
-                        fontSize: 15,
-                        fontWeight: '800',
-                      }}
-                    >
-                      {hideBalances ? "₵ ••••" : `${formatGHS(safeToSpendToday.dailyAllowance)}/day`}
-                    </Text>
+                    <View style={{ alignItems: 'flex-end', justifyContent: 'center', flexShrink: 0 }}>
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          color:
+                            safeToSpendToday.status === 'healthy'
+                              ? '#4ade80'
+                              : safeToSpendToday.status === 'moderate'
+                                ? '#fbbf24'
+                                : '#f43f5e',
+                          fontSize: 15,
+                          fontWeight: '800',
+                        }}
+                      >
+                        {hideBalances ? "₵ ••••" : formatGHS(safeToSpendToday.dailyAllowance)}
+                      </Text>
+                      <Text
+                        style={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 10, fontWeight: '600', marginTop: 1 }}
+                      >
+                        per day
+                      </Text>
+                    </View>
                   </View>
                 )}
               </View>
