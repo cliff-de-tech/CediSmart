@@ -2269,36 +2269,36 @@ const SettingsScreen = ({ navigation, route }: any) => {
               <SettingItem
                 icon={Sparkles}
                 color="#10b981"
-                title="MoMo & Bank SMS Auto-Logging"
-                value="Auto-import MTN, Telecel & bank alerts"
+                title="SMS Auto-Sync"
+                value="Auto-log MoMo & bank alerts"
                 onPress={() => openGuide('sms')}
               />
               <SettingItem
                 icon={PieChart}
                 color="#4c56af"
-                title="Safe-to-Spend & Smart Budgets"
-                value="How daily limits & 50/30/20 budgets work"
+                title="Smart Budgets"
+                value="Daily limits & 50/30/20 rule"
                 onPress={() => openGuide('budgets')}
               />
               <SettingItem
                 icon={Smartphone}
                 color={isDark ? '#4ade80' : '#0d631b'}
-                title="Gestures, Voice AI & Offline Mode"
-                value="Full-swipe delete, voice logging & sync"
+                title="Voice & Gestures"
+                value="Swipe actions & voice commands"
                 onPress={() => openGuide('gestures')}
               />
               <SettingItem
                 icon={Users}
                 color="#d97706"
-                title="Personal vs. Business Profiles"
-                value="Manage multiple accounts & Ghana Card KYC"
+                title="Multi-Profile"
+                value="Switch accounts & KYC limits"
                 onPress={() => openGuide('profiles')}
               />
               <SettingItem
                 icon={BookOpen}
                 color={isDark ? '#60a5fa' : '#2563eb'}
-                title="How to Use CediSmart (Full Guide)"
-                value="Read end-to-end documentation on web"
+                title="User Guide"
+                value="How to use CediSmart"
                 onPress={() => openWebDocs()}
                 rightElement={
                   <ExternalLink size={18} color={isDark ? '#60a5fa' : '#2563eb'} />
@@ -4062,37 +4062,6 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 >
                   <Text className="text-white font-bold text-base mr-2">{activeGuide.ctaLabel}</Text>
                   <ChevronRight size={18} color="#ffffff" />
-                </TouchableOpacity>
-
-                {/* Web Documentation Link Button */}
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => openWebDocs(activeGuide.hash)}
-                  style={{
-                    marginTop: 12,
-                    paddingVertical: 14,
-                    paddingHorizontal: 16,
-                    borderRadius: 16,
-                    borderWidth: 1,
-                    borderColor: isDark ? 'rgba(96, 165, 250, 0.30)' : 'rgba(37, 99, 235, 0.22)',
-                    backgroundColor: isDark ? 'rgba(37, 99, 235, 0.10)' : 'rgba(37, 99, 235, 0.06)',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BookOpen size={16} color={isDark ? '#60a5fa' : '#2563eb'} style={{ marginRight: 8 }} />
-                  <Text
-                    style={{
-                      color: isDark ? '#60a5fa' : '#2563eb',
-                      fontSize: 13.5,
-                      fontWeight: '700',
-                      marginRight: 6,
-                    }}
-                  >
-                    Read Full Documentation on CediSmart Web
-                  </Text>
-                  <ExternalLink size={14} color={isDark ? '#60a5fa' : '#2563eb'} />
                 </TouchableOpacity>
               </View>
             );
