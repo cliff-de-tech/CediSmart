@@ -354,7 +354,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
   // Guides & Web Documentation states
   const guideSheetRef = useRef<BottomSheet>(null);
   const [selectedGuideId, setSelectedGuideId] = useState<'sms' | 'budgets' | 'gestures' | 'profiles'>('sms');
-  const CEDISMART_DOCS_URL = process.env.EXPO_PUBLIC_DOCS_URL || 'https://cedismart.com/docs.html';
+  const CEDISMART_DOCS_URL = process.env.EXPO_PUBLIC_DOCS_URL || 'https://cedismartweb.netlify.app/docs.html';
 
   const openWebDocs = useCallback(async (sectionHash?: string) => {
     Haptics.selectionAsync().catch(() => {});

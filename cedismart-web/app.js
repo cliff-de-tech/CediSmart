@@ -2,6 +2,26 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   
+  // 0. Theme Persistence & Toggle (Light / Dark)
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  const savedTheme = localStorage.getItem('cedismart_theme');
+  if (savedTheme === 'light') {
+    document.body.classList.add('light-theme');
+  }
+  const updateThemeIcon = () => {
+    if (!themeToggleBtn) return;
+    themeToggleBtn.textContent = document.body.classList.contains('light-theme') ? '🌙' : '☀️';
+  };
+  updateThemeIcon();
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+      document.body.classList.toggle('light-theme');
+      const isLight = document.body.classList.contains('light-theme');
+      localStorage.setItem('cedismart_theme', isLight ? 'light' : 'dark');
+      updateThemeIcon();
+    });
+  }
+
   // 1. Dynamic Copyright Year
   const yearElement = document.getElementById('current-year');
   if (yearElement) {

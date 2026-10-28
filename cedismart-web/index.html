@@ -31,18 +31,25 @@
         <li><a href="#features" class="nav-link" id="nav-features">Features</a></li>
         <li><a href="#how-it-works" class="nav-link" id="nav-how">How It Works</a></li>
         <li><a href="#showcase" class="nav-link" id="nav-showcase">Showcase</a></li>
+        <li><a href="docs.html" class="nav-link" id="nav-docs">User Guide</a></li>
         <li><a href="#pricing" class="nav-link" id="nav-pricing">Pricing</a></li>
         <li><a href="#download" class="nav-link" id="nav-download">Download</a></li>
         <li><a href="#faq" class="nav-link" id="nav-faq">FAQs</a></li>
-        <li class="mobile-only"><a href="app/index.html" class="btn-header" id="nav-mobile-cta" style="display: inline-block; width: 100%; text-align: center; margin-top: 20px;">Launch Web App</a></li>
+        <li class="mobile-only"><a href="docs.html" class="btn-secondary" style="display: inline-flex; width: 100%; justify-content: center; margin-top: 12px;">Read User Guide</a></li>
+        <li class="mobile-only"><a href="app/index.html" class="btn-header" id="nav-mobile-cta" style="display: inline-block; width: 100%; text-align: center; margin-top: 12px;">Launch Web App</a></li>
       </ul>
-      <a href="app/index.html" class="btn-header" id="nav-desktop-cta">Launch Web App</a>
-      <!-- Hamburger Toggle Button for Mobile -->
-      <button class="hamburger-menu" id="hamburger-btn" aria-label="Toggle Navigation Menu">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button id="theme-toggle-btn" class="theme-toggle-btn" title="Switch Light / Dark Appearance" aria-label="Toggle Theme">
+          ☀️
+        </button>
+        <a href="app/index.html" class="btn-header" id="nav-desktop-cta">Launch Web App</a>
+        <!-- Hamburger Toggle Button for Mobile -->
+        <button class="hamburger-menu" id="hamburger-btn" aria-label="Toggle Navigation Menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -123,43 +130,34 @@
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
             </svg>
           </div>
-          <h3>Gemini 2.5 Flash Parser</h3>
-          <p>Instantly extract transaction values, accounts, and dates from local Mobile Money alert messages to autofill your ledger without manual logging, powered by Google Gemini 2.5 Flash.</p>
+          <h3>MoMo & Bank SMS Auto-Sync</h3>
+          <p>Auto-detect MTN MoMo, Telecel Cash, AT Money & bank alerts via Android background sync or iOS Shortcuts webhooks, parsed by Gemini 2.5 Flash.</p>
         </div>
         <!-- Feature 2 -->
         <div class="feature-card reveal-on-scroll">
-          <div class="feature-icon-wrapper">
+          <div class="feature-icon-wrapper accent">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-              <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
             </svg>
           </div>
-          <h3>Multi-Account Switching</h3>
-          <p>Switch securely between different personal or business profiles on a single device, locked behind biometric Face ID/Fingerprint gates.</p>
+          <h3>Live Voice AI CFO & Liquid Orb</h3>
+          <p>Speak naturally hands-free ("Log 50 cedis for fuel on MoMo" or "What is my balance?") with real-time neural voice responses and Auto-Pilot mode.</p>
         </div>
         <!-- Feature 3 -->
         <div class="feature-card reveal-on-scroll">
           <div class="feature-icon-wrapper">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
             </svg>
           </div>
-          <h3>Privacy Shield Masking</h3>
-          <p>Hide sensitive assets dynamically with a single tap on the Dashboard, replacing all figures with masks so bystanders cannot peek at your net worth.</p>
+          <h3>English, Pidgin & Twi Engine</h3>
+          <p>Switch effortlessly between Standard Ghanaian English, warm Ghanaian Pidgin ("Charley, no wahala!"), and authentic Twi / Akan financial guidance.</p>
         </div>
         <!-- Feature 4 -->
-        <div class="feature-card reveal-on-scroll">
-          <div class="feature-icon-wrapper">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-              <polyline points="2 17 12 22 22 17"></polyline>
-              <polyline points="2 12 12 17 22 12"></polyline>
-            </svg>
-          </div>
-          <h3>Local Offline Queue</h3>
-          <p>Log transactions on-the-go without any internet connection. CediSmart stores them locally and automatically syncs them when you reconnect.</p>
-        </div>
-        <!-- Feature 5 -->
         <div class="feature-card reveal-on-scroll">
           <div class="feature-icon-wrapper accent">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -167,19 +165,30 @@
               <path d="M12 6v6l4 2"></path>
             </svg>
           </div>
-          <h3>Budget Alerts & Limits</h3>
-          <p>Set spending ceilings for categories like food, transport, or entertainment. Receive push notification warnings when you approach your threshold.</p>
+          <h3>Safe-to-Spend & 50/30/20 Budgets</h3>
+          <p>See your exact daily spending allowance on the Dashboard, generate 50/30/20 budgets with AI, and customize threshold alerts from 50% to 100%.</p>
+        </div>
+        <!-- Feature 5 -->
+        <div class="feature-card reveal-on-scroll">
+          <div class="feature-icon-wrapper">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+          </div>
+          <h3>Receipt Vision & PDF Statements</h3>
+          <p>Snap photos of paper receipts for 1-tap ledger logging, and export bank-grade branded PDF monthly statements or CSV audits anytime.</p>
         </div>
         <!-- Feature 6 -->
         <div class="feature-card reveal-on-scroll">
-          <div class="feature-icon-wrapper accent">
+          <div class="feature-icon-wrapper">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 20h9"></path>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
             </svg>
           </div>
-          <h3>Gemini Pidgin Chatbot</h3>
-          <p>Get localized transaction insights, budget suggestions, and financial advice from a friendly 24/7 assistant speaking a warm Ghanaian pidgin vibe powered by Gemini 2.5 Flash.</p>
+          <h3>Multi-Profile, Offline & KYC</h3>
+          <p>Switch between Personal and Business profiles with Face ID, log 100% offline with auto-sync, and verify Tier 1 identity with your Ghana Card.</p>
         </div>
       </div>
     </div>
@@ -655,6 +664,8 @@
         <div class="footer-col">
           <h4>Product</h4>
           <a href="#features" class="footer-link">Features</a>
+          <a href="docs.html" class="footer-link">User Guide (Docs)</a>
+          <a href="app/index.html" class="footer-link">Launch Web App</a>
           <a href="#pricing" class="footer-link">Pricing</a>
           <a href="#download" class="footer-link">Download</a>
           <a href="#faq" class="footer-link">FAQs</a>

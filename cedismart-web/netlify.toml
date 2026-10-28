@@ -1,0 +1,19 @@
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/api/v1/*"
+  to = "https://cedismart-api.onrender.com/api/v1/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/health"
+  to = "https://cedismart-api.onrender.com/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/docs"
+  to = "/docs.html"
+  status = 200

@@ -1,0 +1,3 @@
+/api/v1/*  https://cedismart-api.onrender.com/api/v1/:splat  200
+/health    https://cedismart-api.onrender.com/health         200
+/docs      /docs.html                                        200

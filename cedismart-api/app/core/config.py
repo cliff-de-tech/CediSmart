@@ -34,7 +34,11 @@ class Settings(BaseSettings):
     # --- Application ---
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8081"
+    ALLOWED_ORIGINS: str = (
+        "http://localhost:3000,http://localhost:8080,http://localhost:8081,"
+        "http://localhost:5173,http://127.0.0.1:8080,http://127.0.0.1:5173,"
+        "https://cedismartweb.netlify.app,https://cedismart.com,https://www.cedismart.com"
+    )
 
     # --- Smile ID ---
     SMILE_ID_PARTNER_ID: str = ""
@@ -69,8 +73,21 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        """Parse comma-separated ALLOWED_ORIGINS into a list."""
-        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        """Parse comma-separated ALLOWED_ORIGINS into a list and always include official web origins."""
+        configured = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        official = [
+            "https://cedismartweb.netlify.app",
+            "https://cedismart.com",
+            "https://www.cedismart.com",
+            "http://localhost:8080",
+            "http://localhost:5173",
+            "http://127.0.0.1:8080",
+            "http://127.0.0.1:5173",
+        ]
+        for origin in official:
+            if origin not in configured:
+                configured.append(origin)
+        return configured
 
 
 settings = Settings()

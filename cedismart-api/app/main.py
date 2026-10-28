@@ -94,6 +94,7 @@ def _add_middleware(app: FastAPI) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins_list,
+        allow_origin_regex=r"^https://([a-z0-9-]+--)?cedismartweb\.netlify\.app$",
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],

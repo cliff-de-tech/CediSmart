@@ -3,37 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CediSmart Web App — Financial Ledger & AI Parser</title>
-  <!-- Google Fonts -->
+  <title>CediSmart Web App — Sovereign Financial Ledger & AI CFO</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Stylesheet -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
-  <!-- Favicon placeholder (can fall back) -->
-  <link rel="icon" type="image/png" href="../assets/app_icon.jpg">
+  <link rel="icon" type="image/jpg" href="../assets/app_icon.jpg">
 </head>
 <body class="dark-mode">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
 
   <!-- ========================================== -->
   <!-- 1. AUTH CONTAINER (LOGIN) -->
   <!-- ========================================== -->
   <div id="auth-container" class="auth-wrapper">
     <div class="auth-card">
+      <div class="auth-top-actions">
+        <a href="../index.html" class="link-pill">← Website</a>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <a href="../docs.html" class="link-pill">📚 User Guide</a>
+          <button type="button" id="auth-theme-toggle" class="btn-icon-round" title="Switch Theme">☀️</button>
+        </div>
+      </div>
       <div class="auth-header">
         <img src="../assets/app_icon.jpg" alt="CediSmart Logo" class="auth-logo">
         <h2>Welcome back, Chale!</h2>
-        <p>Log in with your phone number and secure PIN to manage your ledger.</p>
+        <p>Sign in with your Ghanaian phone number and 6-digit security PIN to access your ledger.</p>
       </div>
       <form id="login-form">
         <div class="input-group">
           <label for="login-phone">Phone Number</label>
-          <input type="tel" id="login-phone" placeholder="e.g. +233241234567" required value="+233">
-          <span class="input-hint">Must start with country code, e.g. +233</span>
+          <input type="tel" id="login-phone" placeholder="e.g. +233241234567 or 0241234567" required value="+233">
+          <span class="input-hint">Accepts +233XXXXXXXXX or 0XXXXXXXXX</span>
         </div>
         <div class="input-group">
           <label for="login-pin">6-Digit PIN</label>
-          <input type="password" id="login-pin" maxlength="6" pattern="\d{6}" placeholder="••••••" required>
+          <input type="password" id="login-pin" inputmode="numeric" maxlength="6" pattern="\d{6}" placeholder="••••••" required>
         </div>
         <div id="login-error" class="error-banner hidden"></div>
         <button type="submit" id="login-submit-btn" class="btn btn-primary btn-block">
@@ -42,7 +49,11 @@
         </button>
       </form>
       <div class="auth-footer">
-        <p>New to CediSmart? Register and set up your profile via the mobile app. <br><a href="../index.html" class="link-back">Back to Home</a></p>
+        <p>New to CediSmart? Register your account on the mobile app first.</p>
+        <div style="display: flex; justify-content: center; gap: 16px; margin-top: 12px;">
+          <a href="../index.html#download" class="link-back">Download App</a>
+          <a href="../docs.html" class="link-back">How to Use CediSmart</a>
+        </div>
       </div>
     </div>
   </div>
@@ -51,42 +62,60 @@
   <!-- 2. MAIN APPLICATION CONTAINER -->
   <!-- ========================================== -->
   <div id="app-container" class="app-wrapper hidden">
+    <!-- Mobile Sidebar Backdrop -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
+
     <!-- Sidebar Navigation -->
-    <aside class="sidebar">
+    <aside id="app-sidebar" class="sidebar">
       <div class="sidebar-brand">
         <img src="../assets/app_icon.jpg" alt="CediSmart Logo" class="sidebar-logo">
         <div class="brand-details">
-          <span class="brand-name">CediSmart</span>
-          <span class="brand-version">v1.0 Web App</span>
+          <span class="brand-name">CediSmart <span style="color: var(--color-primary); font-size: 0.75rem;">PRO</span></span>
+          <span class="brand-version">v2.0 Sovereign Web</span>
         </div>
       </div>
 
       <nav class="sidebar-menu">
         <button class="nav-item active" data-view="dashboard">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"></rect><rect x="14" y="3" width="7" height="5" rx="1"></rect><rect x="14" y="12" width="7" height="9" rx="1"></rect><rect x="3" y="16" width="7" height="5" rx="1"></rect></svg>
           <span>Dashboard</span>
         </button>
         <button class="nav-item" data-view="accounts">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
           <span>Accounts</span>
         </button>
         <button class="nav-item" data-view="transactions">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
           <span>Transactions</span>
         </button>
+        <button class="nav-item" data-view="budgets">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+          <span>Smart Budgets</span>
+        </button>
         <button class="nav-item" data-view="parser">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M12 7v6M9 10h6"></path></svg>
-          <span>Gemini Parser</span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <span>AI CFO & SMS</span>
           <span class="badge badge-accent">AI</span>
         </button>
         <button class="nav-item" data-view="reports">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
           <span>Reports</span>
         </button>
+        <button class="nav-item" data-view="settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span>Settings & Guides</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-profile">
+        <a href="../docs.html" target="_blank" class="sidebar-guide-card">
+          <span>📚</span>
+          <div>
+            <strong>User Guide</strong>
+            <small>How to use CediSmart</small>
+          </div>
+        </a>
+        <div class="user-profile" id="sidebar-profile-trigger" title="Open Settings">
           <div class="user-avatar" id="user-avatar-initials">CS</div>
           <div class="user-details">
             <span class="user-name" id="profile-name">Cedi User</span>
@@ -105,13 +134,20 @@
       <!-- Top header bar -->
       <header class="app-header">
         <div class="header-left">
-          <h1 id="view-title">Dashboard</h1>
-          <p id="view-subtitle" class="text-secondary">Here's your real-time financial standing</p>
+          <button id="mobile-menu-btn" class="btn-icon mobile-menu-btn" aria-label="Open Navigation">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <div>
+            <h1 id="view-title">Dashboard</h1>
+            <p id="view-subtitle" class="text-secondary">Here's your real-time financial standing</p>
+          </div>
         </div>
         <div class="header-right">
-          <!-- Live Date Display -->
-          <div class="live-date" id="live-date-display">Saturday, July 25, 2026</div>
-          <!-- Quick Add Transaction -->
+          <div class="live-date" id="live-date-display"></div>
+          <button id="app-theme-toggle" class="btn-icon-round" title="Toggle Light / Dark Theme">☀️</button>
+          <button id="header-ai-btn" class="btn btn-secondary btn-sm" title="Open AI CFO">
+            <span>🎧 AI CFO</span>
+          </button>
           <button id="quick-add-btn" class="btn btn-primary btn-sm">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>Log Transaction</span>
@@ -123,19 +159,20 @@
       <div class="view-content">
 
         <!-- ========================================== -->
-        <!-- VIEW: DASHBOARD -->
+        <!-- VIEW 1: DASHBOARD -->
         <!-- ========================================== -->
         <section id="view-dashboard" class="view-section">
-          <!-- Metrics Cards Row -->
           <div class="metrics-grid">
             <div class="metric-card balance-primary">
               <div class="metric-header">
-                <span class="metric-label">Net Balance</span>
-                <span class="metric-icon">💰</span>
+                <span class="metric-label">Total Net Balance</span>
+                <button id="mask-balance-btn" class="btn-mask-pill" title="Toggle Privacy Shield">
+                  <span id="mask-balance-label">Hide</span>
+                </button>
               </div>
               <div class="metric-body">
                 <h3 class="metric-value" id="dash-net-balance">₵ 0.00</h3>
-                <span class="metric-trend text-muted">Aggregated cash flow</span>
+                <span class="metric-trend text-muted" id="dash-safe-to-spend">Safe-to-Spend Today: ₵ 0.00</span>
               </div>
             </div>
             <div class="metric-card">
@@ -145,7 +182,7 @@
               </div>
               <div class="metric-body">
                 <h3 class="metric-value" id="dash-momo-balance">₵ 0.00</h3>
-                <span class="metric-trend text-muted">MTN & Telecel accounts</span>
+                <span class="metric-trend text-muted">MTN, Telecel & AT Money</span>
               </div>
             </div>
             <div class="metric-card">
@@ -155,7 +192,7 @@
               </div>
               <div class="metric-body">
                 <h3 class="metric-value" id="dash-bank-balance">₵ 0.00</h3>
-                <span class="metric-trend text-muted">Traditional institutions</span>
+                <span class="metric-trend text-muted">Connected Ghanaian banks</span>
               </div>
             </div>
             <div class="metric-card">
@@ -175,7 +212,7 @@
             <div class="panel-card flex-double">
               <div class="card-header">
                 <h3>Recent Transactions</h3>
-                <button class="btn btn-text" id="dash-view-all-txns">View All</button>
+                <button class="btn btn-text" id="dash-view-all-txns">View All →</button>
               </div>
               <div class="card-body">
                 <div class="table-responsive">
@@ -203,7 +240,7 @@
             <div class="panel-card">
               <div class="card-header">
                 <h3>Monthly Budgets</h3>
-                <button class="btn btn-text" id="dash-view-all-budgets">Manage</button>
+                <button class="btn btn-text" id="dash-view-all-budgets">Manage →</button>
               </div>
               <div class="card-body" id="dash-budgets-list">
                 <div class="text-center text-muted py-4">Loading active budgets...</div>
@@ -213,23 +250,21 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- VIEW: ACCOUNTS -->
+        <!-- VIEW 2: ACCOUNTS -->
         <!-- ========================================== -->
         <section id="view-accounts" class="view-section hidden">
           <div class="view-actions-bar">
-            <h3>Registered Financial Accounts</h3>
+            <h3>Tracked Wallets & Bank Accounts</h3>
             <button id="add-account-btn" class="btn btn-primary btn-sm">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               <span>Add Account</span>
             </button>
           </div>
-          <div class="accounts-grid" id="accounts-list-container">
-            <!-- Rendered Dynamically -->
-          </div>
+          <div class="accounts-grid" id="accounts-list-container"></div>
         </section>
 
         <!-- ========================================== -->
-        <!-- VIEW: TRANSACTIONS -->
+        <!-- VIEW 3: TRANSACTIONS -->
         <!-- ========================================== -->
         <section id="view-transactions" class="view-section hidden">
           <div class="view-actions-bar">
@@ -244,10 +279,15 @@
                 <option value="expense">Expense</option>
               </select>
             </div>
-            <button id="add-txn-btn" class="btn btn-primary btn-sm">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              <span>Log Transaction</span>
-            </button>
+            <div style="display: flex; gap: 10px;">
+              <button id="export-csv-btn" class="btn btn-secondary btn-sm">
+                <span>📥 Export CSV</span>
+              </button>
+              <button id="add-txn-btn" class="btn btn-primary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Log Transaction</span>
+              </button>
+            </div>
           </div>
           <div class="panel-card">
             <div class="card-body">
@@ -260,16 +300,13 @@
                       <th>Category</th>
                       <th>Account</th>
                       <th>Type</th>
-                      <th class="text-right">Amount (GHS)</th>
+                      <th class="text-right">Amount (GH₵)</th>
                       <th class="text-center">Actions</th>
                     </tr>
                   </thead>
-                  <tbody id="txns-list-body">
-                    <!-- Rendered Dynamically -->
-                  </tbody>
+                  <tbody id="txns-list-body"></tbody>
                 </table>
               </div>
-              <!-- Pagination controls -->
               <div class="pagination-footer">
                 <span class="pagination-info" id="pagination-text">Showing 0-0 of 0</span>
                 <div class="pagination-btns">
@@ -282,38 +319,147 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- VIEW: GEMINI PARSER -->
+        <!-- VIEW 4: SMART BUDGETS & 50/30/20 GENERATOR -->
         <!-- ========================================== -->
-        <section id="view-parser" class="view-section hidden">
-          <div class="parser-layout">
-            <!-- Input Card -->
+        <section id="view-budgets" class="view-section hidden">
+          <!-- Safe-to-Spend & Summary Row -->
+          <div class="metrics-grid">
+            <div class="metric-card balance-primary">
+              <div class="metric-header">
+                <span class="metric-label">Safe-to-Spend Today</span>
+                <span class="metric-icon">🎯</span>
+              </div>
+              <div class="metric-body">
+                <h3 class="metric-value" id="budgets-safe-daily">₵ 0.00</h3>
+                <span class="metric-trend text-muted" id="budgets-days-left">Remaining daily allowance</span>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Total Monthly Budget</span>
+                <span class="metric-icon">📊</span>
+              </div>
+              <div class="metric-body">
+                <h3 class="metric-value" id="budgets-total-limit">₵ 0.00</h3>
+                <span class="metric-trend text-muted">Combined category ceilings</span>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Spent So Far</span>
+                <span class="metric-icon">💸</span>
+              </div>
+              <div class="metric-body">
+                <h3 class="metric-value" id="budgets-total-spent">₵ 0.00</h3>
+                <span class="metric-trend text-muted" id="budgets-overall-pct">0% of total budget used</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dashboard-details-grid">
+            <!-- Active Category Budgets List -->
+            <div class="panel-card flex-double">
+              <div class="card-header">
+                <h3>Active Category Budgets</h3>
+                <button id="open-budget-modal-btn" class="btn btn-primary btn-sm">+ Set Category Limit</button>
+              </div>
+              <div class="card-body" id="budgets-full-list"></div>
+            </div>
+
+            <!-- 50/30/20 Smart AI Budget Generator -->
             <div class="panel-card">
               <div class="card-header">
-                <h3>Paste SMS Transaction Notification</h3>
+                <h3>✨ 50/30/20 Smart Generator</h3>
+                <span class="badge badge-accent">AI Rule</span>
               </div>
               <div class="card-body">
-                <p class="text-secondary mb-4">Paste any transaction SMS alert from MTN Mobile Money, Telecel Cash, or local banks. Google's Gemini 2.5 Flash will parse the structured fields automatically.</p>
-                
+                <p class="text-secondary mb-4" style="font-size: 0.875rem; line-height: 1.55;">
+                  Enter your monthly take-home income in GH₵ and CediSmart will automatically allocate <strong>50% Needs</strong>, <strong>30% Wants</strong>, and <strong>20% Savings</strong> across your expense categories.
+                </p>
                 <div class="input-group">
-                  <textarea id="parser-sms-input" rows="8" placeholder="e.g., Payment received of GHS 150.00 from John Doe. Or Trans.ID: 289472390. You have sent GHS 50.00 to Telecel Cash Bundle."></textarea>
+                  <label for="generator-income-input">Monthly Income (GH₵)</label>
+                  <input type="number" id="generator-income-input" min="100" step="50" placeholder="e.g. 5000">
                 </div>
-                
-                <button id="parser-submit-btn" class="btn btn-accent btn-block">
-                  <span>✨ Parse with Gemini 2.5 Flash</span>
+                <button id="generate-503020-btn" class="btn btn-accent btn-block">
+                  <span class="btn-text">⚡ Generate 50/30/20 Budgets</span>
                   <div class="spinner hidden"></div>
                 </button>
               </div>
             </div>
+          </div>
+        </section>
 
-            <!-- Preview Card -->
-            <div class="panel-card" id="parser-preview-card">
-              <div class="card-header">
-                <h3>Extracted AI Ledger Records</h3>
+        <!-- ========================================== -->
+        <!-- VIEW 5: AI CFO CHAT & GEMINI SMS PARSER -->
+        <!-- ========================================== -->
+        <section id="view-parser" class="view-section hidden">
+          <div class="parser-layout">
+            <!-- Left: CediSmart AI CFO Assistant -->
+            <div class="panel-card ai-chat-panel">
+              <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <h3>🎧 CediSmart AI CFO</h3>
+                  <span class="badge badge-accent">Gemini 2.5</span>
+                </div>
+                <div class="ai-lang-pills" id="ai-lang-selector">
+                  <button type="button" class="lang-pill active" data-lang="english">🇬🇭 English</button>
+                  <button type="button" class="lang-pill" data-lang="pidgin">💬 Pidgin</button>
+                  <button type="button" class="lang-pill" data-lang="twi">🇬🇭 Twi</button>
+                </div>
               </div>
-              <div class="card-body" id="parser-preview-body">
-                <div class="empty-state">
-                  <span class="empty-icon">🤖</span>
-                  <p>Extracted variables will be displayed here in real time once you click Parse.</p>
+              <div class="ai-controls-strip">
+                <label class="ai-toggle-chip">
+                  <input type="checkbox" id="ai-autopilot-toggle">
+                  <span>⚡ Auto-Pilot</span>
+                </label>
+                <label class="ai-toggle-chip">
+                  <input type="checkbox" id="ai-deepaudit-toggle">
+                  <span>🧠 Deep Audit</span>
+                </label>
+                <label class="ai-toggle-chip">
+                  <input type="checkbox" id="ai-autospeak-toggle">
+                  <span>🔊 Speak Replies</span>
+                </label>
+              </div>
+              <div class="ai-messages-box" id="ai-messages-box">
+                <div class="ai-msg assistant">
+                  <div class="ai-msg-bubble">
+                    Akwaaba! I'm your CediSmart AI CFO. Ask me about your balances, budgets, or paste a MoMo SMS / receipt image to log transactions.
+                  </div>
+                </div>
+              </div>
+              <form id="ai-chat-form" class="ai-chat-input-bar">
+                <label class="btn-icon" title="Attach Receipt Photo" style="cursor: pointer;">
+                  📷
+                  <input type="file" id="ai-receipt-input" accept="image/*" class="hidden">
+                </label>
+                <input type="text" id="ai-chat-input" placeholder="Ask about your budget, or say 'Log 50 cedis for fuel'..." required>
+                <button type="submit" id="ai-send-btn" class="btn btn-primary btn-sm">Send</button>
+              </form>
+            </div>
+
+            <!-- Right: Instant MoMo & Bank SMS Parser -->
+            <div class="panel-card">
+              <div class="card-header">
+                <h3>✨ Instant MoMo & Bank SMS Parser</h3>
+                <button type="button" id="fill-sample-sms-btn" class="btn btn-text">Try Sample SMS</button>
+              </div>
+              <div class="card-body">
+                <p class="text-secondary mb-4" style="font-size: 0.875rem;">
+                  Paste any transaction SMS alert from MTN MoMo, Telecel Cash, AT Money, or Ghanaian banks to extract structured ledger fields automatically.
+                </p>
+                <div class="input-group">
+                  <textarea id="parser-sms-input" rows="5" placeholder="e.g., Payment received for GHS 250.00 from Kwame Mensah. Current Balance: GHS 1,450.00. Transaction ID: 294810294."></textarea>
+                </div>
+                <button id="parser-submit-btn" class="btn btn-accent btn-block mb-4">
+                  <span class="btn-text">✨ Parse SMS with Gemini AI</span>
+                  <div class="spinner hidden"></div>
+                </button>
+                <div id="parser-preview-body">
+                  <div class="empty-state" style="padding: 28px 16px;">
+                    <span class="empty-icon">🤖</span>
+                    <p>Extracted transaction fields will appear here ready for 1-click saving.</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -321,44 +467,157 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- VIEW: REPORTS -->
+        <!-- VIEW 6: REPORTS & TRENDS -->
         <!-- ========================================== -->
         <section id="view-reports" class="view-section hidden">
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Monthly Income</span>
+                <span class="metric-icon">📈</span>
+              </div>
+              <div class="metric-body">
+                <h3 class="metric-value text-income" id="report-total-income">₵ 0.00</h3>
+                <span class="metric-trend text-muted">Current month inflows</span>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Monthly Expenses</span>
+                <span class="metric-icon">📉</span>
+              </div>
+              <div class="metric-body">
+                <h3 class="metric-value text-expense" id="report-total-expense">₵ 0.00</h3>
+                <span class="metric-trend text-muted">Current month outflows</span>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-header">
+                <span class="metric-label">Net Savings</span>
+                <span class="metric-icon">🏦</span>
+              </div>
+              <div class="metric-body">
+                <h3 class="metric-value" id="report-net-savings">₵ 0.00</h3>
+                <span class="metric-trend text-muted" id="report-savings-rate">Savings Rate: 0%</span>
+              </div>
+            </div>
+          </div>
+
           <div class="reports-grid">
-            <!-- Category spend report -->
+            <!-- Category Expenditure Breakdown -->
             <div class="panel-card flex-double">
               <div class="card-header">
-                <h3>Categorized Expenditure Breakdown</h3>
+                <h3>Category Expenditure Breakdown</h3>
                 <span class="badge">Current Month</span>
               </div>
               <div class="card-body">
-                <div class="category-breakdown-list" id="report-categories-container">
-                  <!-- Rendered Dynamically -->
+                <div class="category-breakdown-list" id="report-categories-container"></div>
+              </div>
+            </div>
+
+            <!-- 6-Month Cash Flow Trend -->
+            <div class="panel-card">
+              <div class="card-header">
+                <h3>6-Month Cash Flow Trend</h3>
+              </div>
+              <div class="card-body" id="report-trends-container"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- VIEW 7: SETTINGS, APPEARANCE & GUIDES -->
+        <!-- ========================================== -->
+        <section id="view-settings" class="view-section hidden">
+          <div class="dashboard-details-grid">
+            <!-- Profile & Appearance -->
+            <div class="panel-card">
+              <div class="card-header">
+                <h3>Profile & Appearance</h3>
+              </div>
+              <div class="card-body">
+                <form id="profile-update-form">
+                  <div class="input-group">
+                    <label for="settings-fullname">Full Name</label>
+                    <input type="text" id="settings-fullname" placeholder="Your Full Name">
+                  </div>
+                  <div class="input-group">
+                    <label for="settings-email">Email Address</label>
+                    <input type="email" id="settings-email" placeholder="you@example.com">
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-block mb-4">Save Profile Changes</button>
+                </form>
+
+                <div class="divider" style="margin: 20px 0;"></div>
+                <h4 style="margin-bottom: 12px; font-size: 0.9rem; color: var(--text-secondary); text-transform: uppercase;">Appearance</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <button type="button" id="theme-btn-light" class="btn btn-secondary">☀️ Light Theme</button>
+                  <button type="button" id="theme-btn-dark" class="btn btn-secondary">🌙 Dark Theme</button>
                 </div>
               </div>
             </div>
 
-            <!-- Summary report -->
-            <div class="panel-card">
+            <!-- Guides & Support -->
+            <div class="panel-card flex-double">
               <div class="card-header">
-                <h3>Monthly Totals</h3>
+                <h3>Guides & Documentation</h3>
+                <a href="../docs.html" target="_blank" class="btn btn-text">Open Full User Guide ↗</a>
               </div>
               <div class="card-body">
-                <div class="report-summary-box">
-                  <div class="summary-row">
-                    <span class="label">Total Income:</span>
-                    <span class="value text-income" id="report-total-income">₵ 0.00</span>
-                  </div>
-                  <div class="summary-row">
-                    <span class="label">Total Expense:</span>
-                    <span class="value text-expense" id="report-total-expense">₵ 0.00</span>
-                  </div>
-                  <div class="divider"></div>
-                  <div class="summary-row large">
-                    <span class="label">Net Savings:</span>
-                    <span class="value" id="report-net-savings">₵ 0.00</span>
-                  </div>
+                <div class="guides-settings-grid">
+                  <a href="../docs.html#sms-auto-sync" target="_blank" class="guide-setting-card">
+                    <span class="guide-card-icon">✨</span>
+                    <div>
+                      <h4>SMS Auto-Sync</h4>
+                      <p>Auto-log MoMo & bank alerts</p>
+                    </div>
+                  </a>
+                  <a href="../docs.html#budgets" target="_blank" class="guide-setting-card">
+                    <span class="guide-card-icon">📊</span>
+                    <div>
+                      <h4>Smart Budgets</h4>
+                      <p>Daily limits & 50/30/20 rule</p>
+                    </div>
+                  </a>
+                  <a href="../docs.html#voice-ai" target="_blank" class="guide-setting-card">
+                    <span class="guide-card-icon">🎙️</span>
+                    <div>
+                      <h4>Voice & Gestures</h4>
+                      <p>Swipe actions & voice commands</p>
+                    </div>
+                  </a>
+                  <a href="../docs.html#profiles" target="_blank" class="guide-setting-card">
+                    <span class="guide-card-icon">👥</span>
+                    <div>
+                      <h4>Multi-Profile</h4>
+                      <p>Switch accounts & KYC limits</p>
+                    </div>
+                  </a>
                 </div>
+
+                <div class="divider" style="margin: 24px 0;"></div>
+                <h4 style="margin-bottom: 12px; font-size: 0.95rem;">Submit Feedback or Report a Bug</h4>
+                <form id="web-feedback-form">
+                  <div class="form-row">
+                    <div class="input-group">
+                      <label for="feedback-kind">Submission Type</label>
+                      <select id="feedback-kind">
+                        <option value="feature_request">Feature Request</option>
+                        <option value="suggestion">Suggestion</option>
+                        <option value="bug">Report a Bug</option>
+                      </select>
+                    </div>
+                    <div class="input-group">
+                      <label for="feedback-title">Short Summary</label>
+                      <input type="text" id="feedback-title" placeholder="e.g. Export filter by wallet" required>
+                    </div>
+                  </div>
+                  <div class="input-group">
+                    <label for="feedback-desc">Details</label>
+                    <textarea id="feedback-desc" rows="3" placeholder="Tell us how we can improve CediSmart..." required></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-secondary">Submit to CediSmart Team</button>
+                </form>
               </div>
             </div>
           </div>
@@ -371,7 +630,7 @@
   <!-- ========================================== -->
   <!-- 3. MODAL: ADD TRANSACTION -->
   <!-- ========================================== -->
-  <div id="txn-modal" class="modal-wrapper hidden">
+  <div id="txn-modal" class="modal-wrapper">
     <div class="modal-card">
       <div class="modal-header">
         <h3 id="modal-title">Log Transaction</h3>
@@ -387,28 +646,24 @@
             </select>
           </div>
           <div class="input-group">
-            <label for="txn-amount">Amount (GHS)</label>
+            <label for="txn-amount">Amount (GH₵)</label>
             <input type="number" id="txn-amount" step="0.01" min="0.01" placeholder="0.00" required>
           </div>
         </div>
 
         <div class="input-group">
           <label for="txn-desc">Description</label>
-          <input type="text" id="txn-desc" placeholder="e.g. Trotro fare, Lunch, MTN airtime" required>
+          <input type="text" id="txn-desc" placeholder="e.g. Trotro fare, Waakye lunch, MTN airtime" required>
         </div>
 
         <div class="form-row">
           <div class="input-group">
             <label for="txn-account">Account</label>
-            <select id="txn-account" required>
-              <!-- Populated dynamically -->
-            </select>
+            <select id="txn-account" required></select>
           </div>
           <div class="input-group">
             <label for="txn-category">Category</label>
-            <select id="txn-category" required>
-              <!-- Populated dynamically -->
-            </select>
+            <select id="txn-category" required></select>
           </div>
         </div>
 
@@ -421,9 +676,7 @@
 
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
-          <button type="submit" class="btn btn-primary">
-            <span>Save Transaction</span>
-          </button>
+          <button type="submit" class="btn btn-primary">Save Transaction</button>
         </div>
       </form>
     </div>
@@ -432,7 +685,7 @@
   <!-- ========================================== -->
   <!-- 4. MODAL: ADD ACCOUNT -->
   <!-- ========================================== -->
-  <div id="account-modal" class="modal-wrapper hidden">
+  <div id="account-modal" class="modal-wrapper">
     <div class="modal-card">
       <div class="modal-header">
         <h3>Create Account</h3>
@@ -441,7 +694,7 @@
       <form id="account-form">
         <div class="input-group">
           <label for="account-name">Account Name</label>
-          <input type="text" id="account-name" placeholder="e.g. Primary Wallet, Ecobank Savings" required>
+          <input type="text" id="account-name" placeholder="e.g. MTN MoMo Wallet, Ecobank Savings" required>
         </div>
         <div class="form-row">
           <div class="input-group">
@@ -453,7 +706,7 @@
             </select>
           </div>
           <div class="input-group">
-            <label for="account-balance">Opening Balance (GHS)</label>
+            <label for="account-balance">Opening Balance (GH₵)</label>
             <input type="number" id="account-balance" step="0.01" min="0" placeholder="0.00" value="0.00">
           </div>
         </div>
@@ -462,15 +715,39 @@
 
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="account-modal-cancel-btn">Cancel</button>
-          <button type="submit" class="btn btn-primary">
-            <span>Add Account</span>
-          </button>
+          <button type="submit" class="btn btn-primary">Add Account</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- App Main JavaScript Logic -->
+  <!-- ========================================== -->
+  <!-- 5. MODAL: SET MONTHLY BUDGET -->
+  <!-- ========================================== -->
+  <div id="budget-modal" class="modal-wrapper">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Set Monthly Category Budget</h3>
+        <button class="btn-close" id="budget-modal-close-btn">&times;</button>
+      </div>
+      <form id="budget-form">
+        <div class="input-group">
+          <label for="budget-category">Expense Category</label>
+          <select id="budget-category" required></select>
+        </div>
+        <div class="input-group">
+          <label for="budget-limit">Monthly Limit (GH₵)</label>
+          <input type="number" id="budget-limit" step="1" min="1" placeholder="e.g. 800" required>
+        </div>
+        <div id="budget-error" class="error-banner hidden"></div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="budget-modal-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Budget Limit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
