@@ -74,7 +74,9 @@ class Settings(BaseSettings):
     @property
     def allowed_origins_list(self) -> list[str]:
         """Parse comma-separated ALLOWED_ORIGINS into a list and always include official web origins."""
-        configured = [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+        configured = [
+            origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()
+        ]
         official = [
             "https://cedismartweb.netlify.app",
             "https://cedismart.com",
