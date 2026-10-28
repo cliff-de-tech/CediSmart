@@ -3,7 +3,7 @@ import { GlassSheetBackground } from '../../components/glass/GlassSheetBackgroun
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
-import { View, Text, TouchableOpacity, ScrollView, Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Switch, Alert, TextInput, KeyboardAvoidingView, Platform, Modal, Image, ActivityIndicator, Dimensions, StyleSheet, Keyboard, TouchableWithoutFeedback } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,7 +22,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
@@ -335,18 +335,21 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [budgetThreshold, setBudgetThreshold] = useState(0.8);
 
   // Bug reporting states
+  const bugSheetRef = useRef<BottomSheet>(null);
+  const bugTitleInputRef = useRef<any>(null);
+  const bugDescInputRef = useRef<any>(null);
   const [bugTitle, setBugTitle] = useState('');
   const [bugDescription, setBugDescription] = useState('');
   const [isSubmittingBug, setIsSubmittingBug] = useState(false);
-  const [isBugModalVisible, setIsBugModalVisible] = useState(false);
   const [isSupportModalVisible, setIsSupportModalVisible] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
 
   // Feedback states
+  const feedbackSheetRef = useRef<BottomSheet>(null);
+  const feedbackDescInputRef = useRef<any>(null);
   const [feedbackType, setFeedbackType] = useState('feature_request'); // 'feature_request', 'suggestion', 'other'
   const [feedbackDescription, setFeedbackDescription] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-  const [isFeedbackModalVisible, setIsFeedbackModalVisible] = useState(false);
 
 
   const queryClient = useQueryClient();
@@ -1182,7 +1185,8 @@ const SettingsScreen = ({ navigation, route }: any) => {
       });
 
       setIsSubmittingBug(false);
-      setIsBugModalVisible(false);
+      Keyboard.dismiss();
+      bugSheetRef.current?.close();
       setBugTitle('');
       setBugDescription('');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -1234,7 +1238,8 @@ const SettingsScreen = ({ navigation, route }: any) => {
       });
 
       setIsSubmittingFeedback(false);
-      setIsFeedbackModalVisible(false);
+      Keyboard.dismiss();
+      feedbackSheetRef.current?.close();
       setFeedbackDescription('');
       setFeedbackType('feature_request');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -2244,7 +2249,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 icon={Bug} 
                 title="Report a Bug" 
                 value="Submit issues to developers" 
-                onPress={() => setIsBugModalVisible(true)}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  bugSheetRef.current?.snapToIndex(0);
+                }}
               />
               <SettingItem 
                 icon={Headphones} 
@@ -2257,7 +2265,10 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 icon={MessageSquare} 
                 title="Share Feedback" 
                 value="Suggest features or send reviews" 
-                onPress={() => setIsFeedbackModalVisible(true)}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => {});
+                  feedbackSheetRef.current?.snapToIndex(0);
+                }}
                 isLast
               />
             </SettingsGroup>
@@ -2322,230 +2333,415 @@ const SettingsScreen = ({ navigation, route }: any) => {
         </Animated.ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Report Bug Modal */}
-      <Modal
-        visible={isBugModalVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setIsBugModalVisible(false)}
+      {/* Report a Bug Bottom Sheet */}
+      <BottomSheet
+        ref={bugSheetRef}
+        index={-1}
+        snapPoints={['72%', '92%']}
+        backdropComponent={renderBackdrop}
+        enablePanDownToClose
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
+        backgroundComponent={GlassSheetBackground}
+        onClose={() => Keyboard.dismiss()}
       >
-        <View className="flex-1 bg-black/65">
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            className="flex-1 justify-center"
-          >
-            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20 }}>
-              <GlassSurface variant="thick" elevated radius={28} style={{ padding: 24, width: '100%' }}>
-                {/* Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, width: '100%' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 12 }}>
-                    <View style={{ flexShrink: 0 }} className={`w-10 h-10 rounded-full ${isDark ? 'bg-red-500/20' : 'bg-red-50'} items-center justify-center mr-3`}>
-                      <Bug size={20} color="#EF4444" />
-                    </View>
-                    <Text
-                      style={{ flex: 1, flexShrink: 1 }}
-                      className={`text-xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
-                    >
-                      Report a Bug
-                    </Text>
-                  </View>
-                  <TouchableOpacity 
-                    onPress={() => setIsBugModalVisible(false)}
-                    style={{ flexShrink: 0, marginLeft: 8 }}
-                    className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+        <BottomSheetScrollView
+          contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View className="px-6 py-4">
+              {/* Sheet Header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 12 }}>
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.18)' : 'rgba(239, 68, 68, 0.10)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: 12,
+                    }}
                   >
-                    <X size={18} color={isDark ? '#e1e3e0' : '#4B5563'} />
-                  </TouchableOpacity>
+                    <Bug size={19} color="#EF4444" />
+                  </View>
+                  <Text
+                    style={{
+                      color: isDark ? '#ffffff' : '#111827',
+                      fontSize: 20,
+                      fontWeight: '700',
+                      letterSpacing: -0.3,
+                    }}
+                    numberOfLines={1}
+                  >
+                    Report a Bug
+                  </Text>
                 </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    bugSheetRef.current?.close();
+                  }}
+                >
+                  <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-base`}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
 
-                {/* Subtitle */}
-                <Text className={`text-sm mb-6 leading-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                  Help us improve CediSmart. Describe the issue in detail, and our support team will instantly track, escalate, and resolve it to keep your experience flawless.
-                </Text>
+              {/* Subtitle */}
+              <Text
+                style={{
+                  color: isDark ? '#98989F' : '#6B7280',
+                  fontSize: 13.5,
+                  lineHeight: 19,
+                  marginBottom: 20,
+                }}
+              >
+                Help us improve CediSmart. Describe what happened and our engineering team will track and resolve it right away.
+              </Text>
 
-                {/* Bug Title */}
-                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Bug Title</Text>
-                <TextInput
+              {/* Bug Title Field */}
+              <Text
+                style={{
+                  color: isDark ? '#8E8E93' : '#6B7280',
+                  fontSize: 11,
+                  fontWeight: '700',
+                  letterSpacing: 0.8,
+                  textTransform: 'uppercase',
+                  marginBottom: 7,
+                  marginLeft: 4,
+                }}
+              >
+                Issue Summary
+              </Text>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => bugTitleInputRef.current?.focus()}
+                style={{
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(164, 243, 185, 0.15)' : 'rgba(0, 0, 0, 0.08)',
+                  backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : '#ffffff',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  marginBottom: 18,
+                }}
+              >
+                <BottomSheetTextInput
+                  ref={bugTitleInputRef}
                   value={bugTitle}
                   onChangeText={setBugTitle}
-                  placeholder="e.g. App crashes on PIN creation"
-                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
-                  className={`w-full p-4 mb-4 rounded-2xl border ${isDark ? 'bg-black/25 border-white/15 text-white' : 'bg-white/70 border-black/10 text-charcoal'} font-medium`}
+                  placeholder="e.g. App freezes when exporting statement"
+                  placeholderTextColor={isDark ? '#636366' : '#9CA3AF'}
+                  returnKeyType="next"
+                  onSubmitEditing={() => bugDescInputRef.current?.focus()}
+                  selectionColor={isDark ? '#4ade80' : '#0d631b'}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 15.5,
+                    fontWeight: '500',
+                    paddingVertical: 0,
+                  }}
                 />
+              </TouchableOpacity>
 
-                {/* Bug Description */}
-                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Description</Text>
-                <TextInput
+              {/* Bug Description Field */}
+              <Text
+                style={{
+                  color: isDark ? '#8E8E93' : '#6B7280',
+                  fontSize: 11,
+                  fontWeight: '700',
+                  letterSpacing: 0.8,
+                  textTransform: 'uppercase',
+                  marginBottom: 7,
+                  marginLeft: 4,
+                }}
+              >
+                Details & Steps to Reproduce
+              </Text>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => bugDescInputRef.current?.focus()}
+                style={{
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(164, 243, 185, 0.15)' : 'rgba(0, 0, 0, 0.08)',
+                  backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : '#ffffff',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  minHeight: 132,
+                  marginBottom: 22,
+                }}
+              >
+                <BottomSheetTextInput
+                  ref={bugDescInputRef}
                   value={bugDescription}
                   onChangeText={setBugDescription}
-                  placeholder="Please describe what happened, steps to reproduce, and any error message you saw..."
-                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+                  placeholder="Describe what happened, the steps you took, and any error message you saw..."
+                  placeholderTextColor={isDark ? '#636366' : '#9CA3AF'}
                   multiline
-                  numberOfLines={6}
                   textAlignVertical="top"
-                  className={`w-full p-4 mb-6 rounded-2xl border h-36 ${isDark ? 'bg-black/25 border-white/15 text-white' : 'bg-white/70 border-black/10 text-charcoal'} font-medium`}
+                  selectionColor={isDark ? '#4ade80' : '#0d631b'}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    minHeight: 104,
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 15,
+                    lineHeight: 21,
+                    paddingVertical: 0,
+                  }}
                 />
+              </TouchableOpacity>
 
-                {/* Submit Button */}
-                <TouchableOpacity
-                  onPress={handleReportBug}
-                  disabled={isSubmittingBug}
-                  className={`w-full py-4 rounded-2xl flex-row justify-center items-center ${isSubmittingBug ? 'bg-gray-400' : 'bg-primary'}`}
-                >
-                  {isSubmittingBug ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <>
-                      <Text className="text-white font-bold text-base mr-2">Submit Bug Report</Text>
-                      <Check size={18} color="white" />
-                    </>
-                  )}
-                </TouchableOpacity>
-              </GlassSurface>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+              {/* Submit Button */}
+              <TouchableOpacity
+                onPress={handleReportBug}
+                disabled={isSubmittingBug}
+                activeOpacity={0.85}
+                className={`w-full py-4 rounded-2xl flex-row justify-center items-center shadow-lg ${
+                  isSubmittingBug ? 'bg-gray-400' : 'bg-primary shadow-primary/25'
+                }`}
+              >
+                {isSubmittingBug ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Text className="text-white font-bold text-base mr-2">Submit Bug Report</Text>
+                    <Check size={18} color="white" />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </BottomSheetScrollView>
+      </BottomSheet>
 
-      {/* Share Feedback Modal */}
-      <Modal
-        visible={isFeedbackModalVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setIsFeedbackModalVisible(false)}
+      {/* Share Feedback Bottom Sheet */}
+      <BottomSheet
+        ref={feedbackSheetRef}
+        index={-1}
+        snapPoints={['72%', '92%']}
+        backdropComponent={renderBackdrop}
+        enablePanDownToClose
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
+        backgroundComponent={GlassSheetBackground}
+        onClose={() => Keyboard.dismiss()}
       >
-        <View className="flex-1 bg-black/65">
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            className="flex-1 justify-center"
-          >
-            <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 20 }}>
-              <GlassSurface variant="thick" elevated radius={28} style={{ padding: 24, width: '100%' }}>
-                {/* Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, width: '100%' }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 12 }}>
-                    <View style={{ flexShrink: 0 }} className={`w-10 h-10 rounded-full ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-50'} items-center justify-center mr-3`}>
-                      <MessageSquare size={20} color={isDark ? '#4ade80' : '#0D631B'} />
-                    </View>
-                    <Text
-                      style={{ flex: 1, flexShrink: 1 }}
-                      className={`text-xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'}`}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
-                    >
-                      Share Feedback
-                    </Text>
+        <BottomSheetScrollView
+          contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <View className="px-6 py-4">
+              {/* Sheet Header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 12 }}>
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: isDark ? 'rgba(74, 222, 128, 0.16)' : 'rgba(13, 99, 27, 0.10)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: 12,
+                    }}
+                  >
+                    <MessageSquare size={19} color={isDark ? '#4ade80' : '#0D631B'} />
                   </View>
-                  <TouchableOpacity 
-                    onPress={() => setIsFeedbackModalVisible(false)}
-                    style={{ flexShrink: 0, marginLeft: 8 }}
-                    className={`w-9 h-9 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/5'} items-center justify-center`}
+                  <Text
+                    style={{
+                      color: isDark ? '#ffffff' : '#111827',
+                      fontSize: 20,
+                      fontWeight: '700',
+                      letterSpacing: -0.3,
+                    }}
+                    numberOfLines={1}
                   >
-                    <X size={18} color={isDark ? '#e1e3e0' : '#4B5563'} />
-                  </TouchableOpacity>
+                    Share Feedback
+                  </Text>
                 </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    feedbackSheetRef.current?.close();
+                  }}
+                >
+                  <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-base`}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
 
-                {/* Subtitle */}
-                <Text className={`text-sm mb-6 leading-5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
-                  Chale, help us shape CediSmart! Got a feature request, a suggestion, or a review? Send it directly to our Discord server.
-                </Text>
+              {/* Subtitle */}
+              <Text
+                style={{
+                  color: isDark ? '#98989F' : '#6B7280',
+                  fontSize: 13.5,
+                  lineHeight: 19,
+                  marginBottom: 20,
+                }}
+              >
+                Help us shape CediSmart! Share a feature request, suggestion, or review directly with our product team.
+              </Text>
 
-                {/* Category Picker — Single-line labels that never hyphenate or break mid-word */}
-                <Text className={`text-xs font-bold uppercase tracking-wider mb-2.5 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Feedback Category</Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 22 }}>
-                  <TouchableOpacity
-                    onPress={() => setFeedbackType('feature_request')}
-                    style={{ flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 6 }}
-                    className={`rounded-2xl items-center justify-center border ${
-                      feedbackType === 'feature_request'
-                        ? 'bg-primary border-primary'
-                        : isDark ? 'bg-black/25 border-white/15' : 'bg-white/70 border-black/10'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-bold text-center ${feedbackType === 'feature_request' ? 'text-white' : (isDark ? 'text-gray-200' : 'text-charcoal')}`}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
+              {/* Apple-Style Segmented Control for Feedback Category */}
+              <Text
+                style={{
+                  color: isDark ? '#8E8E93' : '#6B7280',
+                  fontSize: 11,
+                  fontWeight: '700',
+                  letterSpacing: 0.8,
+                  textTransform: 'uppercase',
+                  marginBottom: 8,
+                  marginLeft: 4,
+                }}
+              >
+                Category
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  borderRadius: 13,
+                  padding: 3,
+                  backgroundColor: isDark ? 'rgba(118, 118, 128, 0.24)' : 'rgba(118, 118, 128, 0.12)',
+                  marginBottom: 20,
+                }}
+              >
+                {[
+                  { key: 'feature_request', label: '🚀 Feature' },
+                  { key: 'suggestion', label: '💡 Suggestion' },
+                  { key: 'other', label: '💬 Review' },
+                ].map((opt) => {
+                  const active = feedbackType === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => {});
+                        setFeedbackType(opt.key);
+                      }}
+                      style={[
+                        {
+                          flex: 1,
+                          paddingVertical: 9,
+                          paddingHorizontal: 6,
+                          borderRadius: 10,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        },
+                        active && {
+                          backgroundColor: isDark ? '#2C2C2E' : '#ffffff',
+                          shadowColor: '#000',
+                          shadowOffset: { width: 0, height: 1 },
+                          shadowOpacity: isDark ? 0.35 : 0.12,
+                          shadowRadius: 3,
+                          elevation: 2,
+                        },
+                      ]}
                     >
-                      🚀 Feature
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setFeedbackType('suggestion')}
-                    style={{ flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 6 }}
-                    className={`rounded-2xl items-center justify-center border ${
-                      feedbackType === 'suggestion'
-                        ? 'bg-primary border-primary'
-                        : isDark ? 'bg-black/25 border-white/15' : 'bg-white/70 border-black/10'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-bold text-center ${feedbackType === 'suggestion' ? 'text-white' : (isDark ? 'text-gray-200' : 'text-charcoal')}`}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
-                    >
-                      💡 Suggestion
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => setFeedbackType('other')}
-                    style={{ flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 6 }}
-                    className={`rounded-2xl items-center justify-center border ${
-                      feedbackType === 'other'
-                        ? 'bg-primary border-primary'
-                        : isDark ? 'bg-black/25 border-white/15' : 'bg-white/70 border-black/10'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-bold text-center ${feedbackType === 'other' ? 'text-white' : (isDark ? 'text-gray-200' : 'text-charcoal')}`}
-                      numberOfLines={1}
-                      adjustsFontSizeToFit
-                      minimumFontScale={0.75}
-                    >
-                      ❓ Other
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                      <Text
+                        style={{
+                          color: active
+                            ? isDark
+                              ? '#ffffff'
+                              : '#111827'
+                            : isDark
+                            ? '#98989F'
+                            : '#6B7280',
+                          fontSize: 12.5,
+                          fontWeight: active ? '700' : '600',
+                        }}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.8}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-                {/* Feedback Description */}
-                <Text className={`text-xs font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>Description</Text>
-                <TextInput
+              {/* Feedback Description Field */}
+              <Text
+                style={{
+                  color: isDark ? '#8E8E93' : '#6B7280',
+                  fontSize: 11,
+                  fontWeight: '700',
+                  letterSpacing: 0.8,
+                  textTransform: 'uppercase',
+                  marginBottom: 7,
+                  marginLeft: 4,
+                }}
+              >
+                Your Message
+              </Text>
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => feedbackDescInputRef.current?.focus()}
+                style={{
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: isDark ? 'rgba(164, 243, 185, 0.15)' : 'rgba(0, 0, 0, 0.08)',
+                  backgroundColor: isDark ? 'rgba(20, 30, 24, 0.90)' : '#ffffff',
+                  paddingHorizontal: 16,
+                  paddingVertical: 14,
+                  minHeight: 140,
+                  marginBottom: 22,
+                }}
+              >
+                <BottomSheetTextInput
+                  ref={feedbackDescInputRef}
                   value={feedbackDescription}
                   onChangeText={setFeedbackDescription}
-                  placeholder="Describe your request, suggestion, or thoughts in detail here..."
-                  placeholderTextColor={isDark ? '#9CA3AF' : '#9CA3AF'}
+                  placeholder="Tell us what you'd love to see or how we can make CediSmart even better..."
+                  placeholderTextColor={isDark ? '#636366' : '#9CA3AF'}
                   multiline
-                  numberOfLines={6}
                   textAlignVertical="top"
-                  className={`w-full p-4 mb-6 rounded-2xl border h-36 ${isDark ? 'bg-black/25 border-white/15 text-white' : 'bg-white/70 border-black/10 text-charcoal'} font-medium`}
+                  selectionColor={isDark ? '#4ade80' : '#0d631b'}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    minHeight: 112,
+                    color: isDark ? '#ffffff' : '#111827',
+                    fontSize: 15,
+                    lineHeight: 21,
+                    paddingVertical: 0,
+                  }}
                 />
+              </TouchableOpacity>
 
-                {/* Submit Button */}
-                <TouchableOpacity
-                  onPress={handleSendFeedback}
-                  disabled={isSubmittingFeedback}
-                  className={`w-full py-4 rounded-2xl flex-row justify-center items-center ${isSubmittingFeedback ? 'bg-gray-400' : 'bg-primary'}`}
-                >
-                  {isSubmittingFeedback ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <>
-                      <Text className="text-white font-bold text-base mr-2">Submit Feedback</Text>
-                      <Check size={18} color="white" />
-                    </>
-                  )}
-                </TouchableOpacity>
-              </GlassSurface>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+              {/* Submit Button */}
+              <TouchableOpacity
+                onPress={handleSendFeedback}
+                disabled={isSubmittingFeedback}
+                activeOpacity={0.85}
+                className={`w-full py-4 rounded-2xl flex-row justify-center items-center shadow-lg ${
+                  isSubmittingFeedback ? 'bg-gray-400' : 'bg-primary shadow-primary/25'
+                }`}
+              >
+                {isSubmittingFeedback ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Text className="text-white font-bold text-base mr-2">Submit Feedback</Text>
+                    <Check size={18} color="white" />
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableWithoutFeedback>
+        </BottomSheetScrollView>
+      </BottomSheet>
 
       {/* Change PIN Bottom Sheet */}
       <BottomSheet

@@ -341,14 +341,22 @@ const AddTransactionScreen = ({ navigation, route }: any) => {
       <CoinBackground />
       {/* Header */}
       <View className="flex-row items-center justify-between px-6 py-4 z-50">
-        <View className="flex-row items-center space-x-4">
-          <GlassButton accessibilityLabel="Close add transaction" onPress={() => navigation.goBack()} style={{ marginRight: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 10 }}>
+          <GlassButton accessibilityLabel="Close add transaction" onPress={() => navigation.goBack()} style={{ marginRight: 10, flexShrink: 0 }}>
             <ArrowLeft size={22} color={isDark ? '#a4f3b9' : '#0d631b'} />
           </GlassButton>
-          <Text className={`text-xl font-headline font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight`}>Add Transaction</Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
+            style={{ flexShrink: 1 }}
+            className={`text-xl font-headline font-bold ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-tight`}
+          >
+            Add Transaction
+          </Text>
         </View>
-        <GlassSurface variant="clear" radius={16} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-          <Text className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-gray-300' : 'text-outline'}`}>₵ GHANA CEDI</Text>
+        <GlassSurface variant="clear" radius={16} style={{ paddingHorizontal: 10, paddingVertical: 6, flexShrink: 0 }}>
+          <Text numberOfLines={1} className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-gray-300' : 'text-outline'}`}>₵ GHANA CEDI</Text>
         </GlassSurface>
       </View>
 
