@@ -403,11 +403,26 @@ function closeMobileSidebar() {
   if (backdrop) backdrop.classList.add('hidden');
 }
 
+function getGreetingTitle() {
+  const hour = new Date().getHours();
+  const prefix =
+    hour < 12 ? 'Good Morning,' : hour < 17 ? 'Good Afternoon,' : 'Good Evening,';
+  const rawName = (state.user?.full_name || '').trim();
+  if (!rawName) return `${prefix} Chale`;
+  const parts = rawName.split(/\s+/);
+  const titles = ['Mr.', 'Mrs.', 'Ms.', 'Dr.'];
+  const shortName =
+    parts.length >= 2 && titles.includes(parts[0])
+      ? `${parts[0]} ${parts[1]}`
+      : parts[0];
+  return `${prefix} ${shortName}`;
+}
+
 function navigateToView(viewName) {
   state.currentView = viewName;
   closeMobileSidebar();
 
-  document.querySelectorAll('.nav-item').forEach((btn) => {
+  document.querySelectorAll('.nav-item, .mobile-tab-item').forEach((btn) => {
     btn.classList.toggle(
       'active',
       btn.getAttribute('data-view') === viewName
@@ -420,8 +435,8 @@ function navigateToView(viewName) {
 
   const viewTitles = {
     dashboard: {
-      title: 'Dashboard',
-      subtitle: "Here's your real-time financial standing",
+      title: getGreetingTitle(),
+      subtitle: 'Home Overview • Real-time sovereign financial standing',
     },
     accounts: {
       title: 'Accounts & Wallets',
@@ -503,9 +518,22 @@ function renderDashboardView() {
     else if (acc.provider === 'cash') cashTotal += bal;
   });
 
-  const { safeDaily, totalLimit } = computeSafeToSpend();
+  // Compute monthly income & expense for Hero Capsules
+  let monthIncome = parseFloat(state.monthlyReport?.total_income ?? 0);
+  let monthExpense = parseFloat(state.monthlyReport?.total_expense ?? 0);
+  if (!state.monthlyReport) {
+    state.transactions.forEach((t) => {
+      const amt = parseFloat(t.amount || 0);
+      if (t.transaction_type === 'income') monthIncome += amt;
+      else if (t.transaction_type === 'expense') monthExpense += amt;
+    });
+  }
+
+  const { safeDaily, totalLimit, totalSpent, remainingDays } = computeSafeToSpend();
   const maskLabel = document.getElementById('mask-balance-label');
+  const maskIcon = document.getElementById('mask-balance-icon');
   if (maskLabel) maskLabel.textContent = state.isMasked ? 'Show' : 'Hide';
+  if (maskIcon) maskIcon.textContent = state.isMasked ? '🙈' : '👁️';
 
   document.getElementById('dash-net-balance').textContent = state.isMasked
     ? '₵ ••••'
@@ -520,12 +548,36 @@ function renderDashboardView() {
     ? '₵ ••••'
     : formatCedi(cashTotal);
 
+  const monthIncEl = document.getElementById('dash-month-income');
+  const monthExpEl = document.getElementById('dash-month-expense');
+  if (monthIncEl) {
+    monthIncEl.textContent = state.isMasked ? '₵ ••••' : formatCedi(monthIncome);
+  }
+  if (monthExpEl) {
+    monthExpEl.textContent = state.isMasked ? '₵ ••••' : formatCedi(monthExpense);
+  }
+
   const safeEl = document.getElementById('dash-safe-to-spend');
+  const safeValEl = document.getElementById('dash-safe-daily-val');
+  const safeBanner = document.getElementById('hero-safe-banner');
+  const remainingBudget = Math.max(0, totalLimit - totalSpent);
+
   if (safeEl) {
     safeEl.textContent =
       totalLimit > 0
-        ? `Safe-to-Spend Today: ${state.isMasked ? '₵ ••••' : formatCedi(safeDaily)}`
-        : 'Set a monthly budget to see your Safe-to-Spend daily target';
+        ? `${remainingDays} ${remainingDays === 1 ? 'day' : 'days'} left • ${state.isMasked ? '₵ ••••' : formatCedi(remainingBudget)} left`
+        : 'Set a monthly budget to see your daily target';
+  }
+  if (safeValEl) {
+    safeValEl.textContent = state.isMasked ? '₵ ••••' : formatCedi(safeDaily);
+  }
+  if (safeBanner) {
+    safeBanner.classList.remove('moderate', 'tight');
+    if (totalLimit > 0) {
+      const ratio = totalSpent / totalLimit;
+      if (ratio >= 0.9) safeBanner.classList.add('tight');
+      else if (ratio >= 0.7) safeBanner.classList.add('moderate');
+    }
   }
 
   // Top 5 Recent Transactions
@@ -551,11 +603,11 @@ function renderDashboardView() {
 
         return `
           <tr>
-            <td>${formatDate(txn.transaction_date)}</td>
-            <td class="font-medium">${txn.description || cat}</td>
-            <td><span class="badge-tag">${cat}</span></td>
-            <td class="text-secondary">${acc}</td>
-            <td class="text-right ${amountClass} font-semibold">${displayAmt}</td>
+            <td data-label="Date">${formatDate(txn.transaction_date)}</td>
+            <td data-label="Description" class="font-medium">${txn.description || cat}</td>
+            <td data-label="Category"><span class="badge-tag">${cat}</span></td>
+            <td data-label="Account" class="text-secondary">${acc}</td>
+            <td data-label="Amount" class="text-right ${amountClass} font-semibold">${displayAmt}</td>
           </tr>
         `;
       })
@@ -663,13 +715,13 @@ function renderTransactionsView() {
 
       return `
         <tr>
-          <td>${formatDate(txn.transaction_date)}</td>
-          <td class="font-medium">${txn.description || cat}</td>
-          <td><span class="badge-tag">${cat}</span></td>
-          <td class="text-secondary">${acc}</td>
-          <td><span class="badge-type ${txn.transaction_type}">${txn.transaction_type}</span></td>
-          <td class="text-right ${amountClass} font-semibold">${amountPrefix} ${formatCedi(txn.amount)}</td>
-          <td class="text-center">
+          <td data-label="Date">${formatDate(txn.transaction_date)}</td>
+          <td data-label="Description" class="font-medium">${txn.description || cat}</td>
+          <td data-label="Category"><span class="badge-tag">${cat}</span></td>
+          <td data-label="Account" class="text-secondary">${acc}</td>
+          <td data-label="Type"><span class="badge-type ${txn.transaction_type}">${txn.transaction_type}</span></td>
+          <td data-label="Amount" class="text-right ${amountClass} font-semibold">${amountPrefix} ${formatCedi(txn.amount)}</td>
+          <td data-label="Action" class="text-center">
             <button class="btn-action-delete" onclick="handleDeleteTransaction('${txn.id}')" title="Delete record">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             </button>
@@ -1326,7 +1378,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   backdrop?.addEventListener('click', closeMobileSidebar);
 
-  document.querySelectorAll('.nav-item').forEach((btn) => {
+  document.querySelectorAll('.nav-item, .mobile-tab-item').forEach((btn) => {
     btn.addEventListener('click', () => {
       const view = btn.getAttribute('data-view');
       navigateToView(view);
@@ -1337,6 +1389,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dash-view-all-budgets')?.addEventListener('click', () => navigateToView('budgets'));
   document.getElementById('header-ai-btn')?.addEventListener('click', () => navigateToView('parser'));
   document.getElementById('sidebar-profile-trigger')?.addEventListener('click', () => navigateToView('settings'));
+
+  // Quick-Action Liquid Glass Squish Buttons on Dashboard
+  document.getElementById('qa-add-expense')?.addEventListener('click', () => {
+    document.getElementById('txn-modal')?.classList.add('active');
+  });
+  document.getElementById('qa-import-sms')?.addEventListener('click', () => {
+    navigateToView('parser');
+    setTimeout(() => document.getElementById('parser-sms-input')?.focus(), 150);
+  });
+  document.getElementById('qa-open-accounts')?.addEventListener('click', () => navigateToView('accounts'));
+  document.getElementById('qa-open-aicfo')?.addEventListener('click', () => {
+    navigateToView('parser');
+    setTimeout(() => document.getElementById('ai-chat-input')?.focus(), 150);
+  });
 
   // Privacy Balance Masking Toggle
   document.getElementById('mask-balance-btn')?.addEventListener('click', () => {
