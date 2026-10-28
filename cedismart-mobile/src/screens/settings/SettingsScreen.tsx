@@ -43,6 +43,29 @@ try {
   // Gracefully catch import error if native module is not compiled in (e.g. in Expo Go sandbox)
 }
 
+const APP_ICON_OPTIONS = [
+  { 
+    name: 'Classic Emerald', 
+    image: require('../../../assets/classic_emerald.png'), 
+    desc: 'Premium forest green brand icon with gold text.' 
+  },
+  { 
+    name: 'Luminous Emerald', 
+    image: require('../../../assets/luminous_emerald.png'), 
+    desc: 'Premium dark forest green with glowing neon borders.' 
+  },
+  { 
+    name: 'Pro Obsidian Gold', 
+    image: require('../../../assets/pro_obsidian_gold.png'), 
+    desc: 'Luxury black gold theme for Pro members.' 
+  },
+  { 
+    name: 'Sovereign Amber', 
+    image: require('../../../assets/sovereign_amber.png'), 
+    desc: 'Premium glowing amber gold theme for Pro members.' 
+  }
+];
+
 const DEFAULT_AVATAR_URL = 'https://lh3.googleusercontent.com/aida-public/AB6AXuCPbtwyh4Eo_96C5zd6dFJFY9kbHP067jJpa7Aayw3aUk1co9x1_rJZOkN1473J1n10wGOmZyH_imPk56BMFUhtqh97n0NlHcDadkkvYPKlykD_wgKQ0fNUrBK4Iu1lJLUicP3eclDQXCGAAWUx5hODGPkFmHdt7ak3QMG9zCIQ1woeQWjZ7lpo8WpbJ3fIQepJ_Q7ZT7r1xyJBsDS0TdhOmQJP54CdoizSC8UpE8ln59Y5-6_lJNv8GhvkiAlc4Ddi9D8xyhpQ_YM';
 
 const normalizePhoneNumber = (phone: string): string => {
@@ -2246,6 +2269,30 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 icon={Smartphone} 
                 title="Premium App Icon" 
                 value={currentAppIcon}
+                rightElement={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View 
+                      className="w-7 h-7 rounded-lg overflow-hidden border border-white/10 shadow-sm bg-black/20"
+                      style={{
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 2,
+                        elevation: 2,
+                      }}
+                    >
+                      <Image
+                        source={
+                          APP_ICON_OPTIONS.find((i) => i.name === currentAppIcon)?.image ||
+                          APP_ICON_OPTIONS[0].image
+                        }
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    </View>
+                    <ChevronRight size={20} color={isDark ? '#6B7280' : '#9CA3AF'} />
+                  </View>
+                }
                 onPress={() => {
                   if (user?.has_premium_access) {
                     appIconSheetRef.current?.snapToIndex(0);
@@ -3580,12 +3627,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
 
             {/* App Icon options */}
             <View className="space-y-3">
-              {[
-                { name: 'Classic Emerald', color: '#0d631b', desc: 'Premium forest green brand icon with gold text.' },
-                { name: 'Luminous Emerald', color: '#16a34a', desc: 'Premium dark forest green with glowing neon borders.' },
-                { name: 'Pro Obsidian Gold', color: '#DAA520', desc: 'Luxury black gold theme for Pro members.' },
-                { name: 'Sovereign Amber', color: '#d97706', desc: 'Premium glowing amber gold theme for Pro members.' }
-              ].map((iconOpt) => {
+              {APP_ICON_OPTIONS.map((iconOpt) => {
                 const isSelected = currentAppIcon === iconOpt.name;
                 return (
                   <TouchableOpacity
@@ -3597,12 +3639,22 @@ const SettingsScreen = ({ navigation, route }: any) => {
                         : (isDark ? 'bg-dark-surface-container-lowest border-dark-outline-variant/10' : 'bg-white border-gray-100')
                     }`}
                   >
-                    {/* Simulated Icon Art */}
+                    {/* Actual App Icon Image */}
                     <View 
-                      style={{ backgroundColor: iconOpt.color }}
-                      className="w-12 h-12 rounded-xl items-center justify-center mr-4 shadow-sm"
+                      className="w-14 h-14 rounded-2xl overflow-hidden mr-4 shadow-sm border border-white/10 bg-black/20"
+                      style={{
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.15,
+                        shadowRadius: 4,
+                        elevation: 3,
+                      }}
                     >
-                      <Text className="text-white font-headline font-black text-xl">₵</Text>
+                      <Image
+                        source={iconOpt.image}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
                     </View>
                     
                     <View className="flex-1">
