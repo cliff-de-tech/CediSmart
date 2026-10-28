@@ -650,7 +650,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
       const tok = await SecureStore.getItemAsync('access_token');
       hasSyncToken = !!tok;
     } catch {}
-    const appVer = Constants.expoConfig?.version || '1.0.0';
+    const appVer = Constants.expoConfig?.version || '2.0.0';
     return {
       os: Platform.OS,
       os_version: String(Platform.Version),
