@@ -999,9 +999,37 @@ const DashboardScreen = ({ navigation }: any) => {
           )}
         </View>
         <View className="flex-row items-center">
-          <GlassButton accessibilityLabel="AI Support" onPress={() => { setStartFreshSupport(false); setIsSupportModalVisible(true); }}>
-            <Headphones size={19} color={isDark ? '#4ade80' : '#0d631b'} />
-          </GlassButton>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel="CediSmart Support"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => {
+              if (Platform.OS !== 'web') void Haptics.selectionAsync().catch(() => {});
+              setStartFreshSupport(false);
+              setIsSupportModalVisible(true);
+            }}
+          >
+            <GlassSurface
+              radius={999}
+              interactive
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                gap: 6,
+              }}
+            >
+              <Headphones size={15} color={isDark ? '#4ade80' : '#0d631b'} strokeWidth={2.2} />
+              <Text
+                maxFontSizeMultiplier={1.3}
+                className={`font-headline font-bold text-xs ${isDark ? 'text-[#4ade80]' : 'text-[#0d631b]'}`}
+              >
+                Support
+              </Text>
+            </GlassSurface>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -2554,7 +2582,7 @@ const DashboardScreen = ({ navigation }: any) => {
       <TopBarSupportTooltip
         userName={user?.full_name}
         screenContext="dashboard"
-        arrowRightOffset={26}
+        arrowRightOffset={50}
         topOffset={74}
         onOpenSupport={(opts) => {
           setStartFreshSupport(!!opts?.startNewChat);

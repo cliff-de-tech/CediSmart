@@ -4,7 +4,8 @@ import { GlassButton } from '../../components/glass/GlassButton';
 import { GlassSurface } from '../../components/glass/GlassSurface';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGlassTabBarMetrics } from '../../components/glass/useGlassTabBarMetrics';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, TextInput, RefreshControl, StyleSheet, Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import BottomSheet from '../../components/shared/AppBottomSheet';
@@ -159,9 +160,38 @@ const BudgetsScreen = () => {
             <Text className={`text-3xl font-bold ${isDark ? 'text-dark-charcoal' : 'text-charcoal'} mb-2`}>My Budgets</Text>
             <Text className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Control your monthly spending</Text>
           </View>
-          <GlassButton accessibilityLabel="Budget AI Support" onPress={() => { setStartFreshSupport(false); setIsSupportModalVisible(true); }} style={{ marginLeft: 12 }}>
-            <Headphones size={19} color={isDark ? '#4ade80' : '#0d631b'} />
-          </GlassButton>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel="Budget Support"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ marginLeft: 12 }}
+            onPress={() => {
+              if (Platform.OS !== 'web') void Haptics.selectionAsync().catch(() => {});
+              setStartFreshSupport(false);
+              setIsSupportModalVisible(true);
+            }}
+          >
+            <GlassSurface
+              radius={999}
+              interactive
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 12,
+                paddingVertical: 7,
+                gap: 6,
+              }}
+            >
+              <Headphones size={15} color={isDark ? '#4ade80' : '#0d631b'} strokeWidth={2.2} />
+              <Text
+                maxFontSizeMultiplier={1.3}
+                className={`font-headline font-bold text-xs ${isDark ? 'text-[#4ade80]' : 'text-[#0d631b]'}`}
+              >
+                Support
+              </Text>
+            </GlassSurface>
+          </TouchableOpacity>
         </View>
 
         {/* Summary Card */}
@@ -416,7 +446,7 @@ const BudgetsScreen = () => {
       <TopBarSupportTooltip
         userName={user?.full_name}
         screenContext="budgets"
-        arrowRightOffset={24}
+        arrowRightOffset={50}
         topOffset={74}
         onOpenSupport={(opts) => {
           setStartFreshSupport(!!opts?.startNewChat);
