@@ -1,7 +1,8 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { GlassSheetBackground } from '../glass/GlassSheetBackground';
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetFlatList } from '@gorhom/bottom-sheet';
+import { BottomSheetBackdrop, BottomSheetFlatList } from '@gorhom/bottom-sheet';
+import BottomSheet from './AppBottomSheet';
 import { useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useThemeStore } from '../../stores/themeStore';

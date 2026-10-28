@@ -15,7 +15,8 @@ import { formatGHS } from '../../utils/currency';
 import { Plus, Tag, Landmark, Smartphone, ShieldCheck, Award, Search, Sparkles, Trash2, Users, SlidersHorizontal, Eye, EyeOff, Clock, RefreshCw, Edit3, X, Headphones, ArrowUpRight, ArrowDownRight, Calendar, Zap, RotateCcw, Check } from 'lucide-react-native';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import BottomSheet from '../../components/shared/AppBottomSheet';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import PINPad from '../../components/shared/PINPad';
@@ -833,14 +834,19 @@ const DashboardScreen = ({ navigation }: any) => {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.6,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selectedUri = result.assets[0].uri;
+        const asset = result.assets[0];
+        const selectedUri = asset.base64
+          ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
+          : asset.uri;
         setAvatarUri(selectedUri);
         if (user?.id) {
           await AsyncStorage.setItem(`user_avatar_${user.id}`, selectedUri);
+          apiClient.patch('/users/me', { avatar_url: selectedUri }).catch(() => {});
         }
       }
     } catch (error) {

@@ -4,7 +4,7 @@ import { GlassSurface } from '../../components/glass/GlassSurface';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator, Image, StyleSheet } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
-import BottomSheet from '@gorhom/bottom-sheet';
+import BottomSheet from '../../components/shared/AppBottomSheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ChevronRight, Calendar, ArrowLeft, Wallet, Tag, Receipt, CheckCircle, Sparkles, X, Plus } from 'lucide-react-native';
 import AccountPicker from '../../components/shared/AccountPicker';

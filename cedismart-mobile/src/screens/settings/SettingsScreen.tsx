@@ -22,7 +22,8 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from 'react-native-reanimated';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { BottomSheetBackdrop, BottomSheetScrollView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import BottomSheet from '../../components/shared/AppBottomSheet';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
@@ -173,14 +174,19 @@ const SettingsScreen = ({ navigation, route }: any) => {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.6,
+        base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const selectedUri = result.assets[0].uri;
+        const asset = result.assets[0];
+        const selectedUri = asset.base64
+          ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
+          : asset.uri;
         setUserAvatarUri(selectedUri);
         if (user?.id) {
           await AsyncStorage.setItem(`user_avatar_${user.id}`, selectedUri);
+          apiClient.patch('/users/me', { avatar_url: selectedUri }).catch(() => {});
         }
       }
     } catch (error) {
