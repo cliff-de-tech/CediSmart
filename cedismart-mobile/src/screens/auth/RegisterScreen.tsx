@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Image, Alert } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -51,6 +51,24 @@ const RegisterScreen = ({ navigation }: any) => {
       const clean9 = normalizeGhanaPhoneDigits(data.phone);
       const formattedPhone = `+233${clean9}`;
       console.log('[Register Clerk] Starting signUp for:', formattedPhone);
+
+      // Pre-check if phone already exists in CediSmart database before sending SMS
+      try {
+        const checkRes = await apiClient.get('/auth/check-phone', {
+          params: { phone: formattedPhone },
+          timeout: 7000,
+        });
+        if (checkRes.data?.exists) {
+          const err = new Error('This phone number is already registered.');
+          (err as any).code = 'PHONE_ALREADY_REGISTERED';
+          throw err;
+        }
+      } catch (checkErr: any) {
+        if (checkErr?.code === 'PHONE_ALREADY_REGISTERED') {
+          throw checkErr;
+        }
+        console.warn('[Register] check-phone preflight skipped:', checkErr.message);
+      }
       
       // Start registration flow with Clerk
       await signUp.create({
@@ -70,6 +88,19 @@ const RegisterScreen = ({ navigation }: any) => {
     },
     onError: (err: any) => {
       console.error('[Register Clerk] Error:', err);
+      if (err?.code === 'PHONE_ALREADY_REGISTERED' || err?.message?.toLowerCase().includes('already registered')) {
+        Alert.alert(
+          'Account Already Exists',
+          'This mobile number is already registered on CediSmart. Please log in with your PIN.',
+          [
+            {
+              text: 'Sign In',
+              onPress: () => navigation.navigate('Login'),
+            },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+      }
     },
   });
 

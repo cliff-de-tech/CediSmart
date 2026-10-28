@@ -15,7 +15,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.199:8000/a
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
-  timeout: 15000,
+  timeout: 45000, // 45 seconds to accommodate Neon serverless scale-to-zero and Render cold starts
   headers: {
     'Content-Type': 'application/json',
   },

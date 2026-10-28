@@ -53,10 +53,43 @@ async def test_register_clerk_duplicate_phone(
             "phone": phone,
             "pin": "123456",
             "full_name": "Ama",
-            "clerk_user_id": "user_12345",
+            "clerk_user_id": "user_different",
         },
     )
     assert_error_response(resp, 409, "PHONE_ALREADY_REGISTERED")
+
+
+async def test_register_clerk_same_session_retry_success(
+    client: AsyncClient, make_user, mock_verify_clerk_user
+) -> None:
+    """If the same Clerk user retries registering (e.g. after a client timeout), it should succeed idempotently."""
+    phone = "+233201234567"
+    clerk_id = "user_same_retry_123"
+    await make_user(phone=phone, clerk_user_id=clerk_id)
+
+    resp = await client.post(
+        "/api/v1/auth/register/clerk",
+        json={
+            "phone": phone,
+            "pin": "654321",
+            "full_name": "Ama Updated",
+            "clerk_user_id": clerk_id,
+        },
+    )
+    assert resp.status_code == 201
+    assert "access_token" in resp.json()
+
+
+async def test_check_phone(client: AsyncClient, make_user) -> None:
+    phone = "+233201234567"
+    resp_before = await client.get("/api/v1/auth/check-phone", params={"phone": phone})
+    assert resp_before.status_code == 200
+    assert resp_before.json() == {"exists": False}
+
+    await make_user(phone=phone)
+    resp_after = await client.get("/api/v1/auth/check-phone", params={"phone": phone})
+    assert resp_after.status_code == 200
+    assert resp_after.json() == {"exists": True}
 
 
 async def test_register_clerk_all_same_digit_pin(client: AsyncClient) -> None:

@@ -10,13 +10,16 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import CurrentUser
 from app.core.redis import get_redis
 from app.modules.auth import service
+from app.modules.auth.models import User
 from app.modules.auth.schemas import (
+    CheckPhoneResponse,
     LoginRequest,
     MessageResponse,
     PinResetConfirmRequest,
@@ -34,6 +37,29 @@ limiter = Limiter(key_func=get_remote_address)
 # Type aliases for dependency injection
 RedisConn = Annotated[aioredis.Redis, Depends(get_redis)]
 DBSession = Annotated[AsyncSession, Depends(get_db)]
+
+
+# ---------------------------------------------------------------------------
+# GET /check-phone
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/check-phone",
+    response_model=CheckPhoneResponse,
+    status_code=200,
+    summary="Check if a phone number is already registered",
+)
+@limiter.limit("60/15minutes")
+async def check_phone(
+    request: Request,
+    phone: str,
+    db: DBSession,
+) -> CheckPhoneResponse:
+    """Check if a phone number already exists in the database."""
+    result = await db.execute(select(User).where(User.phone == phone))
+    user = result.scalar_one_or_none()
+    return CheckPhoneResponse(exists=user is not None)
 
 
 # ---------------------------------------------------------------------------

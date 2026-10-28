@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Animated, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Animated, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
@@ -128,11 +128,38 @@ const SetPINScreen = ({ route, navigation }: any) => {
       if (err?.config?.baseURL) {
         console.warn('[SetPIN Clerk] Request URL:', err.config.baseURL + (err.config.url || ''));
       }
-      setError(
-        typeof err?.response?.data?.error === 'string'
-          ? err?.response?.data?.error
-          : err?.response?.data?.error?.message || err?.message || 'Verification failed.'
-      );
+      const rawError = err?.response?.data?.error;
+      const errorCode = typeof rawError === 'object' ? rawError?.code : err?.response?.data?.error_code;
+      const errorMsg =
+        typeof rawError === 'string'
+          ? rawError
+          : rawError?.message || err?.response?.data?.detail || err?.message || 'Verification failed.';
+
+      if (
+        err?.response?.status === 409 ||
+        errorCode === 'PHONE_ALREADY_REGISTERED' ||
+        errorMsg.toLowerCase().includes('already registered')
+      ) {
+        Alert.alert(
+          'Account Already Exists',
+          'This mobile number is already registered on CediSmart. Please log in with your PIN.',
+          [
+            {
+              text: 'Go to Login',
+              onPress: () => navigation.navigate('Login'),
+            },
+          ]
+        );
+        setError('Number already registered.');
+      } else if (
+        err?.code === 'ECONNABORTED' ||
+        err?.message?.toLowerCase().includes('timeout') ||
+        err?.message?.toLowerCase().includes('network')
+      ) {
+        setError('Server is waking up. Please enter your PIN once more to finish.');
+      } else {
+        setError(errorMsg);
+      }
       setPin('');
       setConfirmPin('');
       setStep('create');
@@ -143,12 +170,12 @@ const SetPINScreen = ({ route, navigation }: any) => {
   const renderDots = () => {
     const currentPin = step === 'create' ? pin : confirmPin;
     return (
-      <GlassSurface variant="clear" radius={999} style={{ paddingHorizontal: 22, paddingVertical: 12, marginBottom: 16 }}>
+      <GlassSurface variant="clear" radius={999} style={{ paddingHorizontal: 20, paddingVertical: 10, marginBottom: 12 }}>
         <View className="flex-row justify-center items-center">
           {[...Array(6)].map((_, i) => (
             <View
               key={i}
-              className={`w-3.5 h-3.5 rounded-full mx-2.5 ${
+              className={`w-3.5 h-3.5 rounded-full mx-2 ${
                 i < currentPin.length
                   ? isDark ? 'bg-[#4ade80] scale-125' : 'bg-primary scale-125'
                   : isDark
@@ -166,24 +193,24 @@ const SetPINScreen = ({ route, navigation }: any) => {
     <SafeAreaView className={`flex-1 ${isDark ? 'bg-dark-background' : 'bg-surface'}`}>
       <CoinBackground />
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', paddingBottom: 16 }}
         showsVerticalScrollIndicator={false}
-        className="px-6 py-4"
+        className="px-6 py-2"
       >
         {/* Header Section */}
-        <View className="items-center mt-2">
+        <View className="items-center mt-1">
           <GlassSurface
             tint="emerald"
             radius={999}
             elevated
-            style={{ width: 60, height: 60, alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}
+            style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}
           >
-            <Shield size={28} color={isDark ? '#4ade80' : '#0d631b'} fill={isDark ? 'rgba(74,222,128,0.25)' : 'rgba(13,99,27,0.18)'} />
+            <Shield size={24} color={isDark ? '#4ade80' : '#0d631b'} fill={isDark ? 'rgba(74,222,128,0.25)' : 'rgba(13,99,27,0.18)'} />
           </GlassSurface>
-          <Text className={`font-headline font-extrabold text-3xl text-center ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} mb-2 tracking-tight`}>
+          <Text className={`font-headline font-extrabold text-2xl text-center ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} mb-1 tracking-tight`}>
             Secure Your Account
           </Text>
-          <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} font-medium text-sm text-center leading-relaxed px-4`}>
+          <Text className={`${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'} font-medium text-xs text-center leading-relaxed px-4 max-w-[320px]`}>
             Set up a 6-digit transaction PIN to protect your wealth and authorize transfers safely.
           </Text>
         </View>
@@ -191,9 +218,9 @@ const SetPINScreen = ({ route, navigation }: any) => {
         {/* PIN Status */}
         <Animated.View 
           style={{ transform: [{ translateX: shakeAnimation }] }}
-          className="items-center my-3"
+          className="items-center my-2"
         >
-          <Text className={`font-label text-xs uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold mb-3`}>
+          <Text className={`font-label text-xs uppercase tracking-widest ${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold mb-2`}>
             {step === 'create' ? 'Enter PIN' : 'Confirm PIN'}
           </Text>
           {renderDots()}
@@ -205,14 +232,14 @@ const SetPINScreen = ({ route, navigation }: any) => {
         </Animated.View>
 
         {/* PINPad */}
-        <View className="pb-2">
+        <View className="pb-1">
           <PINPad 
             onPress={handlePress} 
             onBackspace={handleBackspace} 
             disabled={verifyMutation.isPending}
           />
-          <View className="mt-4 items-center opacity-30">
-            <Text className={`font-headline font-black ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-widest text-[10px] uppercase`}>
+          <View className="mt-3 items-center opacity-30">
+            <Text className={`font-headline font-black ${isDark ? 'text-dark-on-surface' : 'text-on-surface'} tracking-widest text-[9px] uppercase`}>
               CediSmart Secure Layer
             </Text>
           </View>

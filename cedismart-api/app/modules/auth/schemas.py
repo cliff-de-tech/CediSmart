@@ -142,3 +142,9 @@ class MessageResponse(BaseModel):
 
     message: str
     expires_in: int | None = None
+
+
+class CheckPhoneResponse(BaseModel):
+    """Indicates if a phone number is registered."""
+
+    exists: bool

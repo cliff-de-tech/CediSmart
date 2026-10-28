@@ -202,6 +202,7 @@ def make_user(db_session: AsyncSession):  # type: ignore[no-untyped-def]
         currency: str = "GHS",
         is_active: bool = True,
         is_premium: bool = False,
+        clerk_user_id: str | None = None,
     ) -> User:
         user = User(
             phone=phone,
@@ -210,6 +211,7 @@ def make_user(db_session: AsyncSession):  # type: ignore[no-untyped-def]
             currency=currency,
             is_active=is_active,
             is_premium=is_premium,
+            clerk_user_id=clerk_user_id,
         )
         db_session.add(user)
         await db_session.flush()

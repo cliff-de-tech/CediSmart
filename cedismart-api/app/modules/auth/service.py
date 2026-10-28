@@ -70,6 +70,16 @@ async def register_with_clerk(
     result = await db.execute(select(User).where(User.phone == phone))
     existing_user = result.scalar_one_or_none()
     if existing_user is not None:
+        # If this exact same Clerk user session is retrying (e.g. after a client timeout),
+        # update their PIN and issue tokens idempotently instead of blocking them.
+        if existing_user.clerk_user_id == clerk_user_id:
+            existing_user.pin_hash = hash_pin(pin)
+            if full_name:
+                existing_user.full_name = full_name
+            await db.flush()
+            tokens = await _issue_tokens(existing_user.id, redis)
+            return {**tokens, "user": existing_user}
+
         raise AppException(
             status_code=409,
             error_code="PHONE_ALREADY_REGISTERED",
