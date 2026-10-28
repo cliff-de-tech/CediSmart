@@ -15,6 +15,9 @@ const DIRECT_API_URL = IS_LOCAL
 // with automatic fallback to DIRECT_API_URL.
 let preferProxy = !IS_LOCAL;
 
+const DEFAULT_AVATAR_URL =
+  'https://images.unsplash.com/photo-1531384441138-2736e62e0919?auto=format&fit=crop&w=150&q=80';
+
 const state = {
   token: localStorage.getItem('access_token') || null,
   refreshToken: localStorage.getItem('refresh_token') || null,
@@ -22,9 +25,11 @@ const state = {
   aiLanguage: 'english',
   aiMessages: [],
   user: null,
+  avatarUrl: localStorage.getItem('cedismart_avatar_url') || DEFAULT_AVATAR_URL,
   accounts: [],
   categories: [],
   transactions: [],
+  summary: null,
   budgets: [],
   monthlyReport: null,
   categoryReport: null,
@@ -72,15 +77,116 @@ const getHeaders = () => {
   return headers;
 };
 
-const formatCedi = (amount) => {
-  const num = Number(amount || 0);
-  return new Intl.NumberFormat('en-GH', {
+// Exact match with cedismart-mobile/src/utils/currency.ts formatGHS()
+const formatCedi = (amount, options = {}) => {
+  const num = typeof amount === 'string' ? parseFloat(amount) : Number(amount ?? 0);
+  const safeVal = Number.isFinite(num) ? num : 0;
+
+  if (options.compact && Math.abs(safeVal) >= 1_000_000) {
+    return `₵\u00A0${(safeVal / 1_000_000).toFixed(1)}M`;
+  }
+  if (options.compact && Math.abs(safeVal) >= 10_000) {
+    return `₵\u00A0${(safeVal / 1_000).toFixed(1)}K`;
+  }
+
+  const formatted = new Intl.NumberFormat('en-GH', {
     style: 'currency',
     currency: 'GHS',
+    currencyDisplay: 'code',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   })
-    .format(isNaN(num) ? 0 : num)
-    .replace('GHS', '₵');
+    .format(Math.abs(safeVal))
+    .replace('GHS', '₵')
+    .replace(/\s+/g, '\u00A0');
+
+  if (options.showSign && safeVal > 0) return `+${formatted}`;
+  if (safeVal < 0) return `-${formatted}`;
+  return formatted;
 };
+
+function getAccountKind(acc) {
+  const type = String(acc?.account_type || '').toLowerCase();
+  const prov = String(acc?.provider || '').toLowerCase();
+  if (
+    type === 'mobile_money' ||
+    type === 'momo' ||
+    prov.includes('momo') ||
+    prov.includes('mtn') ||
+    prov.includes('telecel') ||
+    prov.includes('vodafone') ||
+    prov.includes('airteltigo')
+  ) {
+    return 'momo';
+  }
+  if (type === 'bank' || prov === 'bank') {
+    return 'bank';
+  }
+  if (type === 'cash' || prov === 'cash') {
+    return 'cash';
+  }
+  return 'cash';
+}
+
+function getAccountBadgeLabel(acc) {
+  if (acc?.provider) return acc.provider;
+  const kind = getAccountKind(acc);
+  if (kind === 'momo') return 'Mobile Money';
+  if (kind === 'bank') return 'Bank Account';
+  return 'Cash Wallet';
+}
+
+function getBudgetLimit(b) {
+  return parseFloat(b?.budgeted_amount ?? b?.amount_limit ?? b?.amount ?? 0) || 0;
+}
+
+function getBudgetSpent(b) {
+  return parseFloat(b?.spent_amount ?? b?.amount_spent ?? 0) || 0;
+}
+
+function getBudgetCategoryName(b) {
+  return (
+    b?.category?.name ||
+    b?.category_name ||
+    state.categories.find((c) => c.id === (b?.category?.id || b?.category_id))?.name ||
+    'Category'
+  );
+}
+
+function getTxnAccountName(txn) {
+  return (
+    txn?.account?.name ||
+    state.accounts.find((a) => a.id === (txn?.account?.id || txn?.account_id))?.name ||
+    'Wallet'
+  );
+}
+
+function getTxnCategoryName(txn) {
+  return (
+    txn?.category?.name ||
+    state.categories.find((c) => c.id === (txn?.category?.id || txn?.category_id))?.name ||
+    'Uncategorized'
+  );
+}
+
+function updateAvatarElements(url) {
+  const resolved = url || DEFAULT_AVATAR_URL;
+  state.avatarUrl = resolved;
+  localStorage.setItem('cedismart_avatar_url', resolved);
+  if (state.user?.id) {
+    localStorage.setItem(`user_avatar_${state.user.id}`, resolved);
+  }
+  ['sidebar-avatar-img', 'header-avatar-img', 'settings-avatar-img'].forEach((id) => {
+    const img = document.getElementById(id);
+    if (img) {
+      img.src = resolved;
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = DEFAULT_AVATAR_URL;
+      };
+    }
+  });
+}
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '—';
@@ -105,6 +211,7 @@ const showLoading = (elementId, show) => {
   }
 };
 
+// Exact match with cedismart-mobile/src/screens/dashboard/DashboardScreen.tsx safeToSpend
 function computeSafeToSpend() {
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -113,18 +220,22 @@ function computeSafeToSpend() {
   let totalLimit = 0;
   let totalSpent = 0;
   state.budgets.forEach((b) => {
-    totalLimit += parseFloat(b.amount_limit ?? b.amount ?? 0);
-    totalSpent += parseFloat(b.amount_spent ?? b.spent_amount ?? 0);
+    totalLimit += getBudgetLimit(b);
+    totalSpent += getBudgetSpent(b);
   });
 
   const remainingBudget = Math.max(0, totalLimit - totalSpent);
   const safeDaily = totalLimit > 0 ? remainingBudget / remainingDays : 0;
+  const status =
+    safeDaily > 50 ? 'healthy' : safeDaily > 15 ? 'moderate' : 'tight';
 
   return {
     totalLimit,
     totalSpent,
+    remainingBudget,
     remainingDays,
     safeDaily,
+    status,
   };
 }
 
@@ -266,24 +377,37 @@ async function fetchUserProfile() {
     const user = await apiFetch('/users/me');
     state.user = user;
 
-    document.getElementById('profile-name').textContent =
-      user.full_name || 'CediSmart Member';
-    document.getElementById('profile-phone').textContent = user.phone || '';
+    const displayName = user.full_name || 'CediSmart Member';
+    const displayPhone = user.phone || '';
+
+    const profileNameEl = document.getElementById('profile-name');
+    const profilePhoneEl = document.getElementById('profile-phone');
+    const settingsNameEl = document.getElementById('settings-avatar-name');
+    const settingsPhoneEl = document.getElementById('settings-avatar-phone');
+
+    if (profileNameEl) profileNameEl.textContent = displayName;
+    if (profilePhoneEl) profilePhoneEl.textContent = displayPhone;
+    if (settingsNameEl) settingsNameEl.textContent = displayName;
+    if (settingsPhoneEl) settingsPhoneEl.textContent = displayPhone;
 
     const fullNameInput = document.getElementById('settings-fullname');
     const emailInput = document.getElementById('settings-email');
     if (fullNameInput) fullNameInput.value = user.full_name || '';
     if (emailInput) emailInput.value = user.email || '';
 
-    const initials = (user.full_name || 'CS')
-      .split(' ')
-      .filter(Boolean)
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
-    document.getElementById('user-avatar-initials').textContent =
-      initials || 'CS';
+    const localAvatar =
+      localStorage.getItem(`user_avatar_${user.id}`) ||
+      localStorage.getItem('cedismart_avatar_url');
+    const resolvedAvatar = user.avatar_url || localAvatar || DEFAULT_AVATAR_URL;
+    updateAvatarElements(resolvedAvatar);
+
+    // If user had a local custom avatar not yet synced to backend, sync it silently
+    if (!user.avatar_url && localAvatar && localAvatar !== DEFAULT_AVATAR_URL) {
+      apiFetch('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ avatar_url: localAvatar }),
+      }).catch(() => {});
+    }
   } catch (error) {
     console.error('Failed to fetch user profile:', error);
     logoutUser();
@@ -305,6 +429,7 @@ function logoutUser() {
   state.accounts = [];
   state.categories = [];
   state.transactions = [];
+  state.summary = null;
   state.budgets = [];
 
   localStorage.removeItem('access_token');
@@ -328,6 +453,7 @@ async function loadAppData() {
     const [
       accountsData,
       categoriesData,
+      summaryData,
       transactionsPage,
       budgetsData,
       monthlyRep,
@@ -336,10 +462,11 @@ async function loadAppData() {
     ] = await Promise.all([
       apiFetch('/accounts/').catch(() => []),
       apiFetch('/categories/').catch(() => []),
+      apiFetch('/transactions/summary').catch(() => null),
       apiFetch(
         `/transactions/?page=${state.pagination.page}&per_page=${state.pagination.per_page}`
       ).catch(() => ({ data: [], pagination: { total: 0 } })),
-      apiFetch('/budgets/current').catch(() => []),
+      apiFetch('/budgets/').catch(() => []),
       apiFetch(`/reports/monthly?year=${year}&month=${month}`).catch(() => null),
       apiFetch(
         `/reports/categories?start_date=${startDate}&end_date=${endDate}&transaction_type=expense`
@@ -349,6 +476,7 @@ async function loadAppData() {
 
     state.accounts = accountsData || [];
     state.categories = categoriesData || [];
+    state.summary = summaryData;
     state.transactions = transactionsPage?.data || [];
     state.pagination.total = transactionsPage?.pagination?.total || 0;
     state.budgets = budgetsData || [];
@@ -369,10 +497,10 @@ function populateFormSelects() {
 
   if (txnAccount) {
     txnAccount.innerHTML = state.accounts
-      .map(
-        (acc) =>
-          `<option value="${acc.id}">${acc.name} (${acc.provider.toUpperCase()})</option>`
-      )
+      .map((acc) => {
+        const badge = getAccountBadgeLabel(acc).toUpperCase();
+        return `<option value="${acc.id}">${acc.name} (${badge})</option>`;
+      })
       .join('');
   }
 
@@ -513,23 +641,31 @@ function renderDashboardView() {
   state.accounts.forEach((acc) => {
     const bal = parseFloat(acc.balance || 0);
     totalBalance += bal;
-    if (acc.provider === 'momo') momoTotal += bal;
-    else if (acc.provider === 'bank') bankTotal += bal;
-    else if (acc.provider === 'cash') cashTotal += bal;
+    const kind = getAccountKind(acc);
+    if (kind === 'momo') momoTotal += bal;
+    else if (kind === 'bank') bankTotal += bal;
+    else cashTotal += bal;
   });
 
-  // Compute monthly income & expense for Hero Capsules
-  let monthIncome = parseFloat(state.monthlyReport?.total_income ?? 0);
-  let monthExpense = parseFloat(state.monthlyReport?.total_expense ?? 0);
-  if (!state.monthlyReport) {
-    state.transactions.forEach((t) => {
-      const amt = parseFloat(t.amount || 0);
-      if (t.transaction_type === 'income') monthIncome += amt;
-      else if (t.transaction_type === 'expense') monthExpense += amt;
-    });
-  }
+  // Compute monthly income & expense matching Mobile DashboardScreen.tsx (summary.current_month)
+  let monthIncome = parseFloat(
+    state.summary?.current_month?.income ??
+      state.monthlyReport?.total_income ??
+      0
+  );
+  let monthExpense = parseFloat(
+    state.summary?.current_month?.expense ??
+      state.monthlyReport?.total_expense ??
+      0
+  );
 
-  const { safeDaily, totalLimit, totalSpent, remainingDays } = computeSafeToSpend();
+  const {
+    safeDaily,
+    totalLimit,
+    remainingBudget,
+    remainingDays,
+    status,
+  } = computeSafeToSpend();
   const maskLabel = document.getElementById('mask-balance-label');
   const maskIcon = document.getElementById('mask-balance-icon');
   if (maskLabel) maskLabel.textContent = state.isMasked ? 'Show' : 'Hide';
@@ -560,7 +696,6 @@ function renderDashboardView() {
   const safeEl = document.getElementById('dash-safe-to-spend');
   const safeValEl = document.getElementById('dash-safe-daily-val');
   const safeBanner = document.getElementById('hero-safe-banner');
-  const remainingBudget = Math.max(0, totalLimit - totalSpent);
 
   if (safeEl) {
     safeEl.textContent =
@@ -574,9 +709,8 @@ function renderDashboardView() {
   if (safeBanner) {
     safeBanner.classList.remove('moderate', 'tight');
     if (totalLimit > 0) {
-      const ratio = totalSpent / totalLimit;
-      if (ratio >= 0.9) safeBanner.classList.add('tight');
-      else if (ratio >= 0.7) safeBanner.classList.add('moderate');
+      if (status === 'tight') safeBanner.classList.add('tight');
+      else if (status === 'moderate') safeBanner.classList.add('moderate');
     }
   }
 
@@ -588,12 +722,8 @@ function renderDashboardView() {
     tbody.innerHTML = state.transactions
       .slice(0, 5)
       .map((txn) => {
-        const acc =
-          state.accounts.find((a) => a.id === txn.account_id)?.name ||
-          'Wallet';
-        const cat =
-          state.categories.find((c) => c.id === txn.category_id)?.name ||
-          'General';
+        const acc = getTxnAccountName(txn);
+        const cat = getTxnCategoryName(txn);
         const amountClass =
           txn.transaction_type === 'income' ? 'text-income' : 'text-expense';
         const amountPrefix = txn.transaction_type === 'income' ? '+' : '-';
@@ -622,13 +752,15 @@ function renderDashboardView() {
     budgetList.innerHTML = state.budgets
       .slice(0, 5)
       .map((b) => {
-        const catName =
-          b.category_name ||
-          state.categories.find((c) => c.id === b.category_id)?.name ||
-          'Category';
-        const limit = parseFloat(b.amount_limit ?? b.amount ?? 0);
-        const spent = parseFloat(b.amount_spent ?? b.spent_amount ?? 0);
-        const percent = limit > 0 ? (spent / limit) * 100 : 0;
+        const catName = getBudgetCategoryName(b);
+        const limit = getBudgetLimit(b);
+        const spent = getBudgetSpent(b);
+        const percent =
+          b.percentage_used !== undefined
+            ? parseFloat(b.percentage_used)
+            : limit > 0
+            ? (spent / limit) * 100
+            : 0;
 
         let progressColor = 'success';
         if (percent >= 100) progressColor = 'danger';
@@ -637,8 +769,12 @@ function renderDashboardView() {
         return `
           <div class="budget-item">
             <div class="budget-info">
-              <span class="budget-name">${catName}</span>
-              <span class="budget-values">${formatCedi(spent)} / ${formatCedi(limit)}</span>
+              <span class="budget-name">${catName} <span class="badge" style="margin-left: 6px; font-size: 0.7rem;">${Math.round(percent)}%</span></span>
+              <span class="budget-values">${
+                state.isMasked
+                  ? '₵ •••• / ₵ ••••'
+                  : `${formatCedi(spent)} / ${formatCedi(limit)}`
+              }</span>
             </div>
             <div class="progress-bar-wrapper">
               <div class="progress-bar ${progressColor}" style="width: ${Math.min(percent, 100)}%"></div>
@@ -665,10 +801,12 @@ function renderAccountsView() {
   } else {
     container.innerHTML = state.accounts
       .map((acc) => {
-        const providerClass = `provider-${acc.provider}`;
+        const kind = getAccountKind(acc);
+        const providerClass = `provider-${kind}`;
+        const badgeLabel = getAccountBadgeLabel(acc);
         return `
           <div class="account-card ${providerClass}">
-            <span class="account-type-tag">${acc.provider}</span>
+            <span class="account-type-tag">${badgeLabel}</span>
             <div>
               <h4>${acc.name}</h4>
             </div>
@@ -704,11 +842,8 @@ function renderTransactionsView() {
 
   tbody.innerHTML = state.transactions
     .map((txn) => {
-      const acc =
-        state.accounts.find((a) => a.id === txn.account_id)?.name || 'Wallet';
-      const cat =
-        state.categories.find((c) => c.id === txn.category_id)?.name ||
-        'General';
+      const acc = getTxnAccountName(txn);
+      const cat = getTxnCategoryName(txn);
       const amountClass =
         txn.transaction_type === 'income' ? 'text-income' : 'text-expense';
       const amountPrefix = txn.transaction_type === 'income' ? '+' : '-';
@@ -777,13 +912,19 @@ function renderBudgetsView() {
 
   container.innerHTML = state.budgets
     .map((b) => {
-      const catName =
-        b.category_name ||
-        state.categories.find((c) => c.id === b.category_id)?.name ||
-        'Category';
-      const limit = parseFloat(b.amount_limit ?? b.amount ?? 0);
-      const spent = parseFloat(b.amount_spent ?? b.spent_amount ?? 0);
-      const percent = limit > 0 ? (spent / limit) * 100 : 0;
+      const catName = getBudgetCategoryName(b);
+      const limit = getBudgetLimit(b);
+      const spent = getBudgetSpent(b);
+      const remaining =
+        b.remaining_amount !== undefined
+          ? parseFloat(b.remaining_amount)
+          : Math.max(0, limit - spent);
+      const percent =
+        b.percentage_used !== undefined
+          ? parseFloat(b.percentage_used)
+          : limit > 0
+          ? (spent / limit) * 100
+          : 0;
 
       let progressColor = 'success';
       if (percent >= 100) progressColor = 'danger';
@@ -795,6 +936,7 @@ function renderBudgetsView() {
             <div>
               <span class="budget-name">${catName}</span>
               <span class="badge" style="margin-left: 8px;">${Math.round(percent)}%</span>
+              <span style="display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${formatCedi(Math.max(0, remaining))} left</span>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="budget-values">${formatCedi(spent)} / ${formatCedi(limit)}</span>
@@ -1055,7 +1197,7 @@ async function commitParsedTransaction() {
 
   try {
     let accountId = state.accounts[0]?.id;
-    const momoAcc = state.accounts.find((a) => a.provider === 'momo');
+    const momoAcc = state.accounts.find((a) => getAccountKind(a) === 'momo');
     if (momoAcc) accountId = momoAcc.id;
 
     if (!accountId) {
@@ -1141,18 +1283,37 @@ async function handleAddAccount(e) {
   errorBanner.classList.add('hidden');
 
   const name = document.getElementById('account-name').value.trim();
-  const provider = document.getElementById('account-provider').value;
+  const providerRaw = document.getElementById('account-provider').value;
   const balance = parseFloat(
     document.getElementById('account-balance').value || 0
   );
+
+  const accountTypeMap = {
+    momo: 'mobile_money',
+    mobile_money: 'mobile_money',
+    bank: 'bank',
+    cash: 'cash',
+  };
+  const accountType = accountTypeMap[providerRaw] || 'mobile_money';
+  let providerName = null;
+  if (accountType === 'mobile_money') {
+    providerName = name.toLowerCase().includes('telecel')
+      ? 'Telecel Cash'
+      : name.toLowerCase().includes('airtel')
+      ? 'AT Money'
+      : 'MTN MoMo';
+  } else if (accountType === 'bank') {
+    providerName = name;
+  }
 
   try {
     await apiFetch('/accounts/', {
       method: 'POST',
       body: JSON.stringify({
         name,
-        provider,
-        opening_balance: balance.toFixed(2),
+        account_type: accountType,
+        provider: providerName,
+        opening_balance: parseFloat(balance.toFixed(2)),
       }),
     });
 
@@ -1175,16 +1336,14 @@ async function handleUpsertBudget(e) {
 
   const categoryId = document.getElementById('budget-category').value;
   const limit = parseFloat(document.getElementById('budget-limit').value);
-  const now = new Date();
 
   try {
     await apiFetch('/budgets/', {
       method: 'POST',
       body: JSON.stringify({
         category_id: categoryId,
-        amount_limit: limit.toFixed(2),
-        year: now.getFullYear(),
-        month: now.getMonth() + 1,
+        amount: parseFloat(limit.toFixed(2)),
+        alert_at_percent: 80,
       }),
     });
 
@@ -1222,7 +1381,6 @@ async function handleGenerate503020() {
 
   showLoading('generate-503020-btn', true);
   try {
-    const now = new Date();
     const weights = [0.3, 0.2, 0.15, 0.15, 0.2];
     for (let i = 0; i < cats.length; i++) {
       const share = Math.max(50, Math.round(income * (weights[i] || 0.15)));
@@ -1230,9 +1388,8 @@ async function handleGenerate503020() {
         method: 'POST',
         body: JSON.stringify({
           category_id: cats[i].id,
-          amount_limit: share.toFixed(2),
-          year: now.getFullYear(),
-          month: now.getMonth() + 1,
+          amount: parseFloat(share.toFixed(2)),
+          alert_at_percent: 80,
         }),
       });
     }
@@ -1253,8 +1410,8 @@ async function handleExportCSV() {
   }
   const headers = ['Date', 'Type', 'Category', 'Account', 'Amount (GHS)', 'Description'];
   const rows = state.transactions.map((t) => {
-    const acc = state.accounts.find((a) => a.id === t.account_id)?.name || 'Wallet';
-    const cat = state.categories.find((c) => c.id === t.category_id)?.name || 'General';
+    const acc = getTxnAccountName(t);
+    const cat = getTxnCategoryName(t);
     return [
       t.transaction_date,
       t.transaction_type,
@@ -1273,6 +1430,35 @@ async function handleExportCSV() {
   a.click();
   URL.revokeObjectURL(url);
   showToast('CSV ledger exported!');
+}
+
+function compressAvatarImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read image file.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Invalid image file.'));
+      img.onload = () => {
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(String(reader.result));
+          return;
+        }
+        const minSide = Math.min(img.width, img.height);
+        const sx = (img.width - minSide) / 2;
+        const sy = (img.height - minSide) / 2;
+        ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.84));
+      };
+      img.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 window.handleDeleteTransaction = async function (txnId) {
@@ -1389,6 +1575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dash-view-all-budgets')?.addEventListener('click', () => navigateToView('budgets'));
   document.getElementById('header-ai-btn')?.addEventListener('click', () => navigateToView('parser'));
   document.getElementById('sidebar-profile-trigger')?.addEventListener('click', () => navigateToView('settings'));
+  document.getElementById('header-profile-btn')?.addEventListener('click', () => navigateToView('settings'));
 
   // Quick-Action Liquid Glass Squish Buttons on Dashboard
   document.getElementById('qa-add-expense')?.addEventListener('click', () => {
@@ -1468,7 +1655,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     reader.readAsDataURL(file);
   });
 
-  // 6. Settings Profile & Feedback Forms
+  // 6. Settings Profile, Avatar & Feedback Forms
+  document.getElementById('avatar-upload-input')?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressAvatarImage(file);
+      updateAvatarElements(dataUrl);
+      await apiFetch('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ avatar_url: dataUrl }),
+      });
+      showToast('Profile photo updated and synced!');
+    } catch (err) {
+      showToast(`Photo update failed: ${err.message}`, 'error');
+    } finally {
+      e.target.value = '';
+    }
+  });
+
+  document.getElementById('avatar-reset-btn')?.addEventListener('click', async () => {
+    try {
+      updateAvatarElements(DEFAULT_AVATAR_URL);
+      await apiFetch('/users/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ avatar_url: DEFAULT_AVATAR_URL }),
+      });
+      showToast('Profile photo reset to default.');
+    } catch (err) {
+      showToast(`Reset failed: ${err.message}`, 'error');
+    }
+  });
+
   document.getElementById('profile-update-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fullName = document.getElementById('settings-fullname').value.trim();

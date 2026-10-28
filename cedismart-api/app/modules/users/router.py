@@ -44,6 +44,7 @@ RedisConn = Annotated[aioredis.Redis, Depends(get_redis)]
 async def get_me(
     user_id: CurrentUser,
     db: DBSession,
+    redis: RedisConn,
 ) -> UserResponse:
     """Return the authenticated user's profile.
 
@@ -51,7 +52,16 @@ async def get_me(
     primary identity and they already know it.
     """
     user = await service.get_current_user(user_id=user_id, db=db)
-    return UserResponse.model_validate(user)
+    resp = UserResponse.model_validate(user)
+    try:
+        raw_avatar = await redis.get(f"user_avatar:{user_id}")
+        if raw_avatar:
+            resp.avatar_url = (
+                raw_avatar.decode("utf-8") if isinstance(raw_avatar, bytes) else str(raw_avatar)
+            )
+    except Exception:  # nosec B110
+        pass
+    return resp
 
 
 # ---------------------------------------------------------------------------
@@ -69,13 +79,31 @@ async def update_me(
     body: UserUpdateRequest,
     user_id: CurrentUser,
     db: DBSession,
+    redis: RedisConn,
 ) -> UserResponse:
-    """Update mutable profile fields: full_name, email, currency.
+    """Update mutable profile fields: full_name, email, currency, avatar_url.
 
     phone and PIN cannot be changed via this endpoint.
     """
     user = await service.update_current_user(user_id=user_id, payload=body, db=db)
-    return UserResponse.model_validate(user)
+    resp = UserResponse.model_validate(user)
+    try:
+        if body.avatar_url is not None:
+            if body.avatar_url == "":
+                await redis.delete(f"user_avatar:{user_id}")
+                resp.avatar_url = None
+            else:
+                await redis.set(f"user_avatar:{user_id}", body.avatar_url)
+                resp.avatar_url = body.avatar_url
+        else:
+            raw_avatar = await redis.get(f"user_avatar:{user_id}")
+            if raw_avatar:
+                resp.avatar_url = (
+                    raw_avatar.decode("utf-8") if isinstance(raw_avatar, bytes) else str(raw_avatar)
+                )
+    except Exception:  # nosec B110
+        pass
+    return resp
 
 
 # ---------------------------------------------------------------------------

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=2.0.2">
   <link rel="icon" type="image/jpg" href="../assets/app_icon.jpg">
 </head>
 <body class="dark-mode">
@@ -153,8 +153,11 @@
             <small>How to use CediSmart</small>
           </div>
         </a>
-        <div class="user-profile" id="sidebar-profile-trigger" title="Open Settings">
-          <div class="user-avatar" id="user-avatar-initials">CS</div>
+        <div class="user-profile" id="sidebar-profile-trigger" title="Open Profile & Settings">
+          <div class="user-avatar" id="user-avatar-wrapper">
+            <img id="sidebar-avatar-img" class="user-avatar-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPbtwyh4Eo_96C5zd6dFJFY9kbHP067jJpa7Aayw3aUk1co9x1_rJZOkN1473J1n10wGOmZyH_imPk56BMFUhtqh97n0NlHcDadkkvYPKlykD_wgKQ0fNUrBK4Iu1lJLUicP3eclDQXCGAAWUx5hODGPkFmHdt7ak3QMG9zCIQ1woeQWjZ7lpo8WpbJ3fIQepJ_Q7ZT7r1xyJBsDS0TdhOmQJP54CdoizSC8UpE8ln59Y5-6_lJNv8GhvkiAlc4Ddi9D8xyhpQ_YM" alt="Profile Photo">
+            <span id="user-avatar-initials" class="hidden">CS</span>
+          </div>
           <div class="user-details">
             <span class="user-name" id="profile-name">Cedi User</span>
             <span class="user-phone" id="profile-phone">+233 -- --- ----</span>
@@ -175,7 +178,7 @@
           <button id="mobile-menu-btn" class="btn-icon mobile-menu-btn" aria-label="Open Navigation">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
           </button>
-          <div>
+          <div class="header-titles">
             <h1 id="view-title">Dashboard</h1>
             <p id="view-subtitle" class="text-secondary">Here's your real-time financial standing</p>
           </div>
@@ -186,9 +189,12 @@
           <button id="header-ai-btn" class="btn btn-secondary btn-sm" title="Open AI CFO">
             <span>🎧 AI CFO</span>
           </button>
-          <button id="quick-add-btn" class="btn btn-primary btn-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <button id="quick-add-btn" class="btn btn-primary btn-sm" title="Log Transaction">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>Log Transaction</span>
+          </button>
+          <button type="button" id="header-profile-btn" class="header-avatar-btn" title="My Profile & Settings">
+            <img id="header-avatar-img" class="user-avatar-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPbtwyh4Eo_96C5zd6dFJFY9kbHP067jJpa7Aayw3aUk1co9x1_rJZOkN1473J1n10wGOmZyH_imPk56BMFUhtqh97n0NlHcDadkkvYPKlykD_wgKQ0fNUrBK4Iu1lJLUicP3eclDQXCGAAWUx5hODGPkFmHdt7ak3QMG9zCIQ1woeQWjZ7lpo8WpbJ3fIQepJ_Q7ZT7r1xyJBsDS0TdhOmQJP54CdoizSC8UpE8ln59Y5-6_lJNv8GhvkiAlc4Ddi9D8xyhpQ_YM" alt="Profile">
           </button>
         </div>
       </header>
@@ -653,9 +659,27 @@
             <!-- Profile & Appearance -->
             <div class="panel-card">
               <div class="card-header">
-                <h3>Profile & Appearance</h3>
+                <h3>Profile &amp; Appearance</h3>
               </div>
               <div class="card-body">
+                <!-- Apple/Mobile-Style Profile Photo Card -->
+                <div class="settings-profile-hero">
+                  <div class="settings-avatar-ring">
+                    <img id="settings-avatar-img" class="user-avatar-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPbtwyh4Eo_96C5zd6dFJFY9kbHP067jJpa7Aayw3aUk1co9x1_rJZOkN1473J1n10wGOmZyH_imPk56BMFUhtqh97n0NlHcDadkkvYPKlykD_wgKQ0fNUrBK4Iu1lJLUicP3eclDQXCGAAWUx5hODGPkFmHdt7ak3QMG9zCIQ1woeQWjZ7lpo8WpbJ3fIQepJ_Q7ZT7r1xyJBsDS0TdhOmQJP54CdoizSC8UpE8ln59Y5-6_lJNv8GhvkiAlc4Ddi9D8xyhpQ_YM" alt="Profile Photo">
+                  </div>
+                  <div class="settings-profile-meta">
+                    <h4 id="settings-profile-name-display">CediSmart Member</h4>
+                    <p id="settings-profile-phone-display" class="text-secondary">+233 -- --- ----</p>
+                    <div class="settings-avatar-actions">
+                      <label class="btn btn-secondary btn-sm" style="cursor: pointer;">
+                        📷 Change Photo
+                        <input type="file" id="avatar-upload-input" accept="image/*" class="hidden">
+                      </label>
+                      <button type="button" id="avatar-reset-btn" class="btn btn-text btn-sm">Reset</button>
+                    </div>
+                  </div>
+                </div>
+
                 <form id="profile-update-form">
                   <div class="input-group">
                     <label for="settings-fullname">Full Name</label>
@@ -764,10 +788,6 @@
       <button type="button" class="mobile-tab-item" data-view="budgets">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
         <span>Budgets</span>
-      </button>
-      <button type="button" class="mobile-tab-item" data-view="parser">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-        <span>AI CFO</span>
       </button>
       <button type="button" class="mobile-tab-item" data-view="settings">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -897,6 +917,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2.0.2"></script>
 </body>
 </html>

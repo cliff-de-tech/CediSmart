@@ -19,6 +19,7 @@ class UserUpdateRequest(BaseModel):
     email: EmailStr | None = None
     currency: str | None = Field(None, min_length=3, max_length=3)
     is_premium: bool | None = None
+    avatar_url: str | None = Field(None, max_length=2_000_000)
 
     @field_validator("currency")
     @classmethod
@@ -53,6 +54,7 @@ class UserResponse(BaseModel):
     has_premium_access: bool
     kyc_verified: bool
     ghana_card: str | None
+    avatar_url: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -75,6 +77,7 @@ class UserResponse(BaseModel):
                 "has_premium_access": data.has_premium_access,
                 "kyc_verified": data.kyc_verified,
                 "ghana_card": data.ghana_card,
+                "avatar_url": getattr(data, "avatar_url", None),
                 "created_at": data.created_at,
             }
         return data
