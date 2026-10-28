@@ -396,8 +396,10 @@ async function fetchUserProfile() {
 
     const fullNameInput = document.getElementById('settings-fullname');
     const emailInput = document.getElementById('settings-email');
+    const escPhone = document.getElementById('escalate-phone');
     if (fullNameInput) fullNameInput.value = user.full_name || '';
     if (emailInput) emailInput.value = user.email || '';
+    if (escPhone && displayPhone) escPhone.value = displayPhone;
 
     const localAvatar =
       localStorage.getItem(`user_avatar_${user.id}`) ||
@@ -977,35 +979,73 @@ function renderBudgetsView() {
 // --- E. GEMINI SMS PARSER PREVIEW ---
 function renderParserView() {
   const container = document.getElementById('parser-preview-body');
-  if (!state.parsedSMS) return;
+  if (!container) return;
+  if (!state.parsedSMS) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding: 24px 16px;">
+        <span class="empty-icon">🤖</span>
+        <p>Extracted transaction details will appear here with 1-click confirmation.</p>
+      </div>
+    `;
+    return;
+  }
 
-  const { amount, transaction_type, description, category_suggestion, notes } =
-    state.parsedSMS;
-  const typeClass =
-    transaction_type === 'income' ? 'badge-type income' : 'badge-type expense';
+  const { amount, transaction_type, description, category_suggestion } = state.parsedSMS;
+  const isIncome = transaction_type === 'income';
+  const typeBadgeClass = isIncome ? 'badge-type income' : 'badge-type expense';
+
+  const accountsOptions = state.accounts
+    .map((a) => {
+      const isMomo = getAccountKind(a) === 'momo';
+      return `<option value="${a.id}" ${isMomo ? 'selected' : ''}>${a.name} (${formatCedi(a.balance)})</option>`;
+    })
+    .join('');
+
+  const categoryOptions = state.categories
+    .map((c) => {
+      const isMatch = (c.name || '').toLowerCase() === (category_suggestion || '').toLowerCase();
+      return `<option value="${c.id}" ${isMatch ? 'selected' : ''}>${c.name}</option>`;
+    })
+    .join('');
 
   container.innerHTML = `
-    <div class="parsed-record-box">
-      <div class="parsed-header-summary">
+    <div class="parsed-receipt-card">
+      <div class="parsed-receipt-top">
         <div>
-          <span class="parsed-amount-label">Extracted Amount</span>
-          <h4 class="parsed-amount-value">${formatCedi(amount)}</h4>
+          <span class="text-secondary" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Extracted Amount</span>
+          <div class="parsed-receipt-amount">${formatCedi(amount)}</div>
         </div>
-        <span class="${typeClass}">${transaction_type}</span>
+        <span class="${typeBadgeClass}">${transaction_type.toUpperCase()}</span>
       </div>
 
-      <div class="parsed-details-list">
-        <div class="parsed-field-row">
-          <span class="parsed-field-label">Counterparty / Description:</span>
-          <span class="parsed-field-val">${description || 'MoMo Transaction'}</span>
+      <div class="parsed-receipt-fields">
+        <div class="input-group">
+          <label for="parsed-save-account">Target Wallet / Account</label>
+          <select id="parsed-save-account" required>
+            ${accountsOptions || '<option value="">Default Wallet</option>'}
+          </select>
         </div>
-        <div class="parsed-field-row">
-          <span class="parsed-field-label">Suggested Category:</span>
-          <span class="parsed-field-val"><span class="badge-tag">${category_suggestion || 'General'}</span></span>
+        <div class="input-group">
+          <label for="parsed-save-category">Category</label>
+          <select id="parsed-save-category" required>
+            ${categoryOptions || '<option value="">General</option>'}
+          </select>
         </div>
-        <div class="parsed-field-row">
-          <span class="parsed-field-label">Notes:</span>
-          <span class="parsed-field-val">${notes || 'Parsed by Gemini 2.5 Flash'}</span>
+      </div>
+
+      <div class="input-group">
+        <label for="parsed-save-desc">Description / Counterparty</label>
+        <input type="text" id="parsed-save-desc" value="${description || 'MoMo SMS Alert'}" required>
+      </div>
+
+      <div class="form-row">
+        <div class="input-group">
+          <label for="parsed-save-amount">Adjust Amount (GH₵)</label>
+          <input type="number" id="parsed-save-amount" step="0.01" min="0.01" value="${parseFloat(amount || 0).toFixed(2)}" required>
+        </div>
+        <div class="input-group">
+          <label for="parsed-save-date">Transaction Date</label>
+          <input type="date" id="parsed-save-date" value="${new Date().toISOString().split('T')[0]}" required>
         </div>
       </div>
 
@@ -1109,31 +1149,133 @@ function renderReportsView() {
 // ---------------------------------------------------------------------------
 // 8. INTERACTIVE ACTIONS & AI CFO HANDLERS
 // ---------------------------------------------------------------------------
+function formatAssistantText(rawText) {
+  if (!rawText) return '';
+  let safe = rawText
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Bold **text**
+  safe = safe.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // Italic *text*
+  safe = safe.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  // Highlight Cedi amounts like GH₵ 50.00 or ₵ 50.00
+  safe = safe.replace(/((?:GH₵|₵|GHS)\s*[\d,]+(?:\.\d{2})?)/gi, '<span class="text-income font-semibold">$1</span>');
+  // Bullet points
+  safe = safe.replace(/^\s*[-•*]\s+(.*)$/gm, '<li class="ai-bullet-item">$1</li>');
+  safe = safe.replace(/(<li class="ai-bullet-item">.*?<\/li>)+/gs, '<ul class="ai-bullet-list">$&</ul>');
+  // Newlines
+  safe = safe.replace(/\n\n+/g, '<br><br>').replace(/\n/g, '<br>');
+
+  return safe;
+}
+
 function appendAiMessage(role, text) {
   const box = document.getElementById('ai-messages-box');
   if (!box) return;
+
   const wrapper = document.createElement('div');
   wrapper.className = `ai-msg ${role}`;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'ai-msg-avatar';
+  avatar.textContent = role === 'assistant' ? '🎧' : '👤';
+
+  const content = document.createElement('div');
+  content.className = 'ai-msg-content';
+
   const bubble = document.createElement('div');
   bubble.className = 'ai-msg-bubble';
-  bubble.textContent = text;
-  wrapper.appendChild(bubble);
+  if (role === 'assistant') {
+    bubble.innerHTML = formatAssistantText(text);
+  } else {
+    bubble.textContent = text;
+  }
+
+  const meta = document.createElement('div');
+  meta.className = 'ai-msg-meta';
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  meta.innerHTML = `
+    <span>${now}</span>
+    ${
+      role === 'assistant'
+        ? `<button type="button" class="copy-msg-btn" onclick="copyAssistantMessage(this)" title="Copy text">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>`
+        : ''
+    }
+  `;
+
+  content.appendChild(bubble);
+  content.appendChild(meta);
+  wrapper.appendChild(avatar);
+  wrapper.appendChild(content);
+
   box.appendChild(wrapper);
   box.scrollTop = box.scrollHeight;
 }
 
-async function handleAiChatSubmit(e, imageBase64 = null, imageMime = null) {
+window.copyAssistantMessage = function (btn) {
+  const bubble = btn.closest('.ai-msg-content')?.querySelector('.ai-msg-bubble');
+  if (!bubble) return;
+  const text = bubble.innerText || bubble.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Copied to clipboard!');
+  }).catch(() => {
+    showToast('Failed to copy', 'error');
+  });
+};
+
+function showAiTypingIndicator() {
+  const box = document.getElementById('ai-messages-box');
+  if (!box || document.getElementById('ai-typing-indicator')) return;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ai-msg assistant typing-msg';
+  wrapper.id = 'ai-typing-indicator';
+  wrapper.innerHTML = `
+    <div class="ai-msg-avatar">🎧</div>
+    <div class="ai-msg-content">
+      <div class="ai-msg-bubble typing-bubble">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>
+  `;
+  box.appendChild(wrapper);
+  box.scrollTop = box.scrollHeight;
+}
+
+function removeAiTypingIndicator() {
+  const el = document.getElementById('ai-typing-indicator');
+  if (el) el.remove();
+}
+
+async function handleAiChatSubmit(e) {
   if (e) e.preventDefault();
   const input = document.getElementById('ai-chat-input');
-  const text = (input?.value || '').trim() || (imageBase64 ? 'Please scan this receipt and extract the transaction details.' : '');
-  if (!text) return;
+  let text = (input?.value || '').trim();
+  const hasStaged = Boolean(state.stagedReceipt);
+
+  if (!text && !hasStaged) return;
+  if (!text && hasStaged) {
+    text = 'Please scan this receipt and extract the transaction details.';
+  }
 
   if (input) input.value = '';
-  appendAiMessage('user', imageBase64 ? `📷 [Receipt Attached] ${text}` : text);
+
+  const staged = state.stagedReceipt;
+  state.stagedReceipt = null;
+  const previewBar = document.getElementById('ai-receipt-preview-bar');
+  if (previewBar) previewBar.classList.add('hidden');
+
+  appendAiMessage('user', staged ? `📷 [Receipt Attached: ${staged.name}] ${text}` : text);
   state.aiMessages.push({ role: 'user', content: text });
 
   const sendBtn = document.getElementById('ai-send-btn');
   if (sendBtn) sendBtn.disabled = true;
+  showAiTypingIndicator();
 
   try {
     const autoPilot = document.getElementById('ai-autopilot-toggle')?.checked || false;
@@ -1149,9 +1291,9 @@ async function handleAiChatSubmit(e, imageBase64 = null, imageMime = null) {
       auto_pilot: autoPilot,
       deep_audit: deepAudit,
     };
-    if (imageBase64) {
-      payload.image_base64 = imageBase64;
-      payload.image_mime_type = imageMime || 'image/jpeg';
+    if (staged) {
+      payload.image_base64 = staged.base64;
+      payload.image_mime_type = staged.mime || 'image/jpeg';
     }
 
     const res = await apiFetch('/support/chat', {
@@ -1159,6 +1301,7 @@ async function handleAiChatSubmit(e, imageBase64 = null, imageMime = null) {
       body: JSON.stringify(payload),
     });
 
+    removeAiTypingIndicator();
     const reply = res?.response || 'I processed your request.';
     state.aiMessages.push({ role: 'assistant', content: reply });
     appendAiMessage('assistant', reply);
@@ -1185,6 +1328,7 @@ async function handleAiChatSubmit(e, imageBase64 = null, imageMime = null) {
       }
     }
   } catch (err) {
+    removeAiTypingIndicator();
     appendAiMessage('assistant', `Sorry Chale, ${err.message}`);
   } finally {
     if (sendBtn) sendBtn.disabled = false;
@@ -1216,43 +1360,38 @@ async function handleParseSMS() {
 }
 
 async function commitParsedTransaction() {
-  if (!state.parsedSMS) return;
   const btn = document.getElementById('add-parsed-ledger-btn');
   if (btn) btn.disabled = true;
 
   try {
-    let accountId = state.accounts[0]?.id;
-    const momoAcc = state.accounts.find((a) => getAccountKind(a) === 'momo');
-    if (momoAcc) accountId = momoAcc.id;
+    const accountId = document.getElementById('parsed-save-account')?.value || state.accounts[0]?.id;
+    const categoryId = document.getElementById('parsed-save-category')?.value || state.categories[0]?.id;
+    const amount = parseFloat(document.getElementById('parsed-save-amount')?.value || state.parsedSMS?.amount || '0');
+    const description = document.getElementById('parsed-save-desc')?.value.trim() || state.parsedSMS?.description || 'MoMo SMS Alert';
+    const date = document.getElementById('parsed-save-date')?.value || new Date().toISOString().split('T')[0];
+    const type = state.parsedSMS?.transaction_type || 'expense';
 
     if (!accountId) {
-      showToast('Please create at least one account under Accounts first.', 'error');
+      showToast('Please create an account under Wallets first.', 'error');
       return;
     }
-
-    let categoryId = state.categories[0]?.id;
-    const matchedCat = state.categories.find(
-      (c) =>
-        c.name.toLowerCase() ===
-        (state.parsedSMS.category_suggestion || '').toLowerCase()
-    );
-    if (matchedCat) categoryId = matchedCat.id;
 
     await apiFetch('/transactions/', {
       method: 'POST',
       body: JSON.stringify({
         account_id: accountId,
         category_id: categoryId,
-        amount: parseFloat(state.parsedSMS.amount).toFixed(2),
-        transaction_type: state.parsedSMS.transaction_type || 'expense',
-        description: state.parsedSMS.description || 'MoMo SMS Transaction',
-        transaction_date: new Date().toISOString().split('T')[0],
+        amount: amount.toFixed(2),
+        transaction_type: type,
+        description: description,
+        transaction_date: date,
       }),
     });
 
     showToast('Transaction saved to ledger!');
     state.parsedSMS = null;
     document.getElementById('parser-sms-input').value = '';
+    renderParserView();
     await loadAppData();
     navigateToView('dashboard');
   } catch (error) {
@@ -1261,6 +1400,108 @@ async function commitParsedTransaction() {
     if (btn) btn.disabled = false;
   }
 }
+
+async function handleSupportEscalate(e) {
+  e.preventDefault();
+  const phone = document.getElementById('escalate-phone')?.value.trim();
+  const category = document.getElementById('escalate-category')?.value;
+  const query = document.getElementById('escalate-query')?.value.trim();
+  const resultBox = document.getElementById('escalate-result-box');
+
+  if (!phone || !query) return;
+
+  showLoading('escalate-submit-btn', true);
+  if (resultBox) resultBox.classList.add('hidden');
+
+  try {
+    const res = await apiFetch('/support/escalate', {
+      method: 'POST',
+      body: JSON.stringify({
+        phone: phone,
+        user_query: `[${category}] ${query}`,
+        chat_history: state.aiMessages.slice(-10),
+        device_diagnostics: {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          screen: `${window.innerWidth}x${window.innerHeight}`,
+          url: window.location.href,
+        },
+      }),
+    });
+
+    if (resultBox) {
+      resultBox.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 10px;">
+          <span style="font-size: 1.3rem;">✅</span>
+          <div>
+            <strong>Support Ticket #${res.issue_number} Created</strong>
+            <p style="margin: 4px 0 8px; font-size: 0.85rem; color: var(--text-secondary);">${res.message}</p>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <a href="${res.issue_url}" target="_blank" class="btn btn-text btn-sm" style="padding: 0;">View GitHub Issue ↗</a>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="lookupTicket('${res.issue_number}')">Track Live Status</button>
+            </div>
+          </div>
+        </div>
+      `;
+      resultBox.classList.remove('hidden');
+    }
+
+    document.getElementById('support-escalate-form')?.reset();
+    showToast(`Ticket #${res.issue_number} submitted to engineering team!`);
+  } catch (err) {
+    showToast(`Escalation failed: ${err.message}`, 'error');
+  } finally {
+    showLoading('escalate-submit-btn', false);
+  }
+}
+
+window.lookupTicket = async function (issueNumber) {
+  const resultContainer = document.getElementById('ticket-lookup-result');
+  if (!issueNumber) {
+    issueNumber = document.getElementById('ticket-lookup-id')?.value.trim();
+  }
+  if (!issueNumber) {
+    showToast('Please enter an issue / ticket number', 'error');
+    return;
+  }
+
+  showLoading('ticket-lookup-btn', true);
+  if (resultContainer) resultContainer.classList.add('hidden');
+
+  try {
+    const data = await apiFetch(`/support/ticket-status/${issueNumber}`);
+    if (resultContainer) {
+      const stateBadge = data.state === 'open' ? 'badge-accent' : 'badge-tag';
+      resultContainer.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <strong>Ticket #${data.issue_number}: ${data.title}</strong>
+          <span class="badge ${stateBadge}">${data.status_label || data.state}</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;">
+          Live status: ${data.user_status}
+        </p>
+        ${
+          data.pr_url
+            ? `<div style="font-size: 0.78rem; margin-bottom: 6px;">🤖 Automated Fix PR: <a href="${data.pr_url}" target="_blank">View Pull Request ↗</a> (${data.pr_state})</div>`
+            : ''
+        }
+        ${
+          data.latest_agent_comment
+            ? `<div style="font-size: 0.75rem; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; margin-top: 6px;">💬 Agent note: ${data.latest_agent_comment.slice(0, 200)}...</div>`
+            : ''
+        }
+        <div style="margin-top: 10px;">
+          <a href="${data.issue_url}" target="_blank" class="btn btn-text btn-sm" style="padding: 0;">Open on GitHub ↗</a>
+        </div>
+      `;
+      resultContainer.classList.remove('hidden');
+    }
+  } catch (err) {
+    showToast(`Ticket lookup failed: ${err.message}`, 'error');
+  } finally {
+    showLoading('ticket-lookup-btn', false);
+  }
+};
 
 async function handleAddTransaction(e) {
   e.preventDefault();
@@ -1836,27 +2077,74 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // 5. AI CFO Chat & SMS Parser
-  document.getElementById('parser-submit-btn')?.addEventListener('click', handleParseSMS);
-  document.getElementById('fill-sample-sms-btn')?.addEventListener('click', () => {
-    const input = document.getElementById('parser-sms-input');
-    if (input) {
-      input.value =
-        'Payment made for GHS 85.00 to SHELL AIRPORT SERVICE STATION. Current Balance: GHS 1,240.50. Transaction ID: 4920184920. Fee charged: GHS 0.50.';
-    }
-  });
+  // 5. Support Sub-Navigation Tabs & Assistant Listeners
+  const supportTabs = document.querySelectorAll('.support-subnav-pill');
+  const supportPanels = {
+    chat: document.getElementById('support-panel-chat'),
+    parser: document.getElementById('support-panel-parser'),
+    tickets: document.getElementById('support-panel-tickets'),
+  };
 
-  document.getElementById('ai-chat-form')?.addEventListener('submit', (e) => handleAiChatSubmit(e));
-
-  document.querySelectorAll('#ai-lang-selector .lang-pill').forEach((pill) => {
+  supportTabs.forEach((pill) => {
     pill.addEventListener('click', () => {
-      document.querySelectorAll('#ai-lang-selector .lang-pill').forEach((p) => p.classList.remove('active'));
+      const tabKey = pill.getAttribute('data-support-tab');
+      supportTabs.forEach((p) => p.classList.remove('active'));
       pill.classList.add('active');
-      state.aiLanguage = pill.getAttribute('data-lang') || 'english';
-      showToast(`AI Language set to ${pill.textContent.trim()}`);
+
+      Object.entries(supportPanels).forEach(([key, panel]) => {
+        if (panel) {
+          panel.classList.toggle('active', key === tabKey);
+        }
+      });
     });
   });
 
+  // Desktop Split View Toggle
+  document.getElementById('support-split-view-btn')?.addEventListener('click', () => {
+    const layout = document.getElementById('support-layout-container');
+    const btn = document.getElementById('support-split-view-btn');
+    if (!layout) return;
+    layout.classList.toggle('split-view');
+    btn?.classList.toggle('active', layout.classList.contains('split-view'));
+    showToast(layout.classList.contains('split-view') ? 'Split View enabled' : 'Tab View enabled');
+  });
+
+  // Support Chat Form Submit
+  document.getElementById('ai-chat-form')?.addEventListener('submit', (e) => handleAiChatSubmit(e));
+
+  // Clear Chat History
+  document.getElementById('clear-ai-chat-btn')?.addEventListener('click', () => {
+    if (!confirm('Clear chat conversation with Support?')) return;
+    state.aiMessages = [];
+    const box = document.getElementById('ai-messages-box');
+    if (box) {
+      box.innerHTML = `
+        <div class="ai-msg assistant">
+          <div class="ai-msg-avatar">🎧</div>
+          <div class="ai-msg-content">
+            <div class="ai-msg-bubble">
+              Chat history cleared. How can I assist you with your ledger today?
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    showToast('Support chat cleared.');
+  });
+
+  // Quick Starter Prompts Chips
+  document.querySelectorAll('.quick-prompt-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const prompt = chip.getAttribute('data-prompt');
+      const input = document.getElementById('ai-chat-input');
+      if (input && prompt) {
+        input.value = prompt;
+        handleAiChatSubmit();
+      }
+    });
+  });
+
+  // Receipt Staging & File Input
   document.getElementById('ai-receipt-input')?.addEventListener('change', (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1864,9 +2152,67 @@ document.addEventListener('DOMContentLoaded', async () => {
     reader.onload = () => {
       const result = String(reader.result || '');
       const base64 = result.includes(',') ? result.split(',')[1] : result;
-      handleAiChatSubmit(null, base64, file.type || 'image/jpeg');
+      state.stagedReceipt = {
+        base64: base64,
+        mime: file.type || 'image/jpeg',
+        name: file.name || 'receipt.jpg',
+      };
+      const previewBar = document.getElementById('ai-receipt-preview-bar');
+      const nameEl = document.getElementById('ai-receipt-filename');
+      if (nameEl) nameEl.textContent = file.name || 'receipt.jpg';
+      if (previewBar) previewBar.classList.remove('hidden');
+      document.getElementById('ai-chat-input')?.focus();
     };
     reader.readAsDataURL(file);
+  });
+
+  document.getElementById('clear-receipt-btn')?.addEventListener('click', () => {
+    state.stagedReceipt = null;
+    const previewBar = document.getElementById('ai-receipt-preview-bar');
+    if (previewBar) previewBar.classList.add('hidden');
+    const input = document.getElementById('ai-receipt-input');
+    if (input) input.value = '';
+  });
+
+  // Realistic Ghanaian SMS Alert Samples
+  const SMS_SAMPLES = {
+    mtn: 'Payment made for GHS 85.00 to SHELL AIRPORT SERVICE STATION. Current Balance: GHS 1,240.50. Transaction ID: 4920184920. Fee charged: GHS 0.50.',
+    telecel: 'You have received GHS 350.00 from Kweku Adomako (233201234567). Your Telecel Cash balance is GHS 820.40. Reference: School fees. Trans ID: 10492810.',
+    gcb: 'GCB Alert: Your Account ****4821 has been debited with GHS 420.00 at MELCOM ADABRAKA on 28-OCT-2026. Available Bal: GHS 3,150.00.',
+  };
+
+  document.querySelectorAll('.sample-sms-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-sample');
+      const text = SMS_SAMPLES[key];
+      const input = document.getElementById('parser-sms-input');
+      if (input && text) {
+        input.value = text;
+        showToast(`Loaded ${btn.textContent.trim()} sample`);
+      }
+    });
+  });
+
+  document.getElementById('parser-clear-btn')?.addEventListener('click', () => {
+    const input = document.getElementById('parser-sms-input');
+    if (input) input.value = '';
+    state.parsedSMS = null;
+    renderParserView();
+  });
+
+  document.getElementById('parser-submit-btn')?.addEventListener('click', handleParseSMS);
+
+  // Support Developer Escalation Form & Ticket Status Lookup
+  document.getElementById('support-escalate-form')?.addEventListener('submit', handleSupportEscalate);
+  document.getElementById('ticket-lookup-btn')?.addEventListener('click', () => lookupTicket());
+
+  document.querySelectorAll('#ai-lang-selector .lang-pill').forEach((pill) => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('#ai-lang-selector .lang-pill').forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      state.aiLanguage = pill.getAttribute('data-lang') || 'english';
+      showToast(`Language set to ${pill.textContent.trim()}`);
+    });
   });
 
   // 6. Settings Profile, Avatar & Feedback Forms

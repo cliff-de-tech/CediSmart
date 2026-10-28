@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css?v=2.0.3">
+  <link rel="stylesheet" href="app.css?v=2.0.4">
   <link rel="icon" type="image/jpg" href="../assets/app_icon.jpg">
 </head>
 <body class="dark-mode">
@@ -506,76 +506,237 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- VIEW 5: AI CFO CHAT & GEMINI SMS PARSER -->
+        <!-- VIEW 5: CEDISMART SUPPORT & SMS PARSER -->
         <!-- ========================================== -->
         <section id="view-parser" class="view-section hidden">
-          <div class="parser-layout">
-            <!-- Left: CediSmart AI CFO Assistant -->
-            <div class="panel-card ai-chat-panel">
-              <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <h3>🎧 CediSmart Support</h3>
-                  <span class="badge badge-accent">AI Helper</span>
+          <!-- Support Sub-Navigation Segmented Switch -->
+          <div class="support-subnav-bar">
+            <div class="support-tab-group">
+              <button type="button" class="support-subnav-pill active" data-support-tab="chat">
+                <span class="pill-icon">🎧</span>
+                <span>Support Chat</span>
+              </button>
+              <button type="button" class="support-subnav-pill" data-support-tab="parser">
+                <span class="pill-icon">✨</span>
+                <span>SMS Parser</span>
+              </button>
+              <button type="button" class="support-subnav-pill" data-support-tab="tickets">
+                <span class="pill-icon">🎫</span>
+                <span>Developer Ticket</span>
+              </button>
+            </div>
+            <button type="button" class="support-split-toggle-btn" id="support-split-view-btn" title="Toggle Split View on Desktop">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
+              <span>Split View</span>
+            </button>
+          </div>
+
+          <div class="parser-layout" id="support-layout-container">
+            <!-- 1. LEFT CARD: CediSmart Support Chat Assistant -->
+            <div class="panel-card ai-chat-panel support-tab-content active" id="support-panel-chat">
+              <div class="card-header support-chat-header">
+                <div class="support-header-meta">
+                  <div class="support-status-avatar">
+                    <span class="support-status-emoji">🎧</span>
+                    <span class="online-pulse-dot" title="Online &amp; Ready"></span>
+                  </div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <h3 style="margin: 0; font-size: 1.05rem;">CediSmart Support</h3>
+                      <span class="badge badge-accent" style="font-size: 0.65rem;">Gemini 2.5</span>
+                    </div>
+                    <span class="support-status-text">Sovereign financial guidance &amp; MoMo audit</span>
+                  </div>
                 </div>
-                <div class="ai-lang-pills" id="ai-lang-selector">
-                  <button type="button" class="lang-pill active" data-lang="english">🇬🇭 English</button>
-                  <button type="button" class="lang-pill" data-lang="pidgin">💬 Pidgin</button>
-                  <button type="button" class="lang-pill" data-lang="twi">🇬🇭 Twi</button>
+
+                <div class="support-header-actions">
+                  <!-- Language Selector -->
+                  <div class="ai-lang-pills" id="ai-lang-selector">
+                    <button type="button" class="lang-pill active" data-lang="english" title="English">🇬🇭 EN</button>
+                    <button type="button" class="lang-pill" data-lang="pidgin" title="Pidgin">💬 Pidgin</button>
+                    <button type="button" class="lang-pill" data-lang="twi" title="Twi">🇬🇭 Twi</button>
+                  </div>
+                  <!-- Clear Chat -->
+                  <button type="button" class="btn-icon-sm" id="clear-ai-chat-btn" title="Clear Conversation">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
                 </div>
               </div>
+
+              <!-- Controls Strip -->
               <div class="ai-controls-strip">
-                <label class="ai-toggle-chip">
+                <label class="ai-toggle-chip" title="Auto-commit transactions without confirmation">
                   <input type="checkbox" id="ai-autopilot-toggle">
                   <span>⚡ Auto-Pilot</span>
                 </label>
-                <label class="ai-toggle-chip">
+                <label class="ai-toggle-chip" title="Deep forensic budget &amp; expense audit">
                   <input type="checkbox" id="ai-deepaudit-toggle">
                   <span>🧠 Deep Audit</span>
                 </label>
-                <label class="ai-toggle-chip">
+                <label class="ai-toggle-chip" title="Speak assistant replies with natural voice">
                   <input type="checkbox" id="ai-autospeak-toggle">
-                  <span>🔊 Speak Replies</span>
+                  <span>🔊 Voice Reply</span>
                 </label>
               </div>
+
+              <!-- Messages Box -->
               <div class="ai-messages-box" id="ai-messages-box">
                 <div class="ai-msg assistant">
-                  <div class="ai-msg-bubble">
-                    Akwaaba! I'm your CediSmart Support Assistant. Ask me about your balances, budgets, or paste a MoMo SMS / receipt image to log transactions.
+                  <div class="ai-msg-avatar">🎧</div>
+                  <div class="ai-msg-content">
+                    <div class="ai-msg-bubble">
+                      <strong>Akwaaba!</strong> I'm your CediSmart Support Assistant.<br><br>
+                      I can inspect your accounts, calculate your daily safe-to-spend allowance, suggest budget optimizations, or parse MoMo receipts. How can I help you today?
+                    </div>
+                    <div class="ai-msg-meta">
+                      <span>Just now</span>
+                      <button type="button" class="copy-msg-btn" onclick="copyAssistantMessage(this)" title="Copy text">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              <!-- Quick Starter Prompts Row -->
+              <div class="ai-quick-prompts-row" id="ai-quick-prompts-row">
+                <button type="button" class="quick-prompt-chip" data-prompt="What is my current net balance and safe-to-spend today?">
+                  <span>⚡</span> Safe-to-spend today?
+                </button>
+                <button type="button" class="quick-prompt-chip" data-prompt="Analyze my top spending categories this month and give 3 ways to save.">
+                  <span>📊</span> Spending analysis
+                </button>
+                <button type="button" class="quick-prompt-chip" data-prompt="What are the current Ghana MoMo transaction fee tiers and E-Levy rules?">
+                  <span>🇬🇭</span> MoMo fees &amp; E-Levy
+                </button>
+                <button type="button" class="quick-prompt-chip" data-prompt="Help me generate a 50/30/20 budget for my income.">
+                  <span>💡</span> 50/30/20 rule help
+                </button>
+              </div>
+
+              <!-- Attached Staged Receipt Preview Bar -->
+              <div class="ai-receipt-preview-bar hidden" id="ai-receipt-preview-bar">
+                <div class="receipt-preview-info">
+                  <span class="receipt-icon">📷</span>
+                  <span class="receipt-filename" id="ai-receipt-filename">receipt_image.jpg</span>
+                  <span class="badge badge-accent" style="font-size: 0.65rem;">Staged for Analysis</span>
+                </div>
+                <button type="button" class="btn-icon-xs" id="clear-receipt-btn" title="Remove attachment">&times;</button>
+              </div>
+
+              <!-- Chat Input Bar -->
               <form id="ai-chat-form" class="ai-chat-input-bar">
-                <label class="btn-icon" title="Attach Receipt Photo" style="cursor: pointer;">
-                  📷
+                <label class="btn-icon receipt-upload-btn" title="Attach Receipt or MoMo Screenshot" style="cursor: pointer;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
                   <input type="file" id="ai-receipt-input" accept="image/*" class="hidden">
                 </label>
-                <input type="text" id="ai-chat-input" placeholder="Ask about your budget, or say 'Log 50 cedis for fuel'..." required>
-                <button type="submit" id="ai-send-btn" class="btn btn-primary btn-sm">Send</button>
+                <input type="text" id="ai-chat-input" placeholder="Type a message, or ask 'Log 35 cedis for Waakye'..." required>
+                <button type="submit" id="ai-send-btn" class="btn btn-primary btn-sm">
+                  <span>Send</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
               </form>
             </div>
 
-            <!-- Right: Instant MoMo & Bank SMS Parser -->
-            <div class="panel-card">
+            <!-- 2. RIGHT CARD: Instant MoMo & Bank SMS Parser -->
+            <div class="panel-card support-tab-content active" id="support-panel-parser">
               <div class="card-header">
-                <h3>✨ Instant MoMo & Bank SMS Parser</h3>
-                <button type="button" id="fill-sample-sms-btn" class="btn btn-text">Try Sample SMS</button>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <h3>✨ Instant SMS &amp; Alert Parser</h3>
+                  <span class="badge" style="font-size: 0.68rem;">NLP</span>
+                </div>
               </div>
               <div class="card-body">
-                <p class="text-secondary mb-4" style="font-size: 0.875rem;">
-                  Paste any transaction SMS alert from MTN MoMo, Telecel Cash, AT Money, or Ghanaian banks to extract structured ledger fields automatically.
-                </p>
-                <div class="input-group">
-                  <textarea id="parser-sms-input" rows="5" placeholder="e.g., Payment received for GHS 250.00 from Kwame Mensah. Current Balance: GHS 1,450.00. Transaction ID: 294810294."></textarea>
+                <div class="parser-providers-row">
+                  <span class="provider-pill mtn">MTN MoMo</span>
+                  <span class="provider-pill telecel">Telecel Cash</span>
+                  <span class="provider-pill at">AT Money</span>
+                  <span class="provider-pill banks">Ghana Banks</span>
                 </div>
-                <button id="parser-submit-btn" class="btn btn-accent btn-block mb-4">
-                  <span class="btn-text">✨ Parse SMS with Gemini AI</span>
-                  <div class="spinner hidden"></div>
-                </button>
-                <div id="parser-preview-body">
-                  <div class="empty-state" style="padding: 28px 16px;">
+
+                <!-- Realistic Ghana Sample SMS Chips -->
+                <div class="sample-sms-chips">
+                  <span class="sample-chip-label">Try sample:</span>
+                  <button type="button" class="sample-sms-btn" data-sample="mtn">🟡 MTN MoMo</button>
+                  <button type="button" class="sample-sms-btn" data-sample="telecel">🔴 Telecel</button>
+                  <button type="button" class="sample-sms-btn" data-sample="gcb">🔵 GCB Debit</button>
+                </div>
+
+                <div class="input-group" style="margin-top: 10px;">
+                  <textarea id="parser-sms-input" rows="4" placeholder="Paste raw transaction SMS alert from MTN MoMo, Telecel, AT Money, GCB, Ecobank, Zenith..."></textarea>
+                </div>
+
+                <div class="parser-actions-row">
+                  <button type="button" id="parser-clear-btn" class="btn btn-secondary btn-sm">Clear</button>
+                  <button id="parser-submit-btn" class="btn btn-accent btn-sm flex-1">
+                    <span class="btn-text">✨ Parse with Gemini AI</span>
+                    <div class="spinner hidden"></div>
+                  </button>
+                </div>
+
+                <!-- Parser Output Area -->
+                <div id="parser-preview-body" style="margin-top: 16px;">
+                  <div class="empty-state" style="padding: 24px 16px;">
                     <span class="empty-icon">🤖</span>
-                    <p>Extracted transaction fields will appear here ready for 1-click saving.</p>
+                    <p>Extracted transaction details will appear here with 1-click confirmation.</p>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. THIRD CARD: Ticket Escalation & Developer Support -->
+            <div class="panel-card support-tab-content" id="support-panel-tickets">
+              <div class="card-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <h3>🎫 Developer Ticket Escalation</h3>
+                  <span class="badge badge-accent">Direct Issue Log</span>
+                </div>
+              </div>
+              <div class="card-body">
+                <p class="text-secondary" style="font-size: 0.85rem; margin-bottom: 16px;">
+                  Experienced a bug, syncing anomaly, or need human developer intervention? Escalate your issue directly to the CediSmart development engineering team with automated GitHub tracking.
+                </p>
+
+                <form id="support-escalate-form">
+                  <div class="form-row">
+                    <div class="input-group">
+                      <label for="escalate-phone">Contact Phone</label>
+                      <input type="tel" id="escalate-phone" placeholder="+233 XX XXX XXXX" required>
+                    </div>
+                    <div class="input-group">
+                      <label for="escalate-category">Issue Category</label>
+                      <select id="escalate-category">
+                        <option value="sms_parsing">SMS Auto-Sync Anomaly</option>
+                        <option value="balance_discrepancy">Balance Discrepancy</option>
+                        <option value="bank_momo_link">Account / Wallet Issue</option>
+                        <option value="ui_ux_bug">UI / Visual Glitch</option>
+                        <option value="feature_request">Feature Proposal</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="input-group">
+                    <label for="escalate-query">Describe What Happened</label>
+                    <textarea id="escalate-query" rows="4" placeholder="Detail the issue, steps to reproduce, or transaction details affected..." required></textarea>
+                  </div>
+
+                  <div id="escalate-result-box" class="ticket-status-card hidden mb-4"></div>
+
+                  <button type="submit" id="escalate-submit-btn" class="btn btn-primary btn-block">
+                    <span>🚀 Escalate &amp; Open Developer Ticket</span>
+                    <div class="spinner hidden"></div>
+                  </button>
+                </form>
+
+                <!-- Live Ticket Lookup -->
+                <div class="divider" style="margin: 22px 0;"></div>
+                <div class="ticket-lookup-section">
+                  <h4 style="font-size: 0.9rem; margin-bottom: 8px;">Check Ticket Status</h4>
+                  <div class="ticket-lookup-bar">
+                    <input type="number" id="ticket-lookup-id" placeholder="Enter Issue / Ticket # (e.g. 142)">
+                    <button type="button" id="ticket-lookup-btn" class="btn btn-secondary btn-sm">Lookup</button>
+                  </div>
+                  <div id="ticket-lookup-result" class="ticket-status-card hidden" style="margin-top: 12px;"></div>
                 </div>
               </div>
             </div>
@@ -988,6 +1149,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=2.0.3"></script>
+  <script src="app.js?v=2.0.4"></script>
 </body>
 </html>
