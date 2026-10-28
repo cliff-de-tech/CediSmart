@@ -48,7 +48,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="CediSmart API",
         description="Production-grade fintech budget management API for Ghana",
-        version="0.1.0",
+        version="2.0.0",
         docs_url="/docs" if settings.DEBUG else None,
         redoc_url="/redoc" if settings.DEBUG else None,
         lifespan=lifespan,
@@ -74,7 +74,7 @@ def create_app() -> FastAPI:
     async def health_check() -> dict[str, Any]:
         return {
             "status": "healthy",
-            "version": "0.1.2",
+            "version": "2.0.0",
             "has_gemini": bool(settings.GEMINI_API_KEY),
             "gemini_prefix": settings.GEMINI_API_KEY[:6] if settings.GEMINI_API_KEY else "",
         }

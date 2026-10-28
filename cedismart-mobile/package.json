@@ -1,6 +1,6 @@
 {
   "name": "cedismart-mobile",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "main": "index.ts",
   "dependencies": {
     "@clerk/clerk-expo": "^2.19.31",
