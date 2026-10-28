@@ -3834,12 +3834,12 @@ const SettingsScreen = ({ navigation, route }: any) => {
           {(() => {
             const guidesMap = {
               sms: {
-                title: 'MoMo & Bank SMS Auto-Logging',
+                title: 'SMS Auto-Sync',
                 subtitle: 'Zero-friction transaction tracking for MTN MoMo, Telecel Cash, AT Money & Ghanaian banks.',
                 color: '#10b981',
                 icon: Sparkles,
                 hash: '#sms-auto-sync',
-                ctaLabel: 'Try SMS Auto-Import',
+                ctaLabel: 'Try SMS Import',
                 onCta: () => {
                   guideSheetRef.current?.close();
                   setTimeout(() => navigation.navigate('AddTransaction'), 200);
@@ -3863,12 +3863,12 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 ],
               },
               budgets: {
-                title: 'Safe-to-Spend & Smart Budgets',
+                title: 'Smart Budgets',
                 subtitle: 'Stay ahead of monthly category limits and know your exact daily spending allowance.',
                 color: '#4c56af',
                 icon: PieChart,
                 hash: '#budgets',
-                ctaLabel: 'Open Budgets Tab',
+                ctaLabel: 'Open Budgets',
                 onCta: () => {
                   guideSheetRef.current?.close();
                   setTimeout(() => navigation.navigate('BudgetsTab'), 200);
@@ -3892,12 +3892,12 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 ],
               },
               gestures: {
-                title: 'Gestures, Voice AI & Offline Mode',
+                title: 'Voice & Gestures',
                 subtitle: 'Navigate at 120fps with Apple-style swipe gestures, hands-free voice AI, and offline resilience.',
                 color: isDark ? '#4ade80' : '#0d631b',
                 icon: Smartphone,
                 hash: '#voice-ai',
-                ctaLabel: 'Launch AI Voice & Chat Assistant',
+                ctaLabel: 'Open AI Assistant',
                 onCta: () => {
                   guideSheetRef.current?.close();
                   setTimeout(() => setIsSupportModalVisible(true), 220);
@@ -3921,12 +3921,12 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 ],
               },
               profiles: {
-                title: 'Personal vs. Business Profiles',
+                title: 'Multi-Profile & KYC',
                 subtitle: 'Separate personal and side-hustle finances on one device and unlock Tier 1 verification.',
                 color: '#d97706',
                 icon: Users,
                 hash: '#profiles',
-                ctaLabel: 'Open Profile Switcher',
+                ctaLabel: 'Switch Profile',
                 onCta: () => {
                   guideSheetRef.current?.close();
                   setTimeout(() => switchSheetRef.current?.snapToIndex(0), 220);
@@ -4058,7 +4058,7 @@ const SettingsScreen = ({ navigation, route }: any) => {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={activeGuide.onCta}
-                  className="w-full py-4 rounded-2xl bg-primary items-center justify-center flex-row shadow-lg shadow-primary/25 mt-2"
+                  className="w-full py-4 px-5 rounded-2xl bg-primary items-center justify-center flex-row shadow-lg shadow-primary/25 mt-2"
                 >
                   <Text className="text-white font-bold text-base mr-2">{activeGuide.ctaLabel}</Text>
                   <ChevronRight size={18} color="#ffffff" />
