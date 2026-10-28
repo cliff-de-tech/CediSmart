@@ -382,8 +382,12 @@ async function fetchUserProfile() {
 
     const profileNameEl = document.getElementById('profile-name');
     const profilePhoneEl = document.getElementById('profile-phone');
-    const settingsNameEl = document.getElementById('settings-avatar-name');
-    const settingsPhoneEl = document.getElementById('settings-avatar-phone');
+    const settingsNameEl =
+      document.getElementById('settings-profile-name-display') ||
+      document.getElementById('settings-avatar-name');
+    const settingsPhoneEl =
+      document.getElementById('settings-profile-phone-display') ||
+      document.getElementById('settings-avatar-phone');
 
     if (profileNameEl) profileNameEl.textContent = displayName;
     if (profilePhoneEl) profilePhoneEl.textContent = displayPhone;
@@ -579,16 +583,16 @@ function navigateToView(viewName) {
       subtitle: 'Daily Safe-to-Spend & 50/30/20 category limits',
     },
     parser: {
-      title: 'CediSmart AI CFO & SMS Parser',
-      subtitle: 'Tri-lingual financial assistant, receipt vision & SMS rescue',
+      title: 'Support & SMS',
+      subtitle: 'Financial support, receipt vision & SMS rescue',
     },
     reports: {
       title: 'Reports & Cash Flow Intelligence',
       subtitle: 'Monthly KPIs, category shares & 6-month velocity',
     },
     settings: {
-      title: 'Settings & Guides',
-      subtitle: 'Profile, Light/Dark appearance, User Guide & Support',
+      title: 'Settings',
+      subtitle: 'Profile, Light/Dark appearance & support',
     },
   };
 
@@ -855,11 +859,20 @@ function renderTransactionsView() {
           <td data-label="Category"><span class="badge-tag">${cat}</span></td>
           <td data-label="Account" class="text-secondary">${acc}</td>
           <td data-label="Type"><span class="badge-type ${txn.transaction_type}">${txn.transaction_type}</span></td>
-          <td data-label="Amount" class="text-right ${amountClass} font-semibold">${amountPrefix} ${formatCedi(txn.amount)}</td>
+          <td data-label="Amount" class="text-right ${amountClass} font-semibold">${
+            state.isMasked
+              ? '₵ ••••'
+              : `${amountPrefix} ${formatCedi(txn.amount)}`
+          }</td>
           <td data-label="Action" class="text-center">
-            <button class="btn-action-delete" onclick="handleDeleteTransaction('${txn.id}')" title="Delete record">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-            </button>
+            <div style="display: inline-flex; gap: 6px; align-items: center; justify-content: center;">
+              <button class="btn-action-edit" onclick="handleEditTransaction('${txn.id}')" title="Edit record">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              </button>
+              <button class="btn-action-delete" onclick="handleDeleteTransaction('${txn.id}')" title="Delete record">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+            </div>
           </td>
         </tr>
       `;
@@ -888,14 +901,17 @@ function renderBudgetsView() {
   const overallPct =
     totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0;
 
-  document.getElementById('budgets-safe-daily').textContent =
-    formatCedi(safeDaily);
+  document.getElementById('budgets-safe-daily').textContent = state.isMasked
+    ? '₵ ••••'
+    : formatCedi(safeDaily);
   document.getElementById('budgets-days-left').textContent =
     `${remainingDays} days remaining in month`;
-  document.getElementById('budgets-total-limit').textContent =
-    formatCedi(totalLimit);
-  document.getElementById('budgets-total-spent').textContent =
-    formatCedi(totalSpent);
+  document.getElementById('budgets-total-limit').textContent = state.isMasked
+    ? '₵ ••••'
+    : formatCedi(totalLimit);
+  document.getElementById('budgets-total-spent').textContent = state.isMasked
+    ? '₵ ••••'
+    : formatCedi(totalSpent);
   document.getElementById('budgets-overall-pct').textContent =
     `${overallPct}% of monthly budget used`;
 
@@ -927,8 +943,8 @@ function renderBudgetsView() {
           : 0;
 
       let progressColor = 'success';
-      if (percent >= 100) progressColor = 'danger';
-      else if (percent >= 80) progressColor = 'warning';
+      if (percent >= 90) progressColor = 'danger';
+      else if (percent >= 70) progressColor = 'warning';
 
       return `
         <div class="budget-item" style="padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
@@ -936,10 +952,14 @@ function renderBudgetsView() {
             <div>
               <span class="budget-name">${catName}</span>
               <span class="badge" style="margin-left: 8px;">${Math.round(percent)}%</span>
-              <span style="display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${formatCedi(Math.max(0, remaining))} left</span>
+              <span style="display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${
+                state.isMasked ? '₵ •••• left' : `${formatCedi(Math.max(0, remaining))} left`
+              }</span>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
-              <span class="budget-values">${formatCedi(spent)} / ${formatCedi(limit)}</span>
+              <span class="budget-values">${
+                state.isMasked ? '₵ •••• / ₵ ••••' : `${formatCedi(spent)} / ${formatCedi(limit)}`
+              }</span>
               <button class="btn-action-delete" onclick="handleDeleteBudget('${b.id}')" title="Remove Budget">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               </button>
@@ -1021,12 +1041,15 @@ function renderReportsView() {
       ? ((totalIncome - totalExpenses) / totalIncome) * 100
       : 0;
 
-  document.getElementById('report-total-income').textContent =
-    formatCedi(totalIncome);
-  document.getElementById('report-total-expense').textContent =
-    formatCedi(totalExpenses);
-  document.getElementById('report-net-savings').textContent =
-    formatCedi(netSavings);
+  document.getElementById('report-total-income').textContent = state.isMasked
+    ? '₵ ••••'
+    : formatCedi(totalIncome);
+  document.getElementById('report-total-expense').textContent = state.isMasked
+    ? '₵ ••••'
+    : formatCedi(totalExpenses);
+  document.getElementById('report-net-savings').textContent = state.isMasked
+    ? '₵ ••••'
+    : formatCedi(netSavings);
   document.getElementById('report-savings-rate').textContent =
     `Savings Rate: ${savingsRate.toFixed(1)}%`;
 
@@ -1042,7 +1065,9 @@ function renderReportsView() {
           <div class="category-report-row">
             <div class="category-report-meta">
               <span class="category-report-name">${c.name || c.category_name}</span>
-              <span class="category-report-percent">${formatCedi(c.amount || c.total)} (${pct.toFixed(1)}%)</span>
+              <span class="category-report-percent">${
+                state.isMasked ? '₵ ••••' : formatCedi(c.amount || c.total)
+              } (${pct.toFixed(1)}%)</span>
             </div>
             <div class="progress-bar-wrapper">
               <div class="progress-bar success" style="width: ${Math.min(pct, 100)}%"></div>
@@ -1461,6 +1486,61 @@ function compressAvatarImage(file) {
   });
 }
 
+window.handleEditTransaction = function (txnId) {
+  const txn = state.transactions.find((t) => t.id === txnId);
+  if (!txn) {
+    showToast('Transaction record not found.', 'error');
+    return;
+  }
+  const editModal = document.getElementById('edit-txn-modal');
+  if (!editModal) return;
+
+  const idInput = document.getElementById('edit-txn-id');
+  const typeInput = document.getElementById('edit-txn-type');
+  const amountInput = document.getElementById('edit-txn-amount');
+  const descInput = document.getElementById('edit-txn-desc');
+  const accSelect = document.getElementById('edit-txn-account');
+  const catSelect = document.getElementById('edit-txn-category');
+  const dateInput = document.getElementById('edit-txn-date');
+  const errBanner = document.getElementById('edit-txn-error');
+
+  if (idInput) idInput.value = txn.id;
+  if (typeInput) typeInput.value = txn.transaction_type || 'expense';
+  if (amountInput) amountInput.value = parseFloat(txn.amount || 0).toFixed(2);
+  if (descInput) descInput.value = txn.description || '';
+
+  if (accSelect) {
+    accSelect.innerHTML = state.accounts
+      .map(
+        (a) =>
+          `<option value="${a.id}" ${
+            a.id === (txn.account_id || txn.account?.id) ? 'selected' : ''
+          }>${a.name} (${formatCedi(a.balance)})</option>`
+      )
+      .join('');
+  }
+
+  if (catSelect) {
+    catSelect.innerHTML = state.categories
+      .map(
+        (c) =>
+          `<option value="${c.id}" ${
+            c.id === (txn.category_id || txn.category?.id) ? 'selected' : ''
+          }>${c.name}</option>`
+      )
+      .join('');
+  }
+
+  if (dateInput) {
+    dateInput.value = txn.transaction_date
+      ? txn.transaction_date.split('T')[0]
+      : new Date().toISOString().split('T')[0];
+  }
+
+  if (errBanner) errBanner.classList.add('hidden');
+  editModal.classList.add('active');
+};
+
 window.handleDeleteTransaction = async function (txnId) {
   if (!confirm('Delete this transaction record?')) return;
   try {
@@ -1509,6 +1589,13 @@ function applyTheme(mode) {
   const appBtn = document.getElementById('app-theme-toggle');
   if (authBtn) authBtn.textContent = icon;
   if (appBtn) appBtn.textContent = icon;
+
+  const lightBtn = document.getElementById('theme-btn-light');
+  const darkBtn = document.getElementById('theme-btn-dark');
+  if (lightBtn && darkBtn) {
+    lightBtn.classList.toggle('active', isLight);
+    darkBtn.classList.toggle('active', !isLight);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1579,16 +1666,53 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Quick-Action Liquid Glass Squish Buttons on Dashboard
   document.getElementById('qa-add-expense')?.addEventListener('click', () => {
-    document.getElementById('txn-modal')?.classList.add('active');
+    const txnModal = document.getElementById('txn-modal');
+    if (txnModal) {
+      const typeSelect = document.getElementById('txn-type');
+      if (typeSelect) typeSelect.value = 'expense';
+      txnModal.classList.add('active');
+    }
+  });
+  document.getElementById('qa-add-income')?.addEventListener('click', () => {
+    const txnModal = document.getElementById('txn-modal');
+    if (txnModal) {
+      const typeSelect = document.getElementById('txn-type');
+      if (typeSelect) typeSelect.value = 'income';
+      txnModal.classList.add('active');
+    }
   });
   document.getElementById('qa-import-sms')?.addEventListener('click', () => {
     navigateToView('parser');
     setTimeout(() => document.getElementById('parser-sms-input')?.focus(), 150);
   });
-  document.getElementById('qa-open-accounts')?.addEventListener('click', () => navigateToView('accounts'));
+  document.getElementById('qa-open-support')?.addEventListener('click', () => {
+    navigateToView('parser');
+    setTimeout(() => document.getElementById('ai-chat-input')?.focus(), 150);
+  });
   document.getElementById('qa-open-aicfo')?.addEventListener('click', () => {
     navigateToView('parser');
     setTimeout(() => document.getElementById('ai-chat-input')?.focus(), 150);
+  });
+  document.getElementById('qa-open-accounts')?.addEventListener('click', () => navigateToView('accounts'));
+
+  // Interactive Dashboard Wallet Cards (MoMo, Bank, Cash)
+  ['dash-wallet-momo', 'dash-wallet-bank', 'dash-wallet-cash'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('click', () => navigateToView('accounts'));
+  });
+
+  // Quick Amount Increment Preset Buttons (+10, +20, +50, +100)
+  document.querySelectorAll('.quick-amount-chips .amount-chip-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const parent = btn.closest('.quick-amount-chips');
+      const targetId = parent?.getAttribute('data-target');
+      const input = targetId ? document.getElementById(targetId) : null;
+      if (!input) return;
+      const inc = parseFloat(btn.getAttribute('data-inc') || '0');
+      const current = parseFloat(input.value || '0');
+      input.value = (current + inc).toFixed(2);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
   });
 
   // Privacy Balance Masking Toggle
@@ -1602,6 +1726,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const txnModal = document.getElementById('txn-modal');
   const accountModal = document.getElementById('account-modal');
   const budgetModal = document.getElementById('budget-modal');
+  const editTxnModal = document.getElementById('edit-txn-modal');
 
   document.getElementById('quick-add-btn')?.addEventListener('click', () => txnModal.classList.add('active'));
   document.getElementById('add-txn-btn')?.addEventListener('click', () => txnModal.classList.add('active'));
@@ -1616,11 +1741,100 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('budget-modal-close-btn')?.addEventListener('click', () => budgetModal.classList.remove('active'));
   document.getElementById('budget-modal-cancel-btn')?.addEventListener('click', () => budgetModal.classList.remove('active'));
 
+  document.getElementById('edit-txn-close-btn')?.addEventListener('click', () => editTxnModal?.classList.remove('active'));
+  document.getElementById('edit-txn-cancel-btn')?.addEventListener('click', () => editTxnModal?.classList.remove('active'));
+
   document.getElementById('txn-form')?.addEventListener('submit', handleAddTransaction);
   document.getElementById('account-form')?.addEventListener('submit', handleAddAccount);
   document.getElementById('budget-form')?.addEventListener('submit', handleUpsertBudget);
   document.getElementById('generate-503020-btn')?.addEventListener('click', handleGenerate503020);
   document.getElementById('export-csv-btn')?.addEventListener('click', handleExportCSV);
+
+  // Edit Transaction Form Submit
+  document.getElementById('edit-txn-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const txnId = document.getElementById('edit-txn-id')?.value;
+    const type = document.getElementById('edit-txn-type')?.value;
+    const amount = parseFloat(document.getElementById('edit-txn-amount')?.value);
+    const description = document.getElementById('edit-txn-desc')?.value.trim();
+    const categoryId = document.getElementById('edit-txn-category')?.value;
+    const date = document.getElementById('edit-txn-date')?.value;
+    const errBanner = document.getElementById('edit-txn-error');
+
+    if (errBanner) errBanner.classList.add('hidden');
+
+    try {
+      await apiFetch(`/transactions/${txnId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          transaction_type: type,
+          amount: amount,
+          description: description,
+          category_id: categoryId,
+          transaction_date: date,
+        }),
+      });
+
+      editTxnModal?.classList.remove('active');
+      await loadAppData();
+      renderActiveView(state.currentView);
+      showToast('Transaction updated successfully!');
+    } catch (err) {
+      if (errBanner) {
+        errBanner.textContent = err.message || 'Failed to update transaction.';
+        errBanner.classList.remove('hidden');
+      } else {
+        showToast(err.message, 'error');
+      }
+    }
+  });
+
+  // Tap modal backdrop to dismiss
+  document.querySelectorAll('.modal-wrapper').forEach((modal) => {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        modal.classList.remove('active');
+      }
+    });
+  });
+
+  // Desktop keyboard shortcuts (Power user navigation & fast logging)
+  document.addEventListener('keydown', (e) => {
+    const activeTag = document.activeElement?.tagName?.toLowerCase();
+    if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-wrapper.active').forEach((m) => m.classList.remove('active'));
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-wrapper.active').forEach((m) => m.classList.remove('active'));
+      closeMobileSidebar();
+    } else if (e.key === 'n' || e.key === 'N') {
+      e.preventDefault();
+      txnModal.classList.add('active');
+    } else if (e.key === 't' || e.key === 'T') {
+      e.preventDefault();
+      const current = localStorage.getItem('cedismart_theme') || 'dark';
+      applyTheme(current === 'light' ? 'dark' : 'light');
+    } else if (e.key === 'm' || e.key === 'M') {
+      e.preventDefault();
+      state.isMasked = !state.isMasked;
+      localStorage.setItem('cedismart_mask_balance', String(state.isMasked));
+      renderActiveView(state.currentView);
+    } else if (e.key === '1') {
+      navigateToView('dashboard');
+    } else if (e.key === '2') {
+      navigateToView('accounts');
+    } else if (e.key === '3') {
+      navigateToView('transactions');
+    } else if (e.key === '4') {
+      navigateToView('budgets');
+    } else if (e.key === '5') {
+      navigateToView('parser');
+    }
+  });
 
   // 5. AI CFO Chat & SMS Parser
   document.getElementById('parser-submit-btn')?.addEventListener('click', handleParseSMS);

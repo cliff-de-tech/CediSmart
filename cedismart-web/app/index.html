@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#080a08">
-  <title>CediSmart Web App — Sovereign Financial Ledger & AI CFO</title>
+  <title>CediSmart Web App — Sovereign Financial Ledger & Support</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css?v=2.0.2">
+  <link rel="stylesheet" href="app.css?v=2.0.3">
   <link rel="icon" type="image/jpg" href="../assets/app_icon.jpg">
 </head>
 <body class="dark-mode">
@@ -132,7 +132,7 @@
         </button>
         <button class="nav-item" data-view="parser">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          <span>AI CFO & SMS</span>
+          <span>Support &amp; SMS</span>
           <span class="badge badge-accent">AI</span>
         </button>
         <button class="nav-item" data-view="reports">
@@ -141,18 +141,11 @@
         </button>
         <button class="nav-item" data-view="settings">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-          <span>Settings & Guides</span>
+          <span>Settings</span>
         </button>
       </nav>
 
       <div class="sidebar-footer">
-        <a href="../docs.html" target="_blank" class="sidebar-guide-card">
-          <span>📚</span>
-          <div>
-            <strong>User Guide</strong>
-            <small>How to use CediSmart</small>
-          </div>
-        </a>
         <div class="user-profile" id="sidebar-profile-trigger" title="Open Profile & Settings">
           <div class="user-avatar" id="user-avatar-wrapper">
             <img id="sidebar-avatar-img" class="user-avatar-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPbtwyh4Eo_96C5zd6dFJFY9kbHP067jJpa7Aayw3aUk1co9x1_rJZOkN1473J1n10wGOmZyH_imPk56BMFUhtqh97n0NlHcDadkkvYPKlykD_wgKQ0fNUrBK4Iu1lJLUicP3eclDQXCGAAWUx5hODGPkFmHdt7ak3QMG9zCIQ1woeQWjZ7lpo8WpbJ3fIQepJ_Q7ZT7r1xyJBsDS0TdhOmQJP54CdoizSC8UpE8ln59Y5-6_lJNv8GhvkiAlc4Ddi9D8xyhpQ_YM" alt="Profile Photo">
@@ -186,9 +179,6 @@
         <div class="header-right">
           <div class="live-date" id="live-date-display"></div>
           <button id="app-theme-toggle" class="btn-icon-round" title="Toggle Light / Dark Theme">☀️</button>
-          <button id="header-ai-btn" class="btn btn-secondary btn-sm" title="Open AI CFO">
-            <span>🎧 AI CFO</span>
-          </button>
           <button id="quick-add-btn" class="btn btn-primary btn-sm" title="Log Transaction">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>Log Transaction</span>
@@ -272,7 +262,7 @@
 
             <!-- 3 Wallet Glass Cards (MoMo, Bank, Cash) -->
             <div class="wallet-trio-grid">
-              <div class="metric-card glass-surface-card">
+              <div class="metric-card glass-surface-card clickable-wallet-card" id="dash-wallet-momo" title="View Wallets & Accounts">
                 <div class="metric-header">
                   <span class="metric-label">Mobile Money (MoMo)</span>
                   <span class="metric-icon-badge momo">📱</span>
@@ -282,7 +272,7 @@
                   <span class="metric-trend text-muted">MTN, Telecel &amp; AT Money</span>
                 </div>
               </div>
-              <div class="metric-card glass-surface-card">
+              <div class="metric-card glass-surface-card clickable-wallet-card" id="dash-wallet-bank" title="View Wallets & Accounts">
                 <div class="metric-header">
                   <span class="metric-label">Bank Accounts</span>
                   <span class="metric-icon-badge bank">🏦</span>
@@ -292,7 +282,7 @@
                   <span class="metric-trend text-muted">Connected Ghanaian banks</span>
                 </div>
               </div>
-              <div class="metric-card glass-surface-card">
+              <div class="metric-card glass-surface-card clickable-wallet-card" id="dash-wallet-cash" title="View Wallets & Accounts">
                 <div class="metric-header">
                   <span class="metric-label">Cash Ledger</span>
                   <span class="metric-icon-badge cash">💵</span>
@@ -313,23 +303,23 @@
               </div>
               <span class="glass-squish-caption">Add Expense</span>
             </button>
+            <button type="button" class="glass-squish-btn" id="qa-add-income">
+              <div class="glass-squish-surface tint-indigo">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
+              </div>
+              <span class="glass-squish-caption">Add Income</span>
+            </button>
             <button type="button" class="glass-squish-btn" id="qa-import-sms">
               <div class="glass-squish-surface tint-gold">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"></path></svg>
               </div>
               <span class="glass-squish-caption">Import SMS</span>
             </button>
-            <button type="button" class="glass-squish-btn" id="qa-open-accounts">
-              <div class="glass-squish-surface tint-indigo">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="3" y1="22" x2="21" y2="22"></line><line x1="6" y1="18" x2="6" y2="11"></line><line x1="10" y1="18" x2="10" y2="11"></line><line x1="14" y1="18" x2="14" y2="11"></line><line x1="18" y1="18" x2="18" y2="11"></line><polygon points="12 2 20 7 4 7"></polygon></svg>
-              </div>
-              <span class="glass-squish-caption">Accounts</span>
-            </button>
-            <button type="button" class="glass-squish-btn" id="qa-open-aicfo">
+            <button type="button" class="glass-squish-btn" id="qa-open-support">
               <div class="glass-squish-surface tint-teal">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
               </div>
-              <span class="glass-squish-caption">AI CFO</span>
+              <span class="glass-squish-caption">Support</span>
             </button>
           </div>
 
@@ -524,8 +514,8 @@
             <div class="panel-card ai-chat-panel">
               <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
                 <div style="display: flex; align-items: center; gap: 10px;">
-                  <h3>🎧 CediSmart AI CFO</h3>
-                  <span class="badge badge-accent">Gemini 2.5</span>
+                  <h3>🎧 CediSmart Support</h3>
+                  <span class="badge badge-accent">AI Helper</span>
                 </div>
                 <div class="ai-lang-pills" id="ai-lang-selector">
                   <button type="button" class="lang-pill active" data-lang="english">🇬🇭 English</button>
@@ -550,7 +540,7 @@
               <div class="ai-messages-box" id="ai-messages-box">
                 <div class="ai-msg assistant">
                   <div class="ai-msg-bubble">
-                    Akwaaba! I'm your CediSmart AI CFO. Ask me about your balances, budgets, or paste a MoMo SMS / receipt image to log transactions.
+                    Akwaaba! I'm your CediSmart Support Assistant. Ask me about your balances, budgets, or paste a MoMo SMS / receipt image to log transactions.
                   </div>
                 </div>
               </div>
@@ -652,7 +642,7 @@
         </section>
 
         <!-- ========================================== -->
-        <!-- VIEW 7: SETTINGS, APPEARANCE & GUIDES -->
+        <!-- VIEW 7: SETTINGS & APPEARANCE -->
         <!-- ========================================== -->
         <section id="view-settings" class="view-section hidden">
           <div class="dashboard-details-grid">
@@ -662,41 +652,58 @@
                 <h3>Profile &amp; Appearance</h3>
               </div>
               <div class="card-body">
-                <!-- Apple/Mobile-Style Profile Photo Card -->
+                <!-- Apple/Mobile-Style Profile Photo Hero -->
                 <div class="settings-profile-hero">
-                  <div class="settings-avatar-ring">
-                    <img id="settings-avatar-img" class="user-avatar-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPbtwyh4Eo_96C5zd6dFJFY9kbHP067jJpa7Aayw3aUk1co9x1_rJZOkN1473J1n10wGOmZyH_imPk56BMFUhtqh97n0NlHcDadkkvYPKlykD_wgKQ0fNUrBK4Iu1lJLUicP3eclDQXCGAAWUx5hODGPkFmHdt7ak3QMG9zCIQ1woeQWjZ7lpo8WpbJ3fIQepJ_Q7ZT7r1xyJBsDS0TdhOmQJP54CdoizSC8UpE8ln59Y5-6_lJNv8GhvkiAlc4Ddi9D8xyhpQ_YM" alt="Profile Photo">
+                  <div class="settings-avatar-wrapper">
+                    <div class="settings-avatar-ring">
+                      <img id="settings-avatar-img" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCPbtwyh4Eo_96C5zd6dFJFY9kbHP067jJpa7Aayw3aUk1co9x1_rJZOkN1473J1n10wGOmZyH_imPk56BMFUhtqh97n0NlHcDadkkvYPKlykD_wgKQ0fNUrBK4Iu1lJLUicP3eclDQXCGAAWUx5hODGPkFmHdt7ak3QMG9zCIQ1woeQWjZ7lpo8WpbJ3fIQepJ_Q7ZT7r1xyJBsDS0TdhOmQJP54CdoizSC8UpE8ln59Y5-6_lJNv8GhvkiAlc4Ddi9D8xyhpQ_YM" alt="Profile Photo">
+                      <label for="avatar-upload-input" class="avatar-camera-badge" title="Change profile photo" aria-label="Change photo">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                      </label>
+                    </div>
+                    <input type="file" id="avatar-upload-input" accept="image/*" class="hidden">
                   </div>
                   <div class="settings-profile-meta">
-                    <h4 id="settings-profile-name-display">CediSmart Member</h4>
-                    <p id="settings-profile-phone-display" class="text-secondary">+233 -- --- ----</p>
+                    <div class="profile-meta-top">
+                      <h4 id="settings-profile-name-display" class="settings-user-name">CediSmart Member</h4>
+                      <span class="badge badge-accent">PRO MEMBER</span>
+                    </div>
+                    <p id="settings-profile-phone-display" class="settings-user-phone">+233 -- --- ----</p>
                     <div class="settings-avatar-actions">
-                      <label class="btn btn-secondary btn-sm" style="cursor: pointer;">
-                        📷 Change Photo
-                        <input type="file" id="avatar-upload-input" accept="image/*" class="hidden">
-                      </label>
-                      <button type="button" id="avatar-reset-btn" class="btn btn-text btn-sm">Reset</button>
+                      <label for="avatar-upload-input" class="btn-link">Change Photo</label>
+                      <span class="meta-dot">•</span>
+                      <button type="button" id="avatar-reset-btn" class="btn-link text-muted">Reset</button>
                     </div>
                   </div>
                 </div>
 
-                <form id="profile-update-form">
-                  <div class="input-group">
-                    <label for="settings-fullname">Full Name</label>
-                    <input type="text" id="settings-fullname" placeholder="Your Full Name">
+                <!-- Editable Personal Information Form -->
+                <form id="profile-update-form" class="settings-compact-form">
+                  <div class="form-row">
+                    <div class="input-group">
+                      <label for="settings-fullname">Full Name</label>
+                      <input type="text" id="settings-fullname" placeholder="Your Full Name">
+                    </div>
+                    <div class="input-group">
+                      <label for="settings-email">Email Address</label>
+                      <input type="email" id="settings-email" placeholder="you@example.com">
+                    </div>
                   </div>
-                  <div class="input-group">
-                    <label for="settings-email">Email Address</label>
-                    <input type="email" id="settings-email" placeholder="you@example.com">
-                  </div>
-                  <button type="submit" class="btn btn-primary btn-block mb-4">Save Profile Changes</button>
+                  <button type="submit" class="btn btn-primary btn-sm mb-4">Save Profile Changes</button>
                 </form>
 
-                <div class="divider" style="margin: 20px 0;"></div>
-                <h4 style="margin-bottom: 12px; font-size: 0.9rem; color: var(--text-secondary); text-transform: uppercase;">Appearance</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                  <button type="button" id="theme-btn-light" class="btn btn-secondary">☀️ Light Theme</button>
-                  <button type="button" id="theme-btn-dark" class="btn btn-secondary">🌙 Dark Theme</button>
+                <div class="divider" style="margin: 18px 0;"></div>
+
+                <!-- Theme Appearance Segmented Switch -->
+                <div class="settings-appearance-row">
+                  <div>
+                    <span class="settings-sub-label">Appearance Theme</span>
+                    <p class="settings-sub-desc">Toggle between daytime light &amp; OLED dark glass</p>
+                  </div>
+                  <div class="segmented-theme-switch" role="group" aria-label="Theme mode">
+                    <button type="button" id="theme-btn-light" class="theme-segment-btn">☀️ Light</button>
+                    <button type="button" id="theme-btn-dark" class="theme-segment-btn active">🌙 Dark</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -704,8 +711,8 @@
             <!-- Guides & Support -->
             <div class="panel-card flex-double">
               <div class="card-header">
-                <h3>Guides & Documentation</h3>
-                <a href="../docs.html" target="_blank" class="btn btn-text">Open Full User Guide ↗</a>
+                <h3>Guides &amp; Support</h3>
+                <a href="../docs.html" target="_blank" class="btn btn-text">User Guide ↗</a>
               </div>
               <div class="card-body">
                 <div class="guides-settings-grid">
@@ -713,28 +720,28 @@
                     <span class="guide-card-icon">✨</span>
                     <div>
                       <h4>SMS Auto-Sync</h4>
-                      <p>Auto-log MoMo & bank alerts</p>
+                      <p>Auto-log MoMo &amp; bank alerts</p>
                     </div>
                   </a>
                   <a href="../docs.html#budgets" target="_blank" class="guide-setting-card">
                     <span class="guide-card-icon">📊</span>
                     <div>
                       <h4>Smart Budgets</h4>
-                      <p>Daily limits & 50/30/20 rule</p>
+                      <p>Daily limits &amp; 50/30/20 rule</p>
                     </div>
                   </a>
                   <a href="../docs.html#voice-ai" target="_blank" class="guide-setting-card">
                     <span class="guide-card-icon">🎙️</span>
                     <div>
-                      <h4>Voice & Gestures</h4>
-                      <p>Swipe actions & voice commands</p>
+                      <h4>Voice &amp; Gestures</h4>
+                      <p>Swipe actions &amp; voice commands</p>
                     </div>
                   </a>
                   <a href="../docs.html#profiles" target="_blank" class="guide-setting-card">
                     <span class="guide-card-icon">👥</span>
                     <div>
                       <h4>Multi-Profile</h4>
-                      <p>Switch accounts & KYC limits</p>
+                      <p>Switch accounts &amp; KYC limits</p>
                     </div>
                   </a>
                 </div>
@@ -781,10 +788,6 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
         <span>Wallets</span>
       </button>
-      <button type="button" class="mobile-tab-item" data-view="transactions">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-        <span>Ledger</span>
-      </button>
       <button type="button" class="mobile-tab-item" data-view="budgets">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
         <span>Budgets</span>
@@ -817,6 +820,12 @@
           <div class="input-group">
             <label for="txn-amount">Amount (GH₵)</label>
             <input type="number" id="txn-amount" step="0.01" min="0.01" placeholder="0.00" required>
+            <div class="quick-amount-chips" data-target="txn-amount">
+              <button type="button" class="amount-chip-btn" data-inc="10">+ ₵10</button>
+              <button type="button" class="amount-chip-btn" data-inc="20">+ ₵20</button>
+              <button type="button" class="amount-chip-btn" data-inc="50">+ ₵50</button>
+              <button type="button" class="amount-chip-btn" data-inc="100">+ ₵100</button>
+            </div>
           </div>
         </div>
 
@@ -897,7 +906,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <h3>Set Monthly Category Budget</h3>
-        <button class="btn-close" id="budget-modal-close-btn">&times;</button>
+        <button type="button" class="btn-close" id="budget-modal-close-btn">&times;</button>
       </div>
       <form id="budget-form">
         <div class="input-group">
@@ -917,6 +926,68 @@
     </div>
   </div>
 
-  <script src="app.js?v=2.0.2"></script>
+  <!-- ========================================== -->
+  <!-- 6. MODAL: EDIT TRANSACTION -->
+  <!-- ========================================== -->
+  <div id="edit-txn-modal" class="modal-wrapper">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Edit Transaction</h3>
+        <button type="button" class="btn-close" id="edit-txn-close-btn">&times;</button>
+      </div>
+      <form id="edit-txn-form">
+        <input type="hidden" id="edit-txn-id">
+        <div class="form-row">
+          <div class="input-group">
+            <label for="edit-txn-type">Transaction Type</label>
+            <select id="edit-txn-type" required>
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="edit-txn-amount">Amount (GH₵)</label>
+            <input type="number" id="edit-txn-amount" step="0.01" min="0.01" placeholder="0.00" required>
+            <div class="quick-amount-chips" data-target="edit-txn-amount">
+              <button type="button" class="amount-chip-btn" data-inc="10">+ ₵10</button>
+              <button type="button" class="amount-chip-btn" data-inc="20">+ ₵20</button>
+              <button type="button" class="amount-chip-btn" data-inc="50">+ ₵50</button>
+              <button type="button" class="amount-chip-btn" data-inc="100">+ ₵100</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="edit-txn-desc">Description</label>
+          <input type="text" id="edit-txn-desc" placeholder="e.g. Trotro fare, Waakye lunch, MTN airtime" required>
+        </div>
+
+        <div class="form-row">
+          <div class="input-group">
+            <label for="edit-txn-account">Account (Locked)</label>
+            <select id="edit-txn-account" disabled title="Account cannot be altered after creation"></select>
+          </div>
+          <div class="input-group">
+            <label for="edit-txn-category">Category</label>
+            <select id="edit-txn-category" required></select>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label for="edit-txn-date">Transaction Date</label>
+          <input type="date" id="edit-txn-date" required>
+        </div>
+
+        <div id="edit-txn-error" class="error-banner hidden"></div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="edit-txn-cancel-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js?v=2.0.3"></script>
 </body>
 </html>
