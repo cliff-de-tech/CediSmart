@@ -14,7 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useAuthStore } from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useThemeStore } from '../../stores/themeStore';
-import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, Sun, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, FileText, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones, Search, Mic } from 'lucide-react-native';
+import { User, Shield, Database, LogOut, Trash2, ChevronRight, Smartphone, Landmark, Award, Sun, SunMoon, Moon, Bell, ShieldCheck, Users, Plus, Wifi, WifiOff, RefreshCw, FileSpreadsheet, FileText, Info, X, Check, Bug, HelpCircle, MessageSquare, Headphones, Search, Mic, Sparkles, BookOpen, ExternalLink, PieChart } from 'lucide-react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -350,6 +350,27 @@ const SettingsScreen = ({ navigation, route }: any) => {
   const [feedbackType, setFeedbackType] = useState('feature_request'); // 'feature_request', 'suggestion', 'other'
   const [feedbackDescription, setFeedbackDescription] = useState('');
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+
+  // Guides & Web Documentation states
+  const guideSheetRef = useRef<BottomSheet>(null);
+  const [selectedGuideId, setSelectedGuideId] = useState<'sms' | 'budgets' | 'gestures' | 'profiles'>('sms');
+  const CEDISMART_DOCS_URL = process.env.EXPO_PUBLIC_DOCS_URL || 'https://cedismart.com/docs.html';
+
+  const openWebDocs = useCallback(async (sectionHash?: string) => {
+    Haptics.selectionAsync().catch(() => {});
+    const targetUrl = sectionHash ? `${CEDISMART_DOCS_URL}${sectionHash}` : CEDISMART_DOCS_URL;
+    try {
+      await WebBrowser.openBrowserAsync(targetUrl);
+    } catch (err) {
+      Alert.alert('CediSmart Documentation', `Visit ${targetUrl} in your browser to read the complete end-to-end user guide.`);
+    }
+  }, [CEDISMART_DOCS_URL]);
+
+  const openGuide = useCallback((id: 'sms' | 'budgets' | 'gestures' | 'profiles') => {
+    Haptics.selectionAsync().catch(() => {});
+    setSelectedGuideId(id);
+    guideSheetRef.current?.snapToIndex(0);
+  }, []);
 
 
   const queryClient = useQueryClient();
@@ -2240,6 +2261,54 @@ const SettingsScreen = ({ navigation, route }: any) => {
           </View>
           )}
 
+          {/* Guides Section */}
+          {matchesSearch('guides', 'guide', 'how to use', 'docs', 'documentation', 'tutorial', 'momo', 'sms', 'auto-logging', 'safe-to-spend', 'budgets', '50/30/20', 'gestures', 'swipe', 'voice', 'offline', 'profiles', 'business', 'kyc') && (
+          <View className="mt-4">
+            <Text className={`text-xs font-bold ${isDark ? 'text-gray-500' : 'text-gray-400'} uppercase tracking-widest mb-3 ml-1`}>Guides</Text>
+            <SettingsGroup>
+              <SettingItem
+                icon={Sparkles}
+                color="#10b981"
+                title="MoMo & Bank SMS Auto-Logging"
+                value="Auto-import MTN, Telecel & bank alerts"
+                onPress={() => openGuide('sms')}
+              />
+              <SettingItem
+                icon={PieChart}
+                color="#4c56af"
+                title="Safe-to-Spend & Smart Budgets"
+                value="How daily limits & 50/30/20 budgets work"
+                onPress={() => openGuide('budgets')}
+              />
+              <SettingItem
+                icon={Smartphone}
+                color={isDark ? '#4ade80' : '#0d631b'}
+                title="Gestures, Voice AI & Offline Mode"
+                value="Full-swipe delete, voice logging & sync"
+                onPress={() => openGuide('gestures')}
+              />
+              <SettingItem
+                icon={Users}
+                color="#d97706"
+                title="Personal vs. Business Profiles"
+                value="Manage multiple accounts & Ghana Card KYC"
+                onPress={() => openGuide('profiles')}
+              />
+              <SettingItem
+                icon={BookOpen}
+                color={isDark ? '#60a5fa' : '#2563eb'}
+                title="How to Use CediSmart (Full Guide)"
+                value="Read end-to-end documentation on web"
+                onPress={() => openWebDocs()}
+                rightElement={
+                  <ExternalLink size={18} color={isDark ? '#60a5fa' : '#2563eb'} />
+                }
+                isLast
+              />
+            </SettingsGroup>
+          </View>
+          )}
+
           {/* Support Section */}
           {matchesSearch('support', 'bug', 'report', 'ai', 'assistant', 'help', 'chat', 'feedback', 'review', 'suggest') && (
           <View className="mt-4">
@@ -3749,6 +3818,285 @@ const SettingsScreen = ({ navigation, route }: any) => {
               </TouchableOpacity>
             )}
           </View>
+        </BottomSheetScrollView>
+      </BottomSheet>
+
+      {/* Interactive Guide Detail Bottom Sheet */}
+      <BottomSheet
+        ref={guideSheetRef}
+        index={-1}
+        snapPoints={['76%', '92%']}
+        backdropComponent={renderBackdrop}
+        enablePanDownToClose
+        backgroundComponent={GlassSheetBackground}
+      >
+        <BottomSheetScrollView contentContainerStyle={{ paddingBottom: tabBarClearance + 40 }}>
+          {(() => {
+            const guidesMap = {
+              sms: {
+                title: 'MoMo & Bank SMS Auto-Logging',
+                subtitle: 'Zero-friction transaction tracking for MTN MoMo, Telecel Cash, AT Money & Ghanaian banks.',
+                color: '#10b981',
+                icon: Sparkles,
+                hash: '#sms-auto-sync',
+                ctaLabel: 'Try SMS Auto-Import',
+                onCta: () => {
+                  guideSheetRef.current?.close();
+                  setTimeout(() => navigation.navigate('AddTransaction'), 200);
+                },
+                steps: [
+                  {
+                    badge: '1',
+                    heading: 'Android Background Auto-Detection',
+                    body: 'On Android, CediSmart automatically detects incoming MoMo and bank SMS alerts and surfaces a 1-tap "Log Now" card right on your Home Dashboard.',
+                  },
+                  {
+                    badge: '2',
+                    heading: 'iPhone Paste-to-Log & Shortcuts',
+                    body: 'On iPhone, copy any MoMo or bank SMS alert, tap + Add Transaction, and select "Import MoMo SMS Alert"—or configure an iOS Shortcuts Automation to open CediSmart whenever a MobileMoney SMS arrives.',
+                  },
+                  {
+                    badge: '3',
+                    heading: 'AI Merchant, Fee & Category Parsing',
+                    body: 'CediSmart AI automatically extracts the exact amount, transaction direction (income vs. expense), merchant/reference, and maps it to the right wallet and category.',
+                  },
+                ],
+              },
+              budgets: {
+                title: 'Safe-to-Spend & Smart Budgets',
+                subtitle: 'Stay ahead of monthly category limits and know your exact daily spending allowance.',
+                color: '#4c56af',
+                icon: PieChart,
+                hash: '#budgets',
+                ctaLabel: 'Open Budgets Tab',
+                onCta: () => {
+                  guideSheetRef.current?.close();
+                  setTimeout(() => navigation.navigate('BudgetsTab'), 200);
+                },
+                steps: [
+                  {
+                    badge: '1',
+                    heading: 'Safe-to-Spend Today',
+                    body: 'Calculated live on your Home Dashboard as (Total Monthly Budget − Spent So Far) ÷ Remaining Days in Month, giving you a clear daily target in GH₵.',
+                  },
+                  {
+                    badge: '2',
+                    heading: '50/30/20 AI Budget Generator',
+                    body: 'In the Budgets tab, use the AI generator to automatically split your monthly income across 50% Needs, 30% Wants, and 20% Savings & Debt.',
+                  },
+                  {
+                    badge: '3',
+                    heading: 'Proactive Threshold Alerts',
+                    body: 'Customize your warning threshold (50%–100% under Settings → Notifications) to get notified before you overspend any category.',
+                  },
+                ],
+              },
+              gestures: {
+                title: 'Gestures, Voice AI & Offline Mode',
+                subtitle: 'Navigate at 120fps with Apple-style swipe gestures, hands-free voice AI, and offline resilience.',
+                color: isDark ? '#4ade80' : '#0d631b',
+                icon: Smartphone,
+                hash: '#voice-ai',
+                ctaLabel: 'Launch AI Voice & Chat Assistant',
+                onCta: () => {
+                  guideSheetRef.current?.close();
+                  setTimeout(() => setIsSupportModalVisible(true), 220);
+                },
+                steps: [
+                  {
+                    badge: '1',
+                    heading: 'Apple-Style Swipe Gestures',
+                    body: 'On any transaction card, short-swipe left to reveal Categorize & Delete actions, or full-swipe left all the way across the row to delete immediately.',
+                  },
+                  {
+                    badge: '2',
+                    heading: 'Hands-Free Voice AI (English, Pidgin & Twi)',
+                    body: 'Tap the Headphones icon on the Home Dashboard to speak naturally ("Log 50 cedis for fuel on MoMo" or "How is my food budget doing?") in English, Pidgin, or Twi.',
+                  },
+                  {
+                    badge: '3',
+                    heading: '100% Offline-First Logging',
+                    body: 'Log transactions anytime without mobile data. Items are saved securely to your local Offline Queue and sync automatically as soon as connectivity returns.',
+                  },
+                ],
+              },
+              profiles: {
+                title: 'Personal vs. Business Profiles',
+                subtitle: 'Separate personal and side-hustle finances on one device and unlock Tier 1 verification.',
+                color: '#d97706',
+                icon: Users,
+                hash: '#profiles',
+                ctaLabel: 'Open Profile Switcher',
+                onCta: () => {
+                  guideSheetRef.current?.close();
+                  setTimeout(() => switchSheetRef.current?.snapToIndex(0), 220);
+                },
+                steps: [
+                  {
+                    badge: '1',
+                    heading: 'Multi-Profile Switching',
+                    body: 'Tap "Switch Profile" inside the Profile card at the top of Settings to add a second account (e.g., your Business or Side-Hustle line) and switch with FaceID or PIN.',
+                  },
+                  {
+                    badge: '2',
+                    heading: 'Isolated Wallets, Budgets & Statements',
+                    body: 'Each profile keeps its own separate MoMo wallets, bank accounts, budgets, and branded PDF monthly statements.',
+                  },
+                  {
+                    badge: '3',
+                    heading: 'Ghana Card (Tier 1) KYC Verification',
+                    body: 'Open Profile → Identity Verification and enter your Ghana Card number (GHA-XXXXXXXXX-X) to unlock Tier 1 verified status.',
+                  },
+                ],
+              },
+            };
+
+            const activeGuide = guidesMap[selectedGuideId];
+            const GuideIcon = activeGuide.icon;
+
+            return (
+              <View className="px-6 py-4">
+                {/* Header */}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, marginRight: 12 }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: `${activeGuide.color}20`,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 12,
+                      }}
+                    >
+                      <GuideIcon size={20} color={activeGuide.color} />
+                    </View>
+                    <Text
+                      style={{
+                        flex: 1,
+                        color: isDark ? '#ffffff' : '#111827',
+                        fontSize: 19,
+                        fontWeight: '700',
+                        letterSpacing: -0.3,
+                      }}
+                      numberOfLines={2}
+                    >
+                      {activeGuide.title}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => guideSheetRef.current?.close()}>
+                    <Text className={`${isDark ? 'text-[#4ade80]' : 'text-primary'} font-bold text-base`}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text
+                  style={{
+                    color: isDark ? '#98989F' : '#6B7280',
+                    fontSize: 13.5,
+                    lineHeight: 19,
+                    marginBottom: 18,
+                  }}
+                >
+                  {activeGuide.subtitle}
+                </Text>
+
+                {/* Step-by-Step Cards */}
+                {activeGuide.steps.map((step) => (
+                  <View
+                    key={step.badge}
+                    style={{
+                      borderRadius: 18,
+                      borderWidth: 1,
+                      borderColor: isDark ? 'rgba(164, 243, 185, 0.14)' : 'rgba(0, 0, 0, 0.07)',
+                      backgroundColor: isDark ? 'rgba(20, 30, 24, 0.88)' : '#ffffff',
+                      padding: 16,
+                      marginBottom: 12,
+                      flexDirection: 'row',
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
+                        backgroundColor: `${activeGuide.color}22`,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 12,
+                        marginTop: 1,
+                      }}
+                    >
+                      <Text style={{ color: activeGuide.color, fontWeight: '800', fontSize: 13 }}>{step.badge}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          color: isDark ? '#ffffff' : '#111827',
+                          fontSize: 15,
+                          fontWeight: '700',
+                          marginBottom: 4,
+                        }}
+                      >
+                        {step.heading}
+                      </Text>
+                      <Text
+                        style={{
+                          color: isDark ? '#98989F' : '#6B7280',
+                          fontSize: 13.5,
+                          lineHeight: 19,
+                        }}
+                      >
+                        {step.body}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+
+                {/* Primary In-App Quick Action Button */}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={activeGuide.onCta}
+                  className="w-full py-4 rounded-2xl bg-primary items-center justify-center flex-row shadow-lg shadow-primary/25 mt-2"
+                >
+                  <Text className="text-white font-bold text-base mr-2">{activeGuide.ctaLabel}</Text>
+                  <ChevronRight size={18} color="#ffffff" />
+                </TouchableOpacity>
+
+                {/* Web Documentation Link Button */}
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => openWebDocs(activeGuide.hash)}
+                  style={{
+                    marginTop: 12,
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: isDark ? 'rgba(96, 165, 250, 0.30)' : 'rgba(37, 99, 235, 0.22)',
+                    backgroundColor: isDark ? 'rgba(37, 99, 235, 0.10)' : 'rgba(37, 99, 235, 0.06)',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BookOpen size={16} color={isDark ? '#60a5fa' : '#2563eb'} style={{ marginRight: 8 }} />
+                  <Text
+                    style={{
+                      color: isDark ? '#60a5fa' : '#2563eb',
+                      fontSize: 13.5,
+                      fontWeight: '700',
+                      marginRight: 6,
+                    }}
+                  >
+                    Read Full Documentation on CediSmart Web
+                  </Text>
+                  <ExternalLink size={14} color={isDark ? '#60a5fa' : '#2563eb'} />
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
         </BottomSheetScrollView>
       </BottomSheet>
 
