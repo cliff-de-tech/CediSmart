@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, KeyboardAvoidingView, Platform, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useMutation } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
@@ -225,11 +225,26 @@ const LoginScreen = ({ navigation }: any) => {
       console.error('[Login API] Error status:', err?.response?.status);
       console.error('[Login API] Error response:', err?.response?.data || err);
       console.error('[Login API] Requested URL:', err?.config?.baseURL + err?.config?.url);
-      const serverError = err?.response?.data?.error;
-      const errorMsg = typeof serverError === 'string' 
-        ? serverError 
-        : serverError?.message || 'Invalid credentials.';
-      setError(errorMsg);
+      
+      const status = err?.response?.status;
+      const isNetworkError =
+        err?.code === 'ECONNABORTED' ||
+        err?.message?.toLowerCase().includes('timeout') ||
+        err?.message?.toLowerCase().includes('network') ||
+        !err?.response;
+
+      if (isNetworkError) {
+        setError('Server is waking up (cold start). Please try again in a moment.');
+      } else if (status === 401) {
+        setError('Incorrect phone number or PIN. Tap "Forgot PIN?" to reset.');
+      } else {
+        const serverError = err?.response?.data?.error;
+        const errorMsg =
+          typeof serverError === 'string'
+            ? serverError
+            : serverError?.message || err?.response?.data?.detail || 'Incorrect phone number or PIN.';
+        setError(errorMsg);
+      }
       setPin('');
       shake();
     }
@@ -421,9 +436,10 @@ const LoginScreen = ({ navigation }: any) => {
 
                   <TouchableOpacity 
                     onPress={() => {
+                      const cleanPhone = phone ? (phone.startsWith('+233') ? phone : `+233${phone}`) : '';
                       setPin('');
                       setError('');
-                      navigation.navigate('ForgotPIN');
+                      navigation.navigate('ForgotPIN', { phone: cleanPhone });
                     }}
                     className="mt-1"
                   >
@@ -462,6 +478,17 @@ const LoginScreen = ({ navigation }: any) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Signing in Overlay */}
+      {loginMutation.isPending && (
+        <View className={`absolute top-0 left-0 right-0 bottom-0 w-full h-full ${isDark ? 'bg-dark-background/70' : 'bg-surface/50'} items-center justify-center z-50`}>
+          <GlassSurface variant="thick" elevated radius={28} style={{ padding: 36, alignItems: 'center' }}>
+            <ActivityIndicator size="large" color={isDark ? '#4ade80' : '#0d631b'} />
+            <Text className={`mt-4 font-headline font-bold text-lg ${isDark ? 'text-dark-on-surface' : 'text-on-surface'}`}>Signing in...</Text>
+            <Text className={`mt-1 font-body text-xs ${isDark ? 'text-dark-on-surface-variant' : 'text-on-surface-variant'}`}>Connecting securely</Text>
+          </GlassSurface>
+        </View>
+      )}
     </SafeAreaView>
   );
 };

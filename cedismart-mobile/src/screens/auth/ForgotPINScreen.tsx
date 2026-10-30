@@ -22,15 +22,19 @@ const normalizePhoneNumber = (phone: string): string => {
   return `+233${clean}`;
 };
 
-const ForgotPINScreen = ({ navigation }: any) => {
+const ForgotPINScreen = ({ route, navigation }: any) => {
   const theme = useThemeStore((state) => state.theme);
   const isDark = theme === 'dark';
   const { isLoaded, signIn, setActive } = useSignIn();
   const { userId, signOut } = useAuth();
 
+  const initialPhone = route?.params?.phone
+    ? route.params.phone.replace('+233', '').replace(/^0/, '')
+    : '';
+
   const [step, setStep] = useState<'phone' | 'otp' | 'pin'>('phone');
   const [supportVisible, setSupportVisible] = useState(false);
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(initialPhone);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(300);
   const [pinStep, setPinStep] = useState<'create' | 'confirm'>('create');
