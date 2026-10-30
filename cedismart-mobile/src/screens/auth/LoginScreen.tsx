@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { Edit2, Shield, Trash2 } from 'lucide-react-native';
 import PINPad from '../../components/shared/PINPad';
 import apiClient, { setActiveTokens } from '../../api/client';
@@ -161,6 +162,8 @@ const LoginScreen = ({ navigation }: any) => {
         }
       }
     })();
+    // Warm up backend early while user is on the login screen
+    apiClient.get('/auth/check-phone?phone=%2B233000000000').catch(() => {});
   }, []);
 
   const handlePress = (digit: string) => {
@@ -221,29 +224,42 @@ const LoginScreen = ({ navigation }: any) => {
       // Trigger local login to hydrate state
       login(user);
     },
-    onError: (err: any) => {
+    onError: async (err: any) => {
       console.error('[Login API] Error status:', err?.response?.status);
       console.error('[Login API] Error response:', err?.response?.data || err);
+      console.error('[Login API] Error code:', err?.code);
       console.error('[Login API] Requested URL:', err?.config?.baseURL + err?.config?.url);
       
-      const status = err?.response?.status;
-      const isNetworkError =
-        err?.code === 'ECONNABORTED' ||
-        err?.message?.toLowerCase().includes('timeout') ||
-        err?.message?.toLowerCase().includes('network') ||
-        !err?.response;
+      const netState = await NetInfo.fetch();
+      console.log('[Login API] Device NetInfo:', {
+        isConnected: netState.isConnected,
+        isInternetReachable: netState.isInternetReachable,
+        type: netState.type,
+      });
 
-      if (isNetworkError) {
-        setError('Server is waking up (cold start). Please try again in a moment.');
-      } else if (status === 401) {
-        setError('Incorrect phone number or PIN. Tap "Forgot PIN?" to reset.');
+      if (!netState.isConnected || netState.isInternetReachable === false) {
+        setError('No internet connection. Please verify your mobile data or Wi-Fi.');
       } else {
-        const serverError = err?.response?.data?.error;
-        const errorMsg =
-          typeof serverError === 'string'
-            ? serverError
-            : serverError?.message || err?.response?.data?.detail || 'Incorrect phone number or PIN.';
-        setError(errorMsg);
+        const status = err?.response?.status;
+        const isNetworkError =
+          err?.code === 'ECONNABORTED' ||
+          err?.code === 'ERR_NETWORK' ||
+          err?.message?.toLowerCase().includes('timeout') ||
+          err?.message?.toLowerCase().includes('network') ||
+          !err?.response;
+
+        if (status === 401) {
+          setError('Incorrect phone number or PIN. Tap "Forgot PIN?" to reset.');
+        } else if (isNetworkError) {
+          setError('Server connection timed out or waking up. Please try again in a moment.');
+        } else {
+          const serverError = err?.response?.data?.error;
+          const errorMsg =
+            typeof serverError === 'string'
+              ? serverError
+              : serverError?.message || err?.response?.data?.detail || 'Incorrect phone number or PIN.';
+          setError(errorMsg);
+        }
       }
       setPin('');
       shake();
