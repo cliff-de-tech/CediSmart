@@ -66,6 +66,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "postinstall": "node scripts/fix-expo-notifications.js",
     "test:voice": "node tests/voice.test.cjs",
     "start": "expo start",
     "android": "expo run:android",
