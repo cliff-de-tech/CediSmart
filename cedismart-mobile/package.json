@@ -73,5 +73,10 @@
     "ios": "expo run:ios",
     "web": "expo start --web"
   },
+  "expo": {
+    "install": {
+      "exclude": ["expo-modules-core"]
+    }
+  },
   "private": true
 }

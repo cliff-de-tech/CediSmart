@@ -44,6 +44,7 @@ import {
   useAudioStream,
   AudioStreamBuffer,
   requestRecordingPermissionsAsync,
+  getRecordingPermissionsAsync,
   setAudioModeAsync,
 } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -307,6 +308,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   const voiceStateRef = useRef(voiceState);
   const retryAudioRef = useRef<string | null>(null);
   const microphoneStopRef = useRef<Promise<void> | null>(null);
+  const isRequestingPermissionRef = useRef(false);
   mutedRef.current = isMuted;
   typingRef.current = isTypingInVoice || showAttachMenu;
   messagesRef.current = messages;
@@ -379,17 +381,31 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     const turn = turnRef.current;
     const start = async () => {
       try {
-        if (!microphonePermissionRef.current) {
-          const permission = await requestRecordingPermissionsAsync();
-          if (!isCurrentTurn(turn) || !canListen()) return;
-          microphonePermissionRef.current = permission.granted;
-          setPermissionDenied(!permission.granted);
-          if (!permission.granted) {
-            setVoiceError('Microphone access is off. Enable it in settings, or type your message.');
-            setVoiceState('idle');
-            return;
+        let granted = microphonePermissionRef.current;
+        if (!granted) {
+          const check = await getRecordingPermissionsAsync();
+          if (check.granted) {
+            granted = true;
+            microphonePermissionRef.current = true;
+            setPermissionDenied(false);
+          } else {
+            isRequestingPermissionRef.current = true;
+            try {
+              const permission = await requestRecordingPermissionsAsync();
+              granted = permission.granted;
+              microphonePermissionRef.current = permission.granted;
+              setPermissionDenied(!permission.granted);
+            } finally {
+              isRequestingPermissionRef.current = false;
+            }
           }
         }
+        if (!granted) {
+          setVoiceError('Microphone access is off. Enable it in settings, or type your message.');
+          setVoiceState('idle');
+          return;
+        }
+        if (!isCurrentTurn(turn) || !canListen()) return;
         await setAudioModeAsync({
           playsInSilentMode: true,
           allowsRecording: true,
@@ -447,15 +463,20 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
   // Do not leave a microphone or a delayed response running when the app is backgrounded.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state !== 'background' || !activeRef.current) return;
-      mutedRef.current = true;
-      setIsMuted(true);
-      ++turnRef.current;
-      requestRef.current?.abort();
-      isProcessingRef.current = false;
-      void voiceService.stop();
-      void stopMicrophone();
-      setVoiceState('idle');
+      if (isRequestingPermissionRef.current) return;
+      if (state === 'background' && activeRef.current) {
+        // App went to background: pause capture to conserve battery and privacy
+        // Note: Do NOT permanently set isMuted=true so the user's toggle state is preserved!
+        ++turnRef.current;
+        requestRef.current?.abort();
+        isProcessingRef.current = false;
+        void voiceService.stop();
+        void stopMicrophone();
+        setVoiceState('idle');
+      } else if (state === 'active' && activeRef.current && !mutedRef.current && !typingRef.current) {
+        // Returned to foreground while unmuted: resume listening
+        void startListeningLoop();
+      }
     });
     return () => subscription.remove();
   }, []);
@@ -498,19 +519,18 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     if (!visible) return;
     const watchdog = setInterval(() => {
       if (!captureActiveRef.current || !canListen() || microphoneStartingRef.current ||
-          Date.now() - lastBufferAtRef.current < 4000) return;
+          Date.now() - lastBufferAtRef.current < 8000) return;
       captureActiveRef.current = false;
-      console.warn('[VoiceSupport] Microphone stopped delivering audio');
+      console.warn('[VoiceSupport] Microphone idle or stopped delivering audio');
       void stopMicrophone().then(() => {
         if (!canListen()) return;
         if (microphoneRestartsRef.current++ < 2) {
           void startListeningLoop();
         } else {
           setVoiceState('idle');
-          setVoiceError('The microphone is not delivering audio. Check microphone access and close other apps using it.');
         }
       });
-    }, 1000);
+    }, 2000);
     return () => clearInterval(watchdog);
   }, [visible]);
 
@@ -1095,6 +1115,7 @@ export const VoiceSupportModal: React.FC<VoiceSupportModalProps> = ({
     const next = !mutedRef.current;
     mutedRef.current = next;
     setIsMuted(next);
+    setVoiceError(null);
     if (next) {
       void stopMicrophone();
       if (voiceStateRef.current === 'listening') setVoiceState('idle');

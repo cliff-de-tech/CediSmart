@@ -1724,19 +1724,45 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     setShowHistoryModal(true);
   }, []);
 
+  const handleSelectPersona = useCallback(async (p: VoicePersona) => {
+    setVoicePersona(p);
+    Haptics.selectionAsync().catch(() => {});
+    try {
+      await AsyncStorage.setItem('cedismart_voice_persona', p);
+    } catch {}
+  }, []);
+
+  // Keyboard auto-scroll listener for Android and iOS
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 120);
+      }
+    );
+    return () => {
+      showSub.remove();
+    };
+  }, []);
+
   const historySwipe = useMemo(() => PanResponder.create({
-    // Claim deliberate, single-finger left swipes without taking vertical scrolling.
+    // Claim deliberate, single-finger left swipes without getting captured by vertical scrolling.
     onMoveShouldSetPanResponderCapture: (_, gesture) =>
       !chatMutation.isPending &&
       gesture.numberActiveTouches === 1 &&
-      gesture.dx < -24 &&
-      Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+      gesture.dx < -18 &&
+      Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
     onPanResponderRelease: (_, gesture) => {
-      const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2;
-      const isLeftSwipe = gesture.dx < -72 || (gesture.dx < -24 && gesture.vx < -0.5);
-      if (!chatMutation.isPending && isHorizontal && isLeftSwipe) openHistory();
+      const isHorizontal = Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.2;
+      const isLeftSwipe = gesture.dx < -45 || (gesture.dx < -18 && gesture.vx < -0.3);
+      if (!chatMutation.isPending && isHorizontal && isLeftSwipe) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        openHistory();
+      }
     },
-    onPanResponderTerminationRequest: () => true,
+    onPanResponderTerminationRequest: () => false,
   }), [chatMutation.isPending, openHistory]);
 
   const renderActionBadgeLabel = (action: ActionTag) => {
@@ -1771,7 +1797,8 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     >
       <View style={[chatStyles.screen, { backgroundColor: colors.background }]}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
           style={chatStyles.screen}
         >
           <View style={{ paddingTop: insets.top, backgroundColor: colors.background }}>
@@ -1788,9 +1815,20 @@ export const SupportModal: React.FC<SupportModalProps> = ({
               </TouchableOpacity>
               <View style={chatStyles.headerIdentity}>
                 <Text style={[chatStyles.headerTitle, { color: colors.text }]} numberOfLines={1}>CediSmart AI</Text>
-                <Text style={[chatStyles.headerSubtitle, { color: colors.muted }]} numberOfLines={1}>
-                  {supportType === 'auth' ? 'Account assistant' : 'Your money, made clearer'}
-                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    const next: VoicePersona = voicePersona === 'akosua' ? 'kwame' : voicePersona === 'kwame' ? 'esi' : 'akosua';
+                    void handleSelectPersona(next);
+                  }}
+                  activeOpacity={0.7}
+                  style={[chatStyles.headerPersonaBadge, { backgroundColor: isDark ? 'rgba(74, 222, 128, 0.15)' : 'rgba(13, 99, 27, 0.1)' }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Current persona: ${VOICE_PERSONAS[voicePersona]?.name}, ${VOICE_PERSONAS[voicePersona]?.label}. Tap to change persona.`}
+                >
+                  <Text style={[chatStyles.headerPersonaText, { color: colors.accent }]}>
+                    🎭 {VOICE_PERSONAS[voicePersona]?.name || 'Akosua'} · {VOICE_PERSONAS[voicePersona]?.desc || 'Advisor'}
+                  </Text>
+                </TouchableOpacity>
               </View>
               <TouchableOpacity
                 onPress={handleNewChat}
@@ -2577,7 +2615,36 @@ export const SupportModal: React.FC<SupportModalProps> = ({
                   })}
                 </View>
 
-                {/* 3. Autonomous AI Modes & Controls */}
+                {/* 3. AI CFO Persona */}
+                <Text style={[chatStyles.sheetSectionLabel, { color: colors.muted, marginTop: 18 }]}>AI Advisor Persona</Text>
+                <View style={[chatStyles.segmentedPillContainer, { backgroundColor: isDark ? '#141a16' : '#f0f3f0', borderColor: colors.border }]}>
+                  {(['akosua', 'kwame', 'esi'] as VoicePersona[]).map((pKey) => {
+                    const isSelected = voicePersona === pKey;
+                    const p = VOICE_PERSONAS[pKey];
+                    return (
+                      <TouchableOpacity
+                        key={pKey}
+                        onPress={() => void handleSelectPersona(pKey)}
+                        style={[
+                          chatStyles.segmentedPillItem,
+                          isSelected && { backgroundColor: colors.accent, elevation: 1 },
+                        ]}
+                      >
+                        <Text style={[
+                          chatStyles.segmentedPillText,
+                          { color: isSelected ? '#ffffff' : colors.text, fontWeight: isSelected ? '700' : '500' }
+                        ]}>
+                          {p?.name || pKey}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 6, paddingHorizontal: 4 }}>
+                  {VOICE_PERSONAS[voicePersona]?.name}: {VOICE_PERSONAS[voicePersona]?.desc} AI Companion
+                </Text>
+
+                {/* 4. Autonomous AI Modes & Controls */}
                 <Text style={[chatStyles.sheetSectionLabel, { color: colors.muted, marginTop: 18 }]}>Autonomous CFO Controls</Text>
                 <View style={[chatStyles.toolGroupCard, { backgroundColor: isDark ? '#141a16' : '#f9fbf9', borderColor: colors.border }]}>
                   {/* Auto-Pilot Toggle */}
@@ -2867,6 +2934,19 @@ const chatStyles = StyleSheet.create({
   headerIdentity: { flex: 1, paddingLeft: 6, paddingRight: 4 },
   headerTitle: { fontSize: 18, fontWeight: '600', letterSpacing: -0.4 },
   headerSubtitle: { fontSize: 11, marginTop: 3 },
+  headerPersonaBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 3,
+  },
+  headerPersonaText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
   conversation: { flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24 },
   welcomeConversation: { justifyContent: 'center' },
   welcome: { paddingVertical: 24, alignItems: 'center' },
