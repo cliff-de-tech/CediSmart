@@ -35,6 +35,7 @@
     "expo-sharing": "~58.0.20",
     "expo-speech": "~58.0.3",
     "expo-status-bar": "~58.0.4",
+    "expo-updates": "~58.0.19",
     "expo-web-browser": "~58.0.6",
     "lucide-react-native": "^0.300.0",
     "nativewind": "^2.0.11",
@@ -75,7 +76,9 @@
   },
   "expo": {
     "install": {
-      "exclude": ["expo-modules-core"]
+      "exclude": [
+        "expo-modules-core"
+      ]
     }
   },
   "private": true

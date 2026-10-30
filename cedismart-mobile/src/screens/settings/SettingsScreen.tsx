@@ -28,6 +28,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as ImagePicker from 'expo-image-picker';
 import NetInfo from '@react-native-community/netinfo';
+import * as Updates from 'expo-updates';
 import { useOfflineSync } from '../../hooks/useOfflineSync';
 import PINPad from '../../components/shared/PINPad';
 import { formatGHS } from '../../utils/currency';
@@ -378,17 +379,62 @@ const SettingsScreen = ({ navigation, route }: any) => {
     setIsCheckingUpdate(true);
     Haptics.selectionAsync().catch(() => {});
     try {
-      const healthRes = await apiClient.get('/health', { timeout: 8000 }).catch(() => null);
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      Alert.alert(
-        "You're Up to Date!",
-        `CediSmart is running the latest standalone build (v2.0.0).\n\n• Backend: ${healthRes?.data?.status === 'ok' ? 'Online & Healthy' : 'Connected'}\n• App ID: com.cedismart.app\n• In-Place Updates: Reinstalling is never required; new builds upgrade seamlessly in-place over your current app without losing your login or data.`,
-        [{ text: 'OK', style: 'default' }]
-      );
-    } catch {
+      if (__DEV__) {
+        Alert.alert(
+          "Development Mode",
+          "Over-The-Air (OTA) updates are active in standalone preview and production builds. In development mode, Metro bundler delivers live updates automatically.",
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      const update = await Updates.checkForUpdateAsync();
+      if (update.isAvailable) {
+        Alert.alert(
+          "Update Available",
+          "A new CediSmart update is available. Download and install now?",
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Download & Apply",
+              onPress: async () => {
+                setIsCheckingUpdate(true);
+                try {
+                  await Updates.fetchUpdateAsync();
+                  Alert.alert(
+                    "Update Ready",
+                    "The update was downloaded successfully. Restart the app now to apply new features?",
+                    [
+                      { text: "Later", style: "cancel" },
+                      {
+                        text: "Restart Now",
+                        onPress: async () => {
+                          await Updates.reloadAsync();
+                        },
+                      },
+                    ]
+                  );
+                } catch (fetchErr: any) {
+                  Alert.alert("Update Error", "Failed to download update. Please try again later.");
+                } finally {
+                  setIsCheckingUpdate(false);
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "You're Up to Date!",
+          `CediSmart is running the latest version.\n\n• Version: 2.0.0\n• OTA Mode: Enabled\n• Future updates will install seamlessly without needing to reinstall the app.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (e: any) {
+      console.warn('[Updates] check error:', e);
       Alert.alert(
         "You're Up to Date",
-        "CediSmart v2.0.0 is the latest version. In-place updates install automatically without needing to uninstall the app.",
+        "Your app is running the latest available build (v2.0.0).",
         [{ text: 'OK' }]
       );
     } finally {

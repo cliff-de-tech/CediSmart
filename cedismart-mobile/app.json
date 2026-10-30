@@ -30,7 +30,14 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "updates": {
+      "url": "https://u.expo.dev/14b2db10-825e-47b9-8d49-108b773c6667"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "plugins": [
+      "expo-updates",
       [
         "@howincodes/expo-dynamic-app-icon",
         {
