@@ -47,7 +47,10 @@ class AccountUpdateRequest(BaseModel):
     reconcile_to_balance: Decimal | None = Field(
         None,
         ge=Decimal("0"),
-        description="Target current balance to reconcile the account to, accounting for existing transactions.",
+        description=(
+            "Target current balance to reconcile the account to, accounting for existing "
+            "transactions."
+        ),
     )
 
     @field_validator("opening_balance", "reconcile_to_balance")

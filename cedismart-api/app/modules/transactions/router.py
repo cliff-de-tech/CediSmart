@@ -315,7 +315,10 @@ async def sms_webhook(
         raise AppException(
             status_code=403,
             error_code="PREMIUM_REQUIRED",
-            message="Auto-syncing Mobile Money SMS transactions is a premium feature. Please upgrade to Pro.",
+            message=(
+                "Auto-syncing Mobile Money SMS transactions is a premium feature. Please upgrade "
+                "to Pro."
+            ),
         )
     tx = await service.parse_and_log_sms(
         user_id=user_id,

@@ -626,7 +626,11 @@ async def get_summary(
 async def parse_sms_with_gemini(
     sms_content: str, db: AsyncSession, user_id: uuid.UUID
 ) -> dict[str, Any]:
-    """Parse SMS transaction notifications using Gemini 2.5 Flash API or a fallback rules-based engine."""
+    (
+        "Parse SMS transaction notifications using Gemini 2.5 Flash API or a fallback "
+        "rules-based "
+        "engine."
+    )
     import httpx
 
     from app.core.config import settings
@@ -635,15 +639,22 @@ async def parse_sms_with_gemini(
     parsed_data = None
 
     if settings.GEMINI_API_KEY:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateCon"
+            "tent?key="
+            f"{settings.GEMINI_API_KEY}"
+        )
 
         prompt = (
-            "Analyze the following SMS transaction notification and extract transaction details. "
-            "Determine if it is an income (receive, cash-in, deposit) or expense (send, cash-out, payment, fee, withdrawal). "
-            "Identify the amount of the transaction. "
-            "Identify the counterparty / recipient / sender or activity as description. "
-            "Suggest a category (e.g. food, transfer, utilities, cash-out, leisure, or other). "
-            f'SMS: "{sms_text}"'
+            "Analyze the following SMS transaction notification and extract transaction "
+            "details. Determine if it is an income (receive, cash-in, deposit) or expense "
+            "(send, cash-out, payment, fee, withdrawal). Identify the amount of the "
+            "transaction. Identify the counterparty / recipient / sender or activity as "
+            "description. Suggest a category (e.g. food, transfer, utilities, cash-out, "
+            "leisure, or other). SMS: "
+            '"'
+            f"{sms_text}"
+            '"'
         )
 
         payload = {
@@ -688,10 +699,11 @@ async def parse_sms_with_gemini(
                     {
                         "role": "system",
                         "content": (
-                            "You are a Ghanaian mobile money and banking SMS parser. "
-                            "Analyze the SMS transaction notification and extract details into valid JSON with keys: "
-                            "amount (number), transaction_type ('income' or 'expense'), "
-                            "description (string), category_suggestion (string), notes (string)."
+                            "You are a Ghanaian mobile money and banking SMS parser. Analyze "
+                            "the SMS transaction notification and extract details into valid "
+                            "JSON with keys: amount (number), transaction_type ('income' or "
+                            "'expense'), description (string), category_suggestion (string), "
+                            "notes (string)."
                         ),
                     },
                     {
@@ -730,10 +742,11 @@ async def parse_sms_with_gemini(
                     {
                         "role": "system",
                         "content": (
-                            "You are a Ghanaian mobile money and banking SMS parser. "
-                            "Analyze the SMS transaction notification and extract details into valid JSON with keys: "
-                            "amount (number), transaction_type ('income' or 'expense'), "
-                            "description (string), category_suggestion (string), notes (string)."
+                            "You are a Ghanaian mobile money and banking SMS parser. Analyze "
+                            "the SMS transaction notification and extract details into valid "
+                            "JSON with keys: amount (number), transaction_type ('income' or "
+                            "'expense'), description (string), category_suggestion (string), "
+                            "notes (string)."
                         ),
                     },
                     {
@@ -802,7 +815,10 @@ async def parse_sms_with_gemini(
 
 
 def _parse_sms_fallback(sms_text: str) -> dict[str, Any]:
-    """Fallback rule-based regex parsing for common Ghana Mobile Money transaction SMS structures."""
+    (
+        "Fallback rule-based regex parsing for common Ghana Mobile Money transaction SMS "
+        "structures."
+    )
     import contextlib
     import re
 
@@ -923,7 +939,7 @@ async def parse_and_log_sms(
     # 2. Find the corresponding FinancialAccount
     stmt = select(FinancialAccount).where(
         FinancialAccount.user_id == user_id,
-        FinancialAccount.is_active == True,
+        FinancialAccount.is_active.is_(True),
         FinancialAccount.account_number == clean_phone,
     )
     result = await db.execute(stmt)
@@ -944,7 +960,7 @@ async def parse_and_log_sms(
         if provider_hint:
             stmt = select(FinancialAccount).where(
                 FinancialAccount.user_id == user_id,
-                FinancialAccount.is_active == True,
+                FinancialAccount.is_active.is_(True),
                 FinancialAccount.account_type == "mobile_money",
                 FinancialAccount.provider == provider_hint,
             )
@@ -955,7 +971,15 @@ async def parse_and_log_sms(
         raise AppException(
             status_code=404,
             error_code="ACCOUNT_NOT_FOUND",
-            message=f"No linked Mobile Money account found for provider matching '{sender}' and phone number '{phone}'.",
+            message=(
+                "No linked Mobile Money account found for provider matching "
+                "'"
+                f"{sender}"
+                "' and phone number "
+                "'"
+                f"{phone}"
+                "'."
+            ),
         )
 
     # 3. Parse SMS (using regex first, falling back to Gemini)
@@ -979,7 +1003,7 @@ async def parse_and_log_sms(
 
         # Check system or user category
         cat_stmt = select(Category).where(
-            or_(Category.user_id == user_id, Category.is_system == True),
+            or_(Category.user_id == user_id, Category.is_system.is_(True)),
             Category.category_type == parsed["transaction_type"],
             func.lower(Category.name) == category_name.lower(),
         )
@@ -989,7 +1013,7 @@ async def parse_and_log_sms(
         if not cat_obj:
             # Fallback to any category for this type
             cat_stmt = select(Category).where(
-                or_(Category.user_id == user_id, Category.is_system == True),
+                or_(Category.user_id == user_id, Category.is_system.is_(True)),
                 Category.category_type == parsed["transaction_type"],
             )
             cat_res = await db.execute(cat_stmt)
@@ -1042,7 +1066,7 @@ async def parse_and_log_sms(
     # Save Fee Transaction (if fee > 0 and transaction is an expense)
     if parsed["fee"] > 0 and parsed["transaction_type"] == "expense":
         stmt_fee = select(Category).where(
-            or_(Category.user_id == user_id, Category.is_system == True),
+            or_(Category.user_id == user_id, Category.is_system.is_(True)),
             Category.category_type == "expense",
             func.lower(Category.name) == "mobile money fees",
         )

@@ -424,7 +424,7 @@ async def check_and_trigger_budget_alerts(
     progress_dict = await _compute_budget_progress(user_id, year, month, db, budget_ids=[budget.id])
     spent = progress_dict.get(budget.id, Decimal("0"))
 
-    percentage = (float(spent) / budget.amount) * 100
+    percentage = (float(spent) / float(budget.amount)) * 100
     alert_key = f"budget_alert_state:{user_id}:{budget.id}:{year}:{month}"
 
     current_state_bytes = await redis.get(alert_key)
@@ -439,12 +439,33 @@ async def check_and_trigger_budget_alerts(
         if current_state not in ("warning", "exceeded"):
             # Trigger 80% warning
             title = f"⚠️ Budget Warning: {category_name}"
-            body = f"You've spent ₵{spent:,.2f} of your ₵{budget.amount:,.2f} budget ({percentage:.1f}%)."
+            body = (
+                "You've spent "
+                "₵"
+                f"{spent:,.2f}"
+                " of your "
+                "₵"
+                f"{budget.amount:,.2f}"
+                " budget "
+                "("
+                f"{percentage:.1f}"
+                "%)."
+            )
             await send_push_notification(user_id, title, body, {"screen": "Budgets"}, db)
             await redis.set(alert_key, "warning", ex=2592000)  # Expire in 30 days
     elif percentage >= 100 and current_state != "exceeded":
         # Trigger 100% exceeded warning
         title = f"🚨 Budget Exceeded: {category_name}"
-        body = f"You just exceeded your budget of ₵{budget.amount:,.2f}! Total spent: ₵{spent:,.2f} ({percentage:.1f}%)."
+        body = (
+            "You just exceeded your budget of "
+            "₵"
+            f"{budget.amount:,.2f}"
+            "! Total spent: "
+            "₵"
+            f"{spent:,.2f}"
+            " ("
+            f"{percentage:.1f}"
+            "%)."
+        )
         await send_push_notification(user_id, title, body, {"screen": "Budgets"}, db)
         await redis.set(alert_key, "exceeded", ex=2592000)  # Expire in 30 days

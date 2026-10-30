@@ -45,27 +45,17 @@ include = ["app*"]
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-exclude = [
-    "alembic",
-    ".venv",
-    ".git",
-    "__pycache__",
-]
+# Applied migration revisions are immutable; validate them by running Alembic in CI.
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TCH"]
 ignore = [
-    "E501",     # Line too long (managed by black)
-    "E712",     # Comparison to True/False in SQLAlchemy filters
     "A003",     # Class attribute shadowing builtin
     "A002",     # Function argument shadowing builtin (e.g., 'type' in FastAPI query params)
     "N818",     # AppException naming is intentional
     "B008",     # FastAPI Query/Depends in function defaults is the correct pattern
-    "B905",     # zip() strict parameter requirement
     "TC001",    # Type-checking imports - SQLAlchemy models need runtime imports for relationships
-    "TC002",
-    "TC003",
-    "TC006",
 ]
 
 [tool.ruff.lint.isort]
@@ -74,12 +64,7 @@ known-first-party = ["app"]
 [tool.black]
 target-version = ["py312"]
 line-length = 100
-extend-exclude = '''
-/(
-    alembic
-  | \.venv.*
-)/
-'''
+extend-exclude = "/alembic/versions/"
 
 [tool.mypy]
 python_version = "3.12"
@@ -97,9 +82,11 @@ testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
+# SQLAlchemy async operations switch through greenlets; trace resumed coroutines too.
+concurrency = ["greenlet", "thread"]
 source = ["app"]
 omit = ["app/core/config.py"]
 
 [tool.coverage.report]
-fail_under = 50
+fail_under = 80
 show_missing = true

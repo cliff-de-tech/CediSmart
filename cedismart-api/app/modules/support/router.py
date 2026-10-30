@@ -36,7 +36,11 @@ DBSession = Annotated[AsyncSession, Depends(get_db)]
 )
 @limiter.limit("30/15minutes")
 async def chat_with_support(request: Request, body: ChatRequest, db: DBSession) -> ChatResponse:
-    """Generate a response using Gemini (with ChatGPT fallback), live X-Ray telemetry, SMS paste rescue, and vision."""
+    (
+        "Generate a response using Gemini (with ChatGPT fallback), live X-Ray telemetry, SMS "
+        "paste rescue, and "
+        "vision."
+    )
     extra_kwargs: dict[str, Any] = {}
     if body.phone is not None:
         extra_kwargs["phone"] = body.phone
@@ -138,7 +142,10 @@ async def synthesize_voice(
 async def escalate_support_issue(
     request: Request, body: EscalateRequest, db: DBSession
 ) -> EscalateResponse:
-    """Save ticket locally, escalate to GitHub (triggering ChatGPT Code Agent), and alert Discord webhook."""
+    (
+        "Save ticket locally, escalate to GitHub (triggering ChatGPT Code Agent), and alert "
+        "Discord webhook."
+    )
     res = await SupportService.escalate_ticket(
         db=db,
         phone=body.phone,
@@ -177,7 +184,10 @@ async def submit_feedback(
     user_id: CurrentUser,
     db: DBSession,
 ) -> FeedbackResponse:
-    """Resolve current user, open a GitHub issue for the ChatGPT Code Agent, and forward to Discord."""
+    (
+        "Resolve current user, open a GitHub issue for the ChatGPT Code Agent, and forward to "
+        "Discord."
+    )
     from sqlalchemy import select
 
     from app.modules.auth.models import User
