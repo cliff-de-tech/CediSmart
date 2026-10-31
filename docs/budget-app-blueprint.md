@@ -285,15 +285,15 @@ Financial applications require ACID compliance. This is not optional. Your datab
 
 | Service | Provider | Monthly Cost | Purpose |
 |---|---|---|---|
-| Backend API | Railway.app (Starter) | $5–10 | FastAPI app container |
-| PostgreSQL | Railway.app managed | $5 (or free tier) | Primary database |
-| Redis | Railway.app | $5 | Cache & sessions |
+| Backend API | Render | TBD | FastAPI app container (Docker) |
+| PostgreSQL | Neon | TBD | Primary database |
+| Redis | Upstash | TBD | Cache & sessions |
 | File Storage | Cloudflare R2 | ~$0 | Profile pics, exports |
 | CDN / DDoS | Cloudflare (free) | $0 | Always put Cloudflare in front |
 | SMS OTP | Termii (Ghana-native) | Pay-per-use ~$0.01/SMS | OTP delivery |
 | Mobile Builds | Expo EAS (free tier) | $0 | iOS/Android builds |
 | Domain | Namecheap | ~$10/year | — |
-| **Total** | | **~$15–20/month** | — |
+| **Total** | | **TBD (update from actual Render, Neon and Upstash bills)** | — |
 
 **Upgrade path:** When you have 500+ active users, move to DigitalOcean App Platform or a small VPS ($12–24/month droplet).
 
@@ -563,12 +563,12 @@ CREATE INDEX idx_budgets_user_period        ON budgets(user_id, budget_year, bud
 - `pydantic-settings` for typed config from environment variables
 - `.env.example` committed (never `.env`)
 - Separate configs: development, testing, production
-- Secrets in Railway environment variables — never in code or Git
+- Secrets in Render environment variables — never in code or Git
 
 **Database Safety**
 - All migrations via Alembic — never `ALTER TABLE` by hand in production
 - Migration review is mandatory before every production deploy
-- Automated daily backups (Railway Postgres does this by default)
+- Automated backups via the managed database provider (Neon) — confirm the retention window for your plan
 - Never expose database port to public internet
 
 **API Security Checklist**
@@ -645,7 +645,7 @@ CREATE INDEX idx_budgets_user_period        ON budgets(user_id, budget_year, bud
 - [ ] Write the data model (schemas on paper first, then SQL)
 - [ ] Define all API endpoints (this document as source)
 - [ ] Set up GitHub repository with branch protection rules
-- [ ] Set up Railway account, provision Postgres + Redis
+- [ ] Set up Render account (API), Neon (Postgres) and Upstash (Redis)
 - [ ] Write ADR-001: Tech stack decisions
 - [ ] Create Figma/Excalidraw wireframes for MVP screens (Dashboard, Transactions, Add Transaction, Budgets, Reports)
 - [ ] Document all system categories (seeder data)
@@ -662,7 +662,7 @@ CREATE INDEX idx_budgets_user_period        ON budgets(user_id, budget_year, bud
 - [ ] Budgets module — **Prompt 12**
 - [ ] Database seeder — **Prompt 8**
 - [ ] CI/CD pipeline — **Prompt 9**
-- **Deliverable:** Fully tested, documented REST API running on Railway
+- **Deliverable:** Fully tested, documented REST API running on Render
 
 ### Phase 3: Frontend Core (Week 7–10)
 - [ ] Expo project setup + navigation + API client — **Prompt 6**
@@ -696,7 +696,7 @@ CREATE INDEX idx_budgets_user_period        ON budgets(user_id, budget_year, bud
 ### Phase 6: Deployment (Week 15–16)
 - [ ] EAS Build configuration — **Prompt 22**
 - [ ] Production migration runbook (manual — see Part 11)
-- [ ] Production environment variables on Railway
+- [ ] Production environment variables on Render
 - [ ] Alembic migrations run on production database
 - [ ] Cloudflare reverse proxy with SSL
 - [ ] TestFlight + Google Play Internal Testing
@@ -1078,7 +1078,7 @@ Income categories to seed:
 
 Generate: scripts/seed_categories.py
 Include a __main__ block that runs asyncio.run(seed()).
-After generating, explain how to run this in a Railway deploy hook.
+After generating, explain how to run this from the container start script (start.sh).
 
 After generating, check your own code for the following vulnerabilities
 and list findings with severity (Critical / Medium / Low):
