@@ -140,7 +140,7 @@ CediSmart uses a **Modular Monolith** — a single deployable unit with enforced
               ┌──────────────┼──────────────┐
               ▼              ▼              ▼
          PostgreSQL        Redis          Clerk
-                                    (Auth API)
+         (Neon)           (Upstash)     (Auth API)
 ```
 
 ### API Surface
