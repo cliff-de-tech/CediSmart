@@ -57,7 +57,7 @@ piece of code you generate. Write code that a senior engineer would be proud to 
 ### Frontend (Mobile)
 | Layer | Technology |
 |---|---|
-| Framework | React Native (Expo SDK 54, Managed Workflow) |
+| Framework | React Native (Expo SDK 58, Managed Workflow) |
 | Language | TypeScript (strict mode — zero `any` tolerance) |
 | Navigation | React Navigation v6 (Native Stack) |
 | Server State | TanStack Query v5 (React Query) |
@@ -72,9 +72,9 @@ piece of code you generate. Write code that a senior engineer would be proud to 
 ### Infrastructure
 | Service | Provider |
 |---|---|
-| App Hosting | Railway.app |
-| Database | Railway managed PostgreSQL |
-| Cache | Railway managed Redis |
+| App Hosting | Render |
+| Database | Neon (PostgreSQL) |
+| Cache | Upstash (Redis) |
 | CDN / Proxy | Cloudflare (always in front) |
 | File Storage | Cloudflare R2 |
 | Mobile Builds | Expo EAS |
@@ -143,7 +143,7 @@ Violating them is a **Critical severity** issue.
 - **NEVER use `random.randint()` for OTP generation** — use `secrets.randbelow()`
 - **NEVER compare OTPs with `==`** — use `hmac.compare_digest()` (timing attack prevention)
 - **NEVER use HS256 for JWT** — RS256 (asymmetric) only
-- **NEVER put secrets in code or Git** — Railway env vars or `.env` (gitignored)
+- **NEVER put secrets in code or Git** — Render env vars or `.env` (gitignored)
 - **NEVER expose a 403 where a 404 should be** — ownership errors return 404 to prevent
   resource enumeration
 - **NEVER trust user input without Pydantic validation** at the API boundary

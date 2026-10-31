@@ -8,7 +8,7 @@
 ![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
-![React Native](https://img.shields.io/badge/React%20Native-0.81.5-61dafb)
+![React Native](https://img.shields.io/badge/React%20Native-0.88.0-61dafb)
 ![License](https://img.shields.io/badge/license-Proprietary-red)
 
 **📚 Documentation:**
@@ -24,7 +24,7 @@
 | **Backend Engineer** | [API README](./cedismart-api/README.md) — Full setup, architecture, testing |
 | **Mobile Developer** | [Mobile README](./cedismart-mobile/README.md) — Expo setup, navigation, offline sync |
 | **Frontend/Web Dev** | [Web README](./cedismart-web/README.md) — HTML/CSS/JS setup, API integration |
-| **DevOps/Deployment** | [API README § Deployment](./cedismart-api/README.md#deployment) — Railway, Docker, CI/CD |
+| **DevOps/Deployment** | [API README § Deployment](./cedismart-api/README.md#deployment) — Render, Docker, CI/CD |
 | **Product Manager** | [Budget Blueprint](./docs/budget-app-blueprint.md) — Features, roadmap, design |
 | **Compliance/Legal** | [Docs README](./docs/README.md) — Privacy, terms, regulations |
 
@@ -112,6 +112,7 @@ The backend is **fully implemented and tested**. 31 endpoints across 7 modules, 
 | Cache | Redis 7 | OTP storage (5-min TTL), JWT revocation, report caching |
 | Auth | RS256 JWT + bcrypt | Asymmetric signing, per-token revocation via `jti` claims |
 | Auth Verification | Clerk SDK / API | Phone verification & SMS OTP offloaded securely to Clerk |
+| Payments | Paystack | Localized Mobile Money billing for premium upgrades (transaction init + webhook) |
 | Rate Limiting | slowapi | Auth endpoints protected at 3–5 req/15min per IP |
 | Migrations | Alembic | Schema history is immutable — no direct DB edits, ever |
 | Config | pydantic-settings | Fully typed environment variables — no `os.getenv()` scattered in code |
@@ -140,7 +141,7 @@ CediSmart uses a **Modular Monolith** — a single deployable unit with enforced
               ┌──────────────┼──────────────┐
               ▼              ▼              ▼
          PostgreSQL        Redis          Clerk
-         (Railway)        (Railway)     (Auth API)
+         (Neon)           (Upstash)     (Auth API)
 ```
 
 ### API Surface
@@ -187,6 +188,10 @@ All endpoints versioned under `/api/v1/`. Every response uses a consistent error
 | POST | `/support/escalate` | Customer problem reporting & GitHub auto-PR issue creation |
 | GET | `/support/ticket-status/{issue_number}` | Real-time 4-stage ticket resolution tracking |
 | POST | `/support/feedback` | In-app user feedback dispatch to Discord |
+| POST | `/billing/start-trial` | Start the 7-day free trial of CediSmart Pro |
+| POST | `/billing/cancel` | Cancel subscription or opt out of the free trial |
+| POST | `/billing/initialize` | Initialize a Paystack transaction for premium upgrade |
+| POST | `/billing/paystack-webhook` | Handle Paystack billing webhook events |
 
 ### Key Engineering Decisions
 
@@ -259,14 +264,14 @@ Three GitHub Actions workflows:
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `backend-ci.yml` | Push / PR to `main` | Lint → type-check → bandit → pytest (Postgres + Redis services) |
-| `backend-deploy.yml` | Push to `main` (CI passes) | Railway deploy → health check → Slack alert on failure |
+| `backend-deploy.yml` | Push to `main` (CI passes) | Optional Railway deploy (skipped when no token is set; production runs on Render) → health check → Slack alert on failure |
 | `mobile-ci.yml` | Push to `mobile/**` | TypeScript check → ESLint (zero warnings) |
 
 ---
 
 ## Mobile App — Complete
 
-React Native (Expo SDK 54, Managed Workflow) with TypeScript strict mode.
+React Native (Expo SDK 58, Managed Workflow) with TypeScript strict mode.
 
 > 📱 **See [Mobile README](./cedismart-mobile/README.md) for full setup instructions.**
 
