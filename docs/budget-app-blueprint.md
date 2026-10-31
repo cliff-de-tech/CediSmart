@@ -1123,7 +1123,7 @@ Jobs:
 Backend CD (trigger: push to main only):
 
 File: .github/workflows/backend-deploy.yml
-1. Deploy to Railway using railwayapp/railway-github-action
+1. Deploy to Render (Render auto-deploys on new commits)
 2. After deploy: run health check against production URL
 3. If health check fails: post Slack notification (webhook from secret)
 
@@ -1143,7 +1143,7 @@ After generating, check your own code for the following vulnerabilities
 and list findings with severity (Critical / Medium / Low):
 - Are any secrets referenced in workflow files that are not in GitHub Secrets?
 - Does the test job use a real DATABASE_URL that could point to production?
-- Is the Railway deploy step gated on the test job passing?
+- Is the production deploy gated on the test job passing?
 - Could the Slack webhook URL be accidentally logged in workflow output?
 ```
 
@@ -1889,7 +1889,7 @@ and list findings with severity (Critical / Medium / Low):
 Write a Locust load test script to simulate 100 concurrent users doing realistic
 daily usage of a budget management API.
 
-Target: Railway production URL (configurable via --host flag)
+Target: Render production URL (configurable via --host flag)
 
 User behaviour (one Locust User class):
 
@@ -1927,7 +1927,7 @@ Custom stats listener — report thresholds:
 
 Generate: tests/load/locustfile.py
 Include as comments:
-locust -f tests/load/locustfile.py --host https://your-api.railway.app \
+locust -f tests/load/locustfile.py --host https://your-api.onrender.com \
   --users 100 --spawn-rate 10
 
 After generating, check your own code for the following vulnerabilities
@@ -1965,7 +1965,7 @@ Generate the following files:
      android: { buildType: "apk" }      # Direct install for testing
      ios: { simulator: false }           # Real device via TestFlight
      env:
-       EXPO_PUBLIC_API_URL: "https://cedismart-api.railway.app/api/v1"
+       EXPO_PUBLIC_API_URL: "https://cedismart-api.onrender.com/api/v1"
        EXPO_PUBLIC_SENTRY_DSN: ""        # Empty for preview
        EXPO_PUBLIC_ENV: "preview"
    production:
@@ -1973,7 +1973,7 @@ Generate the following files:
      android: { buildType: "app-bundle" }  # AAB required for Play Store
      ios: {}
      env:
-       EXPO_PUBLIC_API_URL: "https://cedismart-api.railway.app/api/v1"
+       EXPO_PUBLIC_API_URL: "https://cedismart-api.onrender.com/api/v1"
        EXPO_PUBLIC_SENTRY_DSN: "set-in-eas-secrets"
        EXPO_PUBLIC_ENV: "production"
 
@@ -2062,10 +2062,10 @@ Write a `DEPLOY.md` file in your repository root. This is a manual checklist you
 - [ ] Run `alembic upgrade head` on a staging DB copy first
 - [ ] Verify the app starts cleanly against the migrated staging DB
 - [ ] Review all migration files for destructive operations (DROP COLUMN, type changes)
-- [ ] Confirm all new environment variables are set in Railway production
+- [ ] Confirm all new environment variables are set in Render production
 
 ## Deploy
-- [ ] Set Railway app to maintenance mode (return 503 from /health temporarily)
+- [ ] Set the Render service to maintenance mode (return 503 from /health temporarily)
 - [ ] Run `alembic upgrade head` on production DB
 - [ ] Deploy new backend container via GitHub push to main
 - [ ] Verify /health returns 200 within 2 minutes of deploy
@@ -2074,8 +2074,8 @@ Write a `DEPLOY.md` file in your repository root. This is a manual checklist you
 - [ ] Remove maintenance mode
 - [ ] Smoke test: register → login → add transaction → view dashboard → check reports
 - [ ] Check Sentry for any new error spikes in the first 15 minutes
-- [ ] Check Railway metrics for abnormal CPU or memory usage
-- [ ] If anything looks wrong: Railway supports one-click rollback — use it immediately
+- [ ] Check Render metrics for abnormal CPU or memory usage
+- [ ] If anything looks wrong: Render lets you roll back to a previous deploy from the dashboard — use it immediately
 
 ## Rollback Trigger Conditions
 Roll back immediately if any of these occur within 30 minutes of deploy:
