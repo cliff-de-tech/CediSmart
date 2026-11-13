@@ -42,7 +42,7 @@ CediSmart helps users track spending, manage budgets, and take control of their 
 | **Auth**           | JWT (RS256) + bcrypt PIN hashing                |
 | **Rate Limiting**  | slowapi                                         |
 | **Auth Verification** | Clerk SDK/API                                  |
-| **Hosting**        | Railway.app                                     |
+| **Hosting**        | Render (Docker)                                 |
 
 ---
 
@@ -353,19 +353,20 @@ These rules are **non-negotiable** — they protect real users' money.
 
 ## Deployment
 
-CediSmart is deployed on **Railway.app** with:
+CediSmart is deployed on **Render** with:
 
-- **PostgreSQL** — Railway managed instance
-- **Redis** — Railway managed instance
+- **API** — Render web service, built from the `Dockerfile`
+- **PostgreSQL** — Neon
+- **Redis** — Upstash
 - **Cloudflare** — CDN/proxy in front of all traffic
 - **Expo EAS** — Mobile app builds (React Native)
 
-### Railway Setup
+### Render Setup
 
 1. Connect your GitHub repository
 2. Set all environment variables from `.env.example`
-3. Railway auto-detects the `Dockerfile` and builds
-4. Run `alembic upgrade head` via Railway's run command
+3. Render builds the service from the `Dockerfile`
+4. Render auto-deploys on new commits. Migrations run automatically on every start: `start.sh` runs `alembic upgrade head`, seeds the system categories, then starts the server
 
 ---
 
